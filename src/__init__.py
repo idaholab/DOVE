@@ -1,11 +1,13 @@
 import importlib
+import os
 import sys
 
-from ._utils import get_raven_loc
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
+import DOVE.src._utils as dutils
 
 if importlib.util.find_spec("ravenframework") is None:
-  ravenframework_loc = get_raven_loc()
-  sys.path.append(ravenframework_loc)
+  sys.path.append(dutils.get_raven_loc())
 
 from .Base import Base
 from .Components import Component

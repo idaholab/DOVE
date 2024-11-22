@@ -2,12 +2,20 @@
 
 # This script prepares for running commands from the coverage package
 
-SCRIPT_DIRNAME=`dirname $0`
-DOVE_DIR=`(cd $SCRIPT_DIRNAME/..; pwd)`
-echo $DOVE_DIR
-cd $DOVE_DIR
+if [[ `pwd` != *"DOVE" ]]
+then
+    echo "The initialize_coverage.sh script MUST be run from the DOVE directory. Please try again."
+    exit
+fi
 RAVEN_DIR=`python -c 'from src._utils import get_raven_loc; print(get_raven_loc())'`
+# If RAVEN directory has been added to PYTHONPATH, this confuses get_raven_loc
+if [[ "$RAVEN_DIR" == *"ravenframework" ]]  # get_raven_loc might return ravenframework, not raven
+then
+    RAVEN_DIR=`(cd $RAVEN_DIR/..; pwd)`  # Take parent directory, which is raven directory, instead
+fi
+
 source $RAVEN_DIR/scripts/establish_conda_env.sh --quiet --load
+
 RAVEN_LIBS_PATH=`conda env list | awk -v rln="$RAVEN_LIBS_NAME" '$0 ~ rln {print $NF}'`
 BUILD_DIR=${BUILD_DIR:=$RAVEN_LIBS_PATH/build}
 INSTALL_DIR=${INSTALL_DIR:=$RAVEN_LIBS_PATH}
@@ -22,7 +30,12 @@ update_python_path ()
 {
     if ls -d $INSTALL_DIR/lib/python*
     then
-        export PYTHONPATH=`ls -d $INSTALL_DIR/lib/python*/site-packages/`:"$ORIGPYTHONPATH"
+        NEWPYTHONPATH="`ls -d $INSTALL_DIR/lib/python*/site-packages/`"
+        if [[ "$ORIGPYTHONPATH" != "" && $NEWPYTHONPATH != "" ]]
+        then
+            NEWPYTHONPATH="$NEWPYTHONPATH:"
+        fi
+        export PYTHONPATH="$NEWPYTHONPATH$ORIGPYTHONPATH"
     fi
 }
 

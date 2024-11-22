@@ -7,8 +7,8 @@
 #   "coverage report --format=total" directly in the yaml does not work
 
 SCRIPT_DIRNAME=`dirname $0`
-DOVE_DIR=`(cd $SCRIPT_DIRNAME/..; pwd)`
-cd $DOVE_DIR
+DOVE_LOC=`(cd $SCRIPT_DIRNAME/..; pwd)`
+cd $DOVE_LOC
 
 source coverage_scripts/initialize_coverage.sh > /dev/null 2>&1
 

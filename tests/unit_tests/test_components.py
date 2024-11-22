@@ -1,3 +1,5 @@
+import __init__  # Running __init__ here enables importing from DOVE and RAVEN
+
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 
