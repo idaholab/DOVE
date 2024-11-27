@@ -15,7 +15,7 @@ jobs:
       - run: python3 ../raven/scripts/install_plugins.py -s ${{ github.workspace }}
       - run: >
           WD=`(cd ../../.. && pwd)` && export RAVEN_LIBS_NAME="raven_libs_"`basename $WD` &&
-          CONDA_LOC=`which conda` && CDEFS_LOC=`cd $CONDA_LOC/../.. && pwd`"/etc/profile.d/conda.sh" &&
+          CONDA_LOC=`which conda` && CDEFS_LOC=`dirname dirname $CONDA_LOC`"/etc/profile.d/conda.sh" &&
           ../raven/scripts/establish_conda_env.sh --install --conda-defs=$CDEFS_LOC
       - run: cd ../raven && ./build_raven
       - run: ../raven/run_tests --library-report
@@ -44,7 +44,7 @@ jobs:
       - run: python ../raven/scripts/install_plugins.py -s ${{ github.workspace }}
       - run: >
           $Env:RAVEN_LIBS_NAME =  "raven_libraries_"+(Get-Location).Path.Split("\")[-4];
-          CONDA_LOC=`which conda`; CDEFS_LOC=`cd $CONDA_LOC/../.. && pwd`"/etc/profile.d/conda.sh";
+          CONDA_LOC=`which conda`; CDEFS_LOC="`dirname dirname $CONDA_LOC`/etc/profile.d/conda.sh";
           bash ../raven/scripts/establish_conda_env.sh --install --conda-defs $CDEFS_LOC
       - run: cd ../raven; bash ./build_raven
       - run: bash ../raven/run_tests --library-report
