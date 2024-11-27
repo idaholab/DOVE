@@ -16,7 +16,7 @@ jobs:
       - run: >
           WD=`(cd ../../.. && pwd)` && export RAVEN_LIBS_NAME="raven_libs_"`basename $WD` &&
           CONDA_LOC=`which conda` && CDEFS_LOC=`dirname dirname $CONDA_LOC`"/etc/profile.d/conda.sh" &&
-          ../raven/scripts/establish_conda_env.sh --install --conda-defs=$CDEFS_LOC
+          ../raven/scripts/establish_conda_env.sh --install --conda-defs $CDEFS_LOC
       - run: cd ../raven && ./build_raven
       - run: ../raven/run_tests --library-report
       - run: bash coverage_scripts/check_py_coverage.sh -j4
@@ -44,7 +44,8 @@ jobs:
       - run: python ../raven/scripts/install_plugins.py -s ${{ github.workspace }}
       - run: >
           $Env:RAVEN_LIBS_NAME =  "raven_libraries_"+(Get-Location).Path.Split("\")[-4];
-          CONDA_LOC=`which conda`; CDEFS_LOC="`dirname dirname $CONDA_LOC`/etc/profile.d/conda.sh";
+          $CONDA_LOC = (Get-Command conda).Path; $MC_LOC = Split-Path -Path (Split-Path -Path $CONDA_LOC -Parent) -Parent;
+          $CDEFS_LOC = Join-Path -Path $MC_LOC -ChildPath "/etc/profile.d/conda.sh";
           bash ../raven/scripts/establish_conda_env.sh --install --conda-defs $CDEFS_LOC
       - run: cd ../raven; bash ./build_raven
       - run: bash ../raven/run_tests --library-report
