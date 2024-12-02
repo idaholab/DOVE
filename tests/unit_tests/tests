@@ -1,0 +1,6 @@
+[Tests]
+  [./test_components]
+    type = 'Unittest'
+    input = 'test_components.TestComponent'
+  [../]
+[]
