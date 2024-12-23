@@ -13,10 +13,22 @@ OLD_PYTHONPATH=$PYTHONPATH
     fi
 
 RAVEN_DIR=`python -c 'from src._utils import get_raven_loc; print(get_raven_loc())'`
-# If raven directory has been added to PYTHONPATH, this confuses get_raven_loc
-if [[ "$RAVEN_DIR" == *"ravenframework" ]]  # get_raven_loc might return ravenframework, not raven
+if [[ "$RAVEN_DIR" != *"raven" ]]
 then
-    RAVEN_DIR=`(cd $RAVEN_DIR/..; pwd)`  # Take parent directory, which is raven directory, instead
+  # If raven directory has been added to PYTHONPATH or is pip installed, get_raven_loc will return ravenframework
+  if [[ "$RAVEN_DIR" == *"ravenframework" ]]  # get_raven_loc might return ravenframework, not raven
+  then
+    RAVEN_DIR=`(cd $RAVEN_DIR/..; pwd)`  # Take parent directory, which should be raven directory, instead
+    if [[ "$RAVEN_DIR" != *"raven" ]]  # With a pip installed raven, this would be "site-packages"
+    then
+      echo "Must have git cloned (not pip installed) raven to run tests. Expected 'raven' directory at $RAVEN_DIR."
+      exit
+    fi
+  else
+    echo "Expected 'raven' or 'ravenframework' directory; found '$RAVEN_DIR' instead."
+    exit
+  fi
+
 fi
 
 source $DOVE_LOC/coverage_scripts/initialize_coverage.sh
