@@ -100,6 +100,7 @@ class Component(Base):
     @ In, mode, string, case mode to operate in (e.g. 'sweep' or 'opt')
     @ Out, None
     """
+    print("HELLO")
     # get specs for allowable inputs
     specs = self.get_input_specs()()
     specs.parseNode(xml)

@@ -21,19 +21,19 @@ class Interaction(Base):
     @ Out, input_specs, InputData, specs
     """
     if cls.tag == "produces":
-      desc = r"""indicates that this component produces one or more resources by 
+      desc = r"""indicates that this component produces one or more resources by
                  consuming other resources."""
       resource_desc = r"""the resource produced by this component's activity."""
-    
+
     elif cls.tag == "stores":
-      desc = r"""indicates that this component stores one resource, potentially 
+      desc = r"""indicates that this component stores one resource, potentially
                  absorbing or providing that resource."""
       resource_desc = r"""the resource stored by this component."""
-    
+
     elif cls.tag == "demands":
       desc = r"""indicates that this component exclusively consumes a resource."""
       resource_desc = r"""the resource consumed by this component."""
-    
+
     specs = InputData.parameterInputFactory(cls.tag, ordered=False, descr=desc)
     specs.addParam(
       "resource",
@@ -46,60 +46,60 @@ class Interaction(Base):
       "dispatch",
       param_type=InputTypes.makeEnumType("dispatch_opts", "dispatch_opts", ["fixed", "independent", "dependent"]),
       descr=r"""describes the way this component should be dispatched, or its flexibility.
-              \texttt{fixed} indicates the component always fully dispatched at 
+              \texttt{fixed} indicates the component always fully dispatched at
               its maximum level. \texttt{independent} indicates the component is
               fully dispatchable by the dispatch optimization algorithm.
-              \texttt{dependent} indicates that while this component is not directly 
-              controllable by the dispatch algorithm, it can however be flexibly 
+              \texttt{dependent} indicates that while this component is not directly
+              controllable by the dispatch algorithm, it can however be flexibly
               dispatched in response to other units changing dispatch level.
-              For example, when attempting to increase profitability, the 
-              \texttt{fixed} components are not adjustable, but the \texttt{independent} 
+              For example, when attempting to increase profitability, the
+              \texttt{fixed} components are not adjustable, but the \texttt{independent}
               components can be adjusted to attempt to improve the economic metric.
-              In response to the \texttt{independent} component adjustment, the 
-              \texttt{dependent} components may respond to balance the resource 
+              In response to the \texttt{independent} component adjustment, the
+              \texttt{dependent} components may respond to balance the resource
               usage from the changing behavior of other components.""",
     )
 
     cap = InputData.parameterInputFactory(
-      "capacity", 
-      contentType=InputTypes.FloatOrIntType, 
-      descr=r"""the maximum value at which this component can act, in units 
+      "capacity",
+      contentType=InputTypes.FloatOrIntType,
+      descr=r"""the maximum value at which this component can act, in units
                 corresponding to the indicated resource. """
     )
 
     cap.addParam(
       "resource",
       param_type=InputTypes.StringType,
-      descr=r"""indicates the resource that defines the capacity of this component's 
-              operation. For example, if a component consumes steam and electricity 
-              to produce hydrogen, the capacity of the component can be defined by 
+      descr=r"""indicates the resource that defines the capacity of this component's
+              operation. For example, if a component consumes steam and electricity
+              to produce hydrogen, the capacity of the component can be defined by
               the maximum steam consumable, maximum electricity consumable, or maximum
-              hydrogen producable. Any choice should be nominally equivalent, but 
+              hydrogen producable. Any choice should be nominally equivalent, but
               determines the units of the value of this node.""",
     )
     specs.addSub(cap)
 
     capfactor = InputData.parameterInputFactory(
-      "capacity_factor", 
-      contentType=InputTypes.FloatOrIntType, 
-      descr=r"""the actual value at which this component can act, as a unitless 
-                fraction of total rated capacity. Note that these factors are applied 
+      "capacity_factor",
+      contentType=InputTypes.FloatOrIntType,
+      descr=r"""the actual value at which this component can act, as a unitless
+                fraction of total rated capacity. Note that these factors are applied
                 within the dispatch optimization; we assume that the capacity factor
                 is not a variable in the outer optimization."""
-    )  
+    )
     specs.addSub(capfactor)
 
     minn = InputData.parameterInputFactory(
-      "minimum", 
-      contentType=InputTypes.FloatOrIntType, 
-      descr=r"""provides the minimum value at which this component can act, in 
+      "minimum",
+      contentType=InputTypes.FloatOrIntType,
+      descr=r"""provides the minimum value at which this component can act, in
                 units of the indicated resource."""
     )
-    
+
     minn.addParam(
       "resource",
       param_type=InputTypes.StringType,
-      descr=r"""indicates the resource that defines the minimum activity level for 
+      descr=r"""indicates the resource that defines the minimum activity level for
                 this component, as with the component's capacity.""",
     )
     specs.addSub(minn)
@@ -130,6 +130,9 @@ class Interaction(Base):
     #   for example, {(Producer, 'capacity'): 'method'}
     self._sqrt_rte = 1.0  # sqrt of the round-trip efficiency for this interaction
     self._tracking_vars = []  # list of trackable variables for dispatch activity
+
+  def _set_value(self, item):
+    return item.value
 
   def read_input(self, specs, comp_name):
     """
@@ -223,7 +226,7 @@ class Interaction(Base):
     @ Out, meta, dict, additional variable passthrough
     """
     return self._minimum
-    
+
   def get_sqrt_RTE(self):
     """
     Provide the square root of the round-trip efficiency for this component.
