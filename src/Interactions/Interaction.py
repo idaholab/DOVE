@@ -212,7 +212,7 @@ class Interaction(Base):
     """
     self._capacity.set_value(float(cap))
 
-  def get_minimum(self):
+  def get_minimum(self, meta):
     """
     Returns the minimum level of this interaction.
     Returns an evaluated value unless "raw" is True, then gives ValuedParam

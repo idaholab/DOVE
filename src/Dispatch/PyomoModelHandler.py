@@ -77,6 +77,7 @@ class PyomoModelHandler:
     for comp in self.components:
       self._process_component(comp)
     self._create_conservation()  # conservation of resources (e.g. production == consumption)
+    print("HELLO POPULATE")
     self._create_objective()  # objective function
 
   def _process_component(self, component):
@@ -88,7 +89,7 @@ class PyomoModelHandler:
     interaction = component.get_interaction()
     if interaction.is_governed():
       self._process_governed_component(component, interaction)
-    elif interaction.is_type("Storage"):
+    elif interaction.is_type("HeronStorage"):
       self._create_storage(component)
     else:
       self._create_production(component)
