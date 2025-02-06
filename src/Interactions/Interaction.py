@@ -131,8 +131,8 @@ class Interaction(Base):
     self._sqrt_rte = 1.0  # sqrt of the round-trip efficiency for this interaction
     self._tracking_vars = []  # list of trackable variables for dispatch activity
 
-  def _set_value(self, item):
-    return item.value
+  def _set_value(self, name, comp_name, spec):
+    setattr(self, name, spec.value)
 
   def read_input(self, specs, comp_name):
     """
@@ -148,14 +148,10 @@ class Interaction(Base):
       name = "_" + item.getName()
       if name in ["_capacity", "_capacity_factor", "_minimum"]:
         # common reading for valued params
-        # self._set_valued_param(name, comp_name, item, mode)
+        self._set_value(name, comp_name, item)
         if name == "_capacity":
-          self._capacity = item.value
           self._capacity_var = item.parameterValues.get("resource", None)
-        elif name == "_capacity_factor":
-          self._capacity_factor = item.value
         elif item.getName() == "minimum":
-          self._minimum = item.value
           self._minimum_var = item.parameterValues.get("resource", None)
     # finalize some values
     resources = set(list(self.get_inputs()) + list(self.get_outputs()))

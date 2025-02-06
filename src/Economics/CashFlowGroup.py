@@ -77,6 +77,7 @@ class CashFlowGroup(Base):
         new = CashFlow()
         new.read_input(item)
         self._cash_flows.append(new)
+    return self
 
   def get_crossrefs(self):
     """
