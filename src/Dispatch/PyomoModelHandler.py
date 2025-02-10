@@ -446,24 +446,16 @@ class PyomoModelHandler:
     # -> set operational limits
     # self._create_capacity(m, comp, level_name, meta)
     # (2, 3) separate charge/discharge trackers, so we can implement round-trip efficiency and ramp rates
-    charge_name = self._create_production_variable(
-      comp, tag="charge", add_bounds=False, within=pyo.NonPositiveReals
-    )
-    discharge_name = self._create_production_variable(
-      comp, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals
-    )
+    charge_name = self._create_production_variable(comp, tag="charge", add_bounds=False, within=pyo.NonPositiveReals)
+    discharge_name = self._create_production_variable(comp, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals)
     # balance level, charge/discharge
     level_rule_name = prefix + "_level_constr"
-    rule = lambda mod, t: prl.level_rule(
-      comp, level_name, charge_name, discharge_name, self.initial_storage, r, mod, t
-    )
+    rule = lambda mod, t: prl.level_rule(comp, level_name, charge_name, discharge_name, self.initial_storage, r, mod, t)
     setattr(self.model, level_rule_name, pyo.Constraint(self.model.T, rule=rule))
     # periodic boundary condition for storage level
     if comp.get_interaction().apply_periodic_level:
       periodic_rule_name = prefix + "_level_periodic_constr"
-      rule = lambda mod, t: prl.periodic_level_rule(
-        comp, level_name, self.initial_storage, r, mod, t
-      )
+      rule = lambda mod, t: prl.periodic_level_rule(comp, level_name, self.initial_storage, r, mod, t)
       setattr(self.model, periodic_rule_name, pyo.Constraint(self.model.T, rule=rule))
 
     # (4) a binary variable to track whether we're charging or discharging, to prevent BOTH happening
@@ -474,9 +466,7 @@ class PyomoModelHandler:
     # and frequently results in spurious errors. For now, disable it.
     allow_both = True  # allow simultaneous charging and discharging
     if not allow_both:
-      bin_name = self._create_production_variable(
-        comp, tag="dcforcer", add_bounds=False, within=pyo.Binary
-      )
+      bin_name = self._create_production_variable(comp, tag="dcforcer", add_bounds=False, within=pyo.Binary)
       # we need a large epsilon, but not so large that addition stops making sense
       # -> we don't know what any values for this component will be! How do we choose?
       # -> NOTE that choosing this value has VAST impact on solve stability!!
@@ -486,9 +476,7 @@ class PyomoModelHandler:
       rule = lambda mod, t: prl.charge_rule(charge_name, bin_name, large_eps, r, mod, t)
       setattr(self.model, charge_rule_name, pyo.Constraint(self.model.T, rule=rule))
       discharge_rule_name = prefix + "_discharge_constr"
-      rule = lambda mod, t: prl.discharge_rule(
-        discharge_name, bin_name, large_eps, r, mod, t
-      )
+      rule = lambda mod, t: prl.discharge_rule(discharge_name, bin_name, large_eps, r, mod, t)
       setattr(self.model, discharge_rule_name, pyo.Constraint(self.model.T, rule=rule))
 
   def _create_conservation(self):
