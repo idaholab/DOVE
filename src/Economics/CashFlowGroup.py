@@ -51,7 +51,7 @@ class CashFlowGroup(Base):
     @ Out, None
     """
     Base.__init__(self, **kwargs)
-    self.name = "test"  # component.name
+    self.name = component.name
     self._component = component  # component this one
     self._lifetime = None  # lifetime of the component
     self._cash_flows = []
