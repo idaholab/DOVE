@@ -89,8 +89,8 @@ class Storage(Interaction):
         # self._set_valued_param('_rate', comp_name, item, mode)
         pass
       elif item.getName() == "initial_stored":
+        self._set_value('_initial_stored', comp_name, item)
         # self._set_valued_param('_initial_stored', comp_name, item, mode)
-        pass
       elif item.getName() == "periodic_level":
         self.apply_periodic_level = item.value
       elif item.getName() == "strategy":
