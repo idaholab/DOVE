@@ -102,7 +102,7 @@ class PyomoModelHandler:
     @ Out, None
     """
     self.meta["request"] = {"component": component, "time": self.time}
-    if interaction.is_type("Storage"):
+    if interaction.is_type("HeronStorage"):
       self._process_storage_component(component, interaction)
     else:
       activity = interaction.get_strategy().evaluate(self.meta)[0]["level"]
@@ -221,9 +221,7 @@ class PyomoModelHandler:
     caps, mins = self._find_production_limits(comp)
     if min(caps) < 0:
       # quick check that capacities signs are consistent #FIXME: revisit, this is an assumption
-      assert (
-        max(caps) <= 0
-      ), "Capacities are inconsistent: mix of positive and negative values not currently  supported."
+      assert (max(caps) <= 0), "Capacities are inconsistent: mix of positive and negative values not currently  supported."
       # we have a unit that's consuming, so we need to flip the variables to be sensible
       mins, caps = caps, mins
       inits = caps

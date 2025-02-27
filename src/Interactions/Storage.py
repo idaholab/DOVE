@@ -25,30 +25,25 @@ class Storage(Interaction):
     # initial stored
     descr = r"""indicates what percent of the storage unit is full at the start of each optimization sequence,
               from 0 to 1. \default{0.0}. """
-    sub = InputData.parameterInputFactory(
-      "initial_stored", contentType=InputTypes.FloatOrIntType, descr=descr
-    )  # vp_factory.make_input_specs('initial_stored', descr=descr)
+    sub = InputData.parameterInputFactory("initial_stored", contentType=InputTypes.FloatOrIntType, descr=descr)  
+    # vp_factory.make_input_specs('initial_stored', descr=descr)
     specs.addSub(sub)
 
     # periodic level boundary condition
     descr = r"""indicates whether the level of the storage should be required to return to its initial level
               within each modeling window. If True, this reduces the flexibility of the storage, but if False,
               can result in breaking conservation of resources. \default{True}. """
-    sub = InputData.parameterInputFactory(
-      "periodic_level", contentType=InputTypes.BoolType, descr=descr
-    )
+    sub = InputData.parameterInputFactory("periodic_level", contentType=InputTypes.BoolType, descr=descr)
     specs.addSub(sub)
 
     # control strategy
-    # descr=r"""control strategy for operating the storage. If not specified, uses a perfect foresight strategy. """
+    descr=r"""control strategy for operating the storage. If not specified, uses a perfect foresight strategy. """
+    specs.addSub(InputData.parameterInputFactory("strategy", contentType=InputTypes.StringType, descr=descr))
     # specs.addSub(vp_factory.make_input_specs('strategy', allowed=['Function'], descr=descr))
     # round trip efficiency
+    
     descr = r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
-    specs.addSub(
-      InputData.parameterInputFactory(
-        "RTE", contentType=InputTypes.FloatType, descr=descr
-      )
-    )
+    specs.addSub(InputData.parameterInputFactory("RTE", contentType=InputTypes.FloatType, descr=descr))
     return specs
 
   def __init__(self, **kwargs):
@@ -58,20 +53,12 @@ class Storage(Interaction):
     @ Out, None
     """
     Interaction.__init__(self, **kwargs)
-    self.apply_periodic_level = (
-      True  # whether to apply periodic boundary conditions for the level of the storage
-    )
+    self.apply_periodic_level = True  # whether to apply periodic boundary conditions for the level of the storage
     self._stores = None  # the resource stored by this interaction
     self._rate = None  # the rate at which this component can store up or discharge
-    self._initial_stored = (
-      None  # how much resource does this component start with stored?
-    )
+    self._initial_stored = None  # how much resource does this component start with stored?
     self._strategy = None  # how to operate storage unit
-    self._tracking_vars = [
-      "level",
-      "charge",
-      "discharge",
-    ]  # stored quantity, charge activity, discharge activity
+    self._tracking_vars = ["level", "charge", "discharge",]  # stored quantity, charge activity, discharge activity
 
   def read_input(self, specs, comp_name):
     """
@@ -94,19 +81,16 @@ class Storage(Interaction):
       elif item.getName() == "periodic_level":
         self.apply_periodic_level = item.value
       elif item.getName() == "strategy":
+        self._set_value('_strategy', comp_name, item)
         # self._set_valued_param('_strategy', comp_name, item, mode)
-        pass
       elif item.getName() == "RTE":
         self._sqrt_rte = np.sqrt(item.value)
-    assert (
-      len(self._stores) == 1
-    ), f'Multiple storage resources given for component "{comp_name}"'
+    assert (len(self._stores) == 1), f'Multiple storage resources given for component "{comp_name}"'
     self._stores = self._stores[0]
     # checks and defaults
     if self._initial_stored is None:
-      self.raiseAWarning(
-        f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.'
-      )
+      self.raiseAWarning(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')
+      self._initial_stored = self._set_fixed_value('initial_stored', 0.0)
       # make a fake reader node for a 0 value
       # vp = ValuedParamHandler('initial_stored')
       # vp.set_const_VP(0.0)

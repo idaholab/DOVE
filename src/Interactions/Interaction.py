@@ -131,6 +131,9 @@ class Interaction(Base):
     self._sqrt_rte = 1.0  # sqrt of the round-trip efficiency for this interaction
     self._tracking_vars = []  # list of trackable variables for dispatch activity
 
+  def _set_fixed_value(name, value):
+    setattr(self, '_' + name, value)
+
   def _set_value(self, name, comp_name, spec):
     setattr(self, name, spec.value)
 

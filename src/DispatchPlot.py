@@ -81,7 +81,7 @@ class DispatchPlot(PlotPlugin):
     @ Out, None
     """
     super().__init__()
-    self.printTag = "HERON.DispatchPlot"
+    self.printTag = "DOVE.DispatchPlot"
     self._sourceName = None
     self._source = None
     self._macroName = None
@@ -336,9 +336,7 @@ class DispatchPlot(PlotPlugin):
     assert self._source is not None
     ds = self._source.asDataset()
     if ds is None:
-      self.raiseAWarning(
-        f'No data in "{self._source.name}" data object; nothing to plot!'
-      )
+      self.raiseAWarning(f'No data in "{self._source.name}" data object; nothing to plot!')
       return
     df = ds.to_dataframe().reset_index()
     dispatch_vars = list(filter(lambda x: "Dispatch__" in x, df.columns))
@@ -353,9 +351,7 @@ class DispatchPlot(PlotPlugin):
     cdict = self.color_style(grouped_vars)
 
     resources = set([x for x in grouped_vars])
-    for sample_id, macro_step, cluster_id in it.product(
-      sample_ids, macro_steps, cluster_ids
-    ):
+    for sample_id, macro_step, cluster_id in it.product(sample_ids, macro_steps, cluster_ids):
       # Filter data to plot correct values for current dimension
       dat = df[
         (df[self._source.sampleTag] == sample_id)
