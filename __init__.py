@@ -11,3 +11,5 @@ import DOVE.src._utils as dutils
 
 if importlib.util.find_spec("ravenframework") is None:
   sys.path.append(dutils.get_raven_loc())
+
+from DOVE.src import DispatchPlot
