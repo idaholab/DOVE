@@ -104,7 +104,7 @@ class TestCashFlowGroup(unittest.TestCase):
     mockSpecs.return_value.subparts = mockSpecs.subparts
     self.mockEconomicsParsed.return_value.parseNode.return_value = mockSpecs
     self.mockCashFlow.side_effect = [mockNewCFInstance1, mockNewCFInstance2] # Reset iterator
-    
+
     mockXML = MagicMock()
 
     # Call the method under test with xml input

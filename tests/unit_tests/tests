@@ -7,4 +7,8 @@
     type = 'Unittest'
     input = 'test_cashflowgroup.TestCashFlowGroup'
   [../]
+  [./test_cashflow]
+    type = 'Unittest'
+    input = 'test_cashflow.TestCashFlow'
+  [../]
 []
