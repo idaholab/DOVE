@@ -20,15 +20,16 @@ class TestInteraction(unittest.TestCase):
     # Add cleanup to stop all manually started patchers
     self.addCleanup(patch.stopall)
 
+    # Set up mocks
+    self.mockSpecs = MagicMock(name="mockSpecs")
+    self.mockCapacity = MagicMock(name="mockCapacity")
+    self.mockCapFactor = MagicMock(name="mockCapacityFactor")
+    self.mockMinimum = MagicMock(name="mockMinimum")
+
   def testGetInputSpecs(self):
 
-    # Set up test-specific mocks
-    mockSpecs = MagicMock(name="mockSpecs")
-    mockCapacity = MagicMock(name="mockCapacity")
-    mockCapFactor = MagicMock(name="mockCapacityFactor")
-    mockMinimum = MagicMock(name="mockMinimum")
-
-    self.mockParameterInputFactory.side_effect = [mockSpecs, mockCapacity, mockCapFactor, mockMinimum]
+    # Test-specific mock setup
+    self.mockParameterInputFactory.side_effect = [self.mockSpecs, self.mockCapacity, self.mockCapFactor, self.mockMinimum]
 
     mockMakeEnumType = MagicMock(name="mockMakeEnumType")
 
@@ -65,32 +66,32 @@ class TestInteraction(unittest.TestCase):
       call("dispatch", param_type=mockMakeEnumType.return_value, descr=ANY)
     ]
 
-    mockSpecs.addParam.assert_has_calls(expectedAddParamCalls)
+    self.mockSpecs.addParam.assert_has_calls(expectedAddParamCalls)
     # Check descr is correct
-    self.assertIn("produced", mockSpecs.addParam.call_args_list[0][1]["descr"])
+    self.assertIn("produced", self.mockSpecs.addParam.call_args_list[0][1]["descr"])
 
     # This check is necessary because of the patch on makeEnumType
     mockMakeEnumType.assert_called_once_with("dispatch_opts", "dispatch_opts", ["fixed", "independent", "dependent"])
 
     # Check specs.addSub calls
-    expectedAddSubCalls = [call(mockCapacity), call(mockCapFactor), call(mockMinimum)]
-    mockSpecs.addSub.assert_has_calls(expectedAddSubCalls)
+    expectedAddSubCalls = [call(self.mockCapacity), call(self.mockCapFactor), call(self.mockMinimum)]
+    self.mockSpecs.addSub.assert_has_calls(expectedAddSubCalls)
 
     # Check cap.addParam call
-    mockCapacity.addParam.assert_called_once_with("resource", param_type=InputTypes.StringType, descr=ANY)
+    self.mockCapacity.addParam.assert_called_once_with("resource", param_type=InputTypes.StringType, descr=ANY)
 
     # Check minn.addParam call
-    mockMinimum.addParam.assert_called_once_with("resource", param_type=InputTypes.StringType, descr=ANY)
+    self.mockMinimum.addParam.assert_called_once_with("resource", param_type=InputTypes.StringType, descr=ANY)
 
     # Check the returned value
-    self.assertEqual(specs, mockSpecs)
+    self.assertEqual(specs, self.mockSpecs)
 
     ### Test descriptions for storage
 
     # Reset mocks
-    self.mockParameterInputFactory.side_effect = [mockSpecs, mockCapacity, mockCapFactor, mockMinimum]
+    self.mockParameterInputFactory.side_effect = [self.mockSpecs, self.mockCapacity, self.mockCapFactor, self.mockMinimum]
     self.mockParameterInputFactory.call_args_list = [] # This is crude, but it gets the job done
-    mockSpecs.addParam.call_args_list = []
+    self.mockSpecs.addParam.call_args_list = []
 
     class testStorage(Interaction):
       tag = "stores"
@@ -104,14 +105,14 @@ class TestInteraction(unittest.TestCase):
 
     # Assert descriptions were set correctly
     self.assertIn("stores", self.mockParameterInputFactory.call_args_list[0][1]["descr"])
-    self.assertIn("stored", mockSpecs.addParam.call_args_list[0][1]["descr"])
+    self.assertIn("stored", self.mockSpecs.addParam.call_args_list[0][1]["descr"])
 
     ### Test descriptions for Demand
 
     # Reset mocks
-    self.mockParameterInputFactory.side_effect = [mockSpecs, mockCapacity, mockCapFactor, mockMinimum]
+    self.mockParameterInputFactory.side_effect = [self.mockSpecs, self.mockCapacity, self.mockCapFactor, self.mockMinimum]
     self.mockParameterInputFactory.call_args_list = []
-    mockSpecs.addParam.call_args_list = []
+    self.mockSpecs.addParam.call_args_list = []
 
     class testDemand(Interaction):
       tag = "demands"
@@ -125,7 +126,62 @@ class TestInteraction(unittest.TestCase):
 
     # Assert descriptions were set correctly
     self.assertIn("consumes", self.mockParameterInputFactory.call_args_list[0][1]["descr"])
-    self.assertIn("consumed", mockSpecs.addParam.call_args_list[0][1]["descr"])
+    self.assertIn("consumed", self.mockSpecs.addParam.call_args_list[0][1]["descr"])
+
+  def testReadInput(self):
+    # Note that this test also checks _set_value and 4 getter functions
+
+    # Test-specific mock setup
+    self.mockSpecs.parameterValues = {"dispatch":"independent"}
+    self.mockSpecs.subparts = [self.mockCapacity, self.mockCapFactor, self.mockMinimum]
+
+    self.mockCapacity.getName.return_value = "capacity"
+    self.mockCapacity.value = 200
+    self.mockCapacity.parameterValues = {"resource":"electricity"}
+
+    self.mockCapFactor.getName.return_value = "capacity_factor"
+    self.mockCapFactor.value = 0.75
+
+    self.mockMinimum.getName.return_value = "minimum"
+    self.mockMinimum.value = 50
+    self.mockMinimum.parameterValues = {"resource": "electricity"}
+
+    # Create Interaction instance and call method under test
+    testInteraction = Interaction()
+    testInteraction.read_input(self.mockSpecs, "testComponentName")
+
+    # Assertions to verify behavior
+
+    self.assertEqual(testInteraction.is_dispatchable(), "independent")
+    self.assertEqual(testInteraction.get_capacity(), 150) # 200 * 0.75
+    self.assertEqual(testInteraction.get_capacity_var(), "electricity")
+    self.assertEqual(testInteraction.get_minimum(None), 50) # Don't care about the "meta" arg
+    self.assertEqual(testInteraction._minimum_var, "electricity") # No getter for _minimum_var
+
+    ### Test with no capacity var
+
+    # Update mock
+    self.mockCapacity.parameterValues = {}
+
+    # Create new Interaction instance and call method under test again
+    testInteractionNoCapVar = Interaction()
+    testInteractionNoCapVar.read_input(self.mockSpecs, "testComponentName")
+
+    # Check capacity var default
+    self.assertEqual(testInteractionNoCapVar.get_capacity_var(), "electricity")
+
+    ### Test with no minimum var
+
+    # Update mocks
+    self.mockCapacity.parameterValues = {"resource":"electricity"}
+    self.mockMinimum.parameterValues = {}
+
+    # Create new Interaction instance and call method under test again
+    testInteractionNoMinVar = Interaction()
+    testInteractionNoMinVar.read_input(self.mockSpecs, "testComponentName")
+
+    # Check minimum var default
+    self.assertEqual(testInteractionNoMinVar._minimum_var, "electricity")
 
 
 if __name__ == "__main__":
