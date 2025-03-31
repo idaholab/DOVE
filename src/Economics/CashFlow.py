@@ -21,7 +21,7 @@ class CashFlow:
     @ Out, __repr__, string representation
     """
     return f'<DOVE CashFlow "{self.name}">'
-
+  
   @classmethod
   def get_input_specs(cls):
     """
@@ -32,10 +32,10 @@ class CashFlow:
     cf = InputData.parameterInputFactory(
       "CashFlow",
       descr=r"""node for defining a CashFlow for a particular Component.
-                This HERON CashFlow will be used to generate a TEAL CashFlow from
-                RAVEN's TEAL plugin. Note a CashFlow generally takes the form
-                $C = \alpha \left(\frac{D}{D'}\right)^x$, aggregated depending on
-                the \xmlAttr{type}. For more information, see the TEAL plugin for
+                This HERON CashFlow will be used to generate a TEAL CashFlow from 
+                RAVEN's TEAL plugin. Note a CashFlow generally takes the form 
+                $C = \alpha \left(\frac{D}{D'}\right)^x$, aggregated depending on 
+                the \xmlAttr{type}. For more information, see the TEAL plugin for 
                 RAVEN."""
     )
 
@@ -116,8 +116,8 @@ class CashFlow:
     driver = InputData.parameterInputFactory(
       "driver",
       contentType=InputTypes.FloatOrIntType,
-      descr=r"""indicates the main driver for this CashFlow, such as the number of
-                units sold or the size of the constructed unit. Corresponds to $D$
+      descr=r"""indicates the main driver for this CashFlow, such as the number of 
+                units sold or the size of the constructed unit. Corresponds to $D$ 
                 in the CashFlow equation.""",
     )
     cf.addSub(driver)
@@ -133,7 +133,7 @@ class CashFlow:
     levelized_cost = InputData.parameterInputFactory(
       "levelized_cost",
       strictMode=True,
-      descr=r"""indicates whether HERON and TEAL are meant to solve for the levelized
+      descr=r"""indicates whether HERON and TEAL are meant to solve for the levelized 
                 price related to this cashflow.""",
     )
 
@@ -151,9 +151,9 @@ class CashFlow:
     x = InputData.parameterInputFactory(
       "scaling_factor_x",
       contentType=InputTypes.FloatType,
-      descr=r"""determines the scaling factor for this CashFlow. Corresponds to
-                $x$ in the CashFlow equation. If $x$ is less than one, the per-unit
-                price decreases as the units sold increases above the \xmlNode{reference_driver},
+      descr=r"""determines the scaling factor for this CashFlow. Corresponds to 
+                $x$ in the CashFlow equation. If $x$ is less than one, the per-unit 
+                price decreases as the units sold increases above the \xmlNode{reference_driver}, 
                 and vice versa.""",
     )
     cf.addSub(x)
@@ -161,8 +161,8 @@ class CashFlow:
     depreciate = InputData.parameterInputFactory(
       "depreciate",
       contentType=InputTypes.IntegerType,
-      descr=r"""indicates the number of cycles over which this CashFlow should be
-                depreciated. Depreciation schemes are assumed to be MACRS and available
+      descr=r"""indicates the number of cycles over which this CashFlow should be 
+                depreciated. Depreciation schemes are assumed to be MACRS and available 
                 cycles are listed in the CashFlow submodule of RAVEN.""",
     )
     cf.addSub(depreciate)
@@ -215,18 +215,14 @@ class CashFlow:
     self._npv_exempt = item.parameterValues.get("npv_exempt", False)
     # the remainder of the entries are ValuedParams, so they'll be evaluated as-needed
     for sub in item.subparts:
-      # Magic variables are dumb, but here we are.
-      name = sub.getName()
-      if name == "driver":
-        self._set_value("_driver", sub)
-      elif name == "reference_price":
-        price_is_levelized = self.set_reference_price(sub)
-      elif name == "reference_driver":
-        self._set_value("_reference", sub)
-      elif name == "scaling_factor_x":
-        self._set_value("_scale", sub)
-      elif name == "depreciate":
+      # Magic variables are dumb, but here we are. 
+      name = "_" + sub.getName()
+      if name == "_depreciate":
         self._depreciate = sub.value
+      elif name == "_reference_price":
+        price_is_levelized = self.set_reference_price(sub)
+      elif name in ["_driver", "_reference_driver", "_scaling_factor_x"]:
+        self._set_value(name, sub)
       else:
         raise IOError(f"Unrecognized 'CashFlow' node: {sub.getName()}")
 
