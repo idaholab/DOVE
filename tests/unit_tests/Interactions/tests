@@ -1,0 +1,6 @@
+[Tests]
+  [./test_interaction]
+    type = 'Unittest'
+    input = 'test_interaction.TestInteraction'
+  [../]
+[]

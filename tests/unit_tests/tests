@@ -3,20 +3,4 @@
     type = 'Unittest'
     input = 'test_components.TestComponent'
   [../]
-  [./test_cashflowgroup]
-    type = 'Unittest'
-    input = 'test_cashflowgroup.TestCashFlowGroup'
-  [../]
-  [./test_cashflow]
-    type = 'Unittest'
-    input = 'test_cashflow.TestCashFlow'
-  [../]
-  [./test_interaction]
-    type = 'Unittest'
-    input = 'test_interaction.TestInteraction'
-  [../]
-  [./test_transferfunc]
-    type = 'Unittest'
-    input = 'test_transferfunc.TestTransferFunc'
-  [../]
 []
