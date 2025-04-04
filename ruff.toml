@@ -1,1 +1,8 @@
 indent-width = 2
+line-length = 120
+
+[lint]
+select = ["E", "F", "D101", "D102", "D103", "D106", "N801", "W191", "W291"]
+
+[format]
+indent-style = "space"

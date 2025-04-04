@@ -39,6 +39,7 @@ jobs:
         with:
           name: coverage_results
           path: tests/coverage_html_report
+      - run: ruff check --config ruff.toml
   Test-DOVE-Windows:
     runs-on: [windows-latest]
     steps:
