@@ -40,7 +40,7 @@ class TransferFunc(MessageUser):
     @ In, None
     @ Out, None
     """
-    return "<HERON TransferFunc>"
+    return "<DOVE TransferFunc>"
 
   def read(self, comp_name, spec):
     """

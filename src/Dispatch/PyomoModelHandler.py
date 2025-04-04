@@ -77,6 +77,7 @@ class PyomoModelHandler:
     for comp in self.components:
       self._process_component(comp)
     self._create_conservation()  # conservation of resources (e.g. production == consumption)
+    print("HELLO POPULATE")
     self._create_objective()  # objective function
 
   def _process_component(self, component):
@@ -88,7 +89,7 @@ class PyomoModelHandler:
     interaction = component.get_interaction()
     if interaction.is_governed():
       self._process_governed_component(component, interaction)
-    elif interaction.is_type("Storage"):
+    elif interaction.is_type("HeronStorage"):
       self._create_storage(component)
     else:
       self._create_production(component)
@@ -101,7 +102,7 @@ class PyomoModelHandler:
     @ Out, None
     """
     self.meta["request"] = {"component": component, "time": self.time}
-    if interaction.is_type("Storage"):
+    if interaction.is_type("HeronStorage"):
       self._process_storage_component(component, interaction)
     else:
       activity = interaction.get_strategy().evaluate(self.meta)[0]["level"]
@@ -220,9 +221,7 @@ class PyomoModelHandler:
     caps, mins = self._find_production_limits(comp)
     if min(caps) < 0:
       # quick check that capacities signs are consistent #FIXME: revisit, this is an assumption
-      assert (
-        max(caps) <= 0
-      ), "Capacities are inconsistent: mix of positive and negative values not currently  supported."
+      assert (max(caps) <= 0), "Capacities are inconsistent: mix of positive and negative values not currently  supported."
       # we have a unit that's consuming, so we need to flip the variables to be sensible
       mins, caps = caps, mins
       inits = caps
@@ -445,24 +444,16 @@ class PyomoModelHandler:
     # -> set operational limits
     # self._create_capacity(m, comp, level_name, meta)
     # (2, 3) separate charge/discharge trackers, so we can implement round-trip efficiency and ramp rates
-    charge_name = self._create_production_variable(
-      comp, tag="charge", add_bounds=False, within=pyo.NonPositiveReals
-    )
-    discharge_name = self._create_production_variable(
-      comp, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals
-    )
+    charge_name = self._create_production_variable(comp, tag="charge", add_bounds=False, within=pyo.NonPositiveReals)
+    discharge_name = self._create_production_variable(comp, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals)
     # balance level, charge/discharge
     level_rule_name = prefix + "_level_constr"
-    rule = lambda mod, t: prl.level_rule(
-      comp, level_name, charge_name, discharge_name, self.initial_storage, r, mod, t
-    )
+    rule = lambda mod, t: prl.level_rule(comp, level_name, charge_name, discharge_name, self.initial_storage, r, mod, t)
     setattr(self.model, level_rule_name, pyo.Constraint(self.model.T, rule=rule))
     # periodic boundary condition for storage level
     if comp.get_interaction().apply_periodic_level:
       periodic_rule_name = prefix + "_level_periodic_constr"
-      rule = lambda mod, t: prl.periodic_level_rule(
-        comp, level_name, self.initial_storage, r, mod, t
-      )
+      rule = lambda mod, t: prl.periodic_level_rule(comp, level_name, self.initial_storage, r, mod, t)
       setattr(self.model, periodic_rule_name, pyo.Constraint(self.model.T, rule=rule))
 
     # (4) a binary variable to track whether we're charging or discharging, to prevent BOTH happening
@@ -473,9 +464,7 @@ class PyomoModelHandler:
     # and frequently results in spurious errors. For now, disable it.
     allow_both = True  # allow simultaneous charging and discharging
     if not allow_both:
-      bin_name = self._create_production_variable(
-        comp, tag="dcforcer", add_bounds=False, within=pyo.Binary
-      )
+      bin_name = self._create_production_variable(comp, tag="dcforcer", add_bounds=False, within=pyo.Binary)
       # we need a large epsilon, but not so large that addition stops making sense
       # -> we don't know what any values for this component will be! How do we choose?
       # -> NOTE that choosing this value has VAST impact on solve stability!!
@@ -485,9 +474,7 @@ class PyomoModelHandler:
       rule = lambda mod, t: prl.charge_rule(charge_name, bin_name, large_eps, r, mod, t)
       setattr(self.model, charge_rule_name, pyo.Constraint(self.model.T, rule=rule))
       discharge_rule_name = prefix + "_discharge_constr"
-      rule = lambda mod, t: prl.discharge_rule(
-        discharge_name, bin_name, large_eps, r, mod, t
-      )
+      rule = lambda mod, t: prl.discharge_rule(discharge_name, bin_name, large_eps, r, mod, t)
       setattr(self.model, discharge_rule_name, pyo.Constraint(self.model.T, rule=rule))
 
   def _create_conservation(self):

@@ -1,0 +1,15 @@
+###
+### RAVEN 
+###
+.ravenconfig.xml
+
+###
+### Python
+###
+__pycache__/
+
+
+###
+### Misc
+###
+.DS_Store

@@ -75,7 +75,7 @@ def get_initial_storage_levels(components: list, meta: dict, start_index: int) -
   """
   initial_levels = {}
   for comp in components:
-    if comp.get_interaction().is_type("Storage"):
+    if comp.get_interaction().is_type("HeronStorage"):
       if start_index == 0:
         initial_levels[comp] = comp.get_interaction().get_initial_level(meta)
         # NOTE: There used to be an else conditional here that depended on the
