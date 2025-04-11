@@ -2,7 +2,8 @@ indent-width = 2
 line-length = 120
 
 [lint]
-select = ["E", "F", "D101", "D102", "D103", "D106", "N801", "W191", "W291"]
+select = ["E", "F", "W", "D1"]
+ignore = ["E402", "E501", "W505"]
 
 [format]
 indent-style = "space"
