@@ -100,6 +100,7 @@ class Component(Base):
     @ In, mode, string, case mode to operate in (e.g. 'sweep' or 'opt')
     @ Out, None
     """
+    print("HELLO")
     # get specs for allowable inputs
     specs = self.get_input_specs()()
     specs.parseNode(xml)
@@ -222,14 +223,14 @@ class Component(Base):
     """
     return self.get_interaction().get_capacity()
 
-  def get_minimum(self):
+  def get_minimum(self, meta, raw=False):
     """
     returns the minimum of the interaction of this component
     @ In, meta, dict, arbitrary metadata from EGRET
     @ In, raw, bool, optional, if True then return the ValuedParam instance for capacity, instead of the evaluation
     @ Out, capacity, float (or ValuedParam), the capacity of this component's interaction
     """
-    return self.get_interaction().get_minimum()
+    return self.get_interaction().get_minimum(meta)
 
   def get_capacity_var(self):
     """

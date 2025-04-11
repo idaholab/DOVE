@@ -14,6 +14,14 @@ class CashFlow:
     D' is the nominal amount of widgets sold
     x is the scaling factor
   """
+  def __repr__(self):
+    """
+    String representation.
+    @ In, None
+    @ Out, __repr__, string representation
+    """
+    return f'<DOVE CashFlow "{self.name}">'
+
   @classmethod
   def get_input_specs(cls):
     """
@@ -24,10 +32,10 @@ class CashFlow:
     cf = InputData.parameterInputFactory(
       "CashFlow",
       descr=r"""node for defining a CashFlow for a particular Component.
-                This HERON CashFlow will be used to generate a TEAL CashFlow from 
-                RAVEN's TEAL plugin. Note a CashFlow generally takes the form 
-                $C = \alpha \left(\frac{D}{D'}\right)^x$, aggregated depending on 
-                the \xmlAttr{type}. For more information, see the TEAL plugin for 
+                This HERON CashFlow will be used to generate a TEAL CashFlow from
+                RAVEN's TEAL plugin. Note a CashFlow generally takes the form
+                $C = \alpha \left(\frac{D}{D'}\right)^x$, aggregated depending on
+                the \xmlAttr{type}. For more information, see the TEAL plugin for
                 RAVEN."""
     )
 
@@ -108,8 +116,8 @@ class CashFlow:
     driver = InputData.parameterInputFactory(
       "driver",
       contentType=InputTypes.FloatOrIntType,
-      descr=r"""indicates the main driver for this CashFlow, such as the number of 
-                units sold or the size of the constructed unit. Corresponds to $D$ 
+      descr=r"""indicates the main driver for this CashFlow, such as the number of
+                units sold or the size of the constructed unit. Corresponds to $D$
                 in the CashFlow equation.""",
     )
     cf.addSub(driver)
@@ -125,7 +133,7 @@ class CashFlow:
     levelized_cost = InputData.parameterInputFactory(
       "levelized_cost",
       strictMode=True,
-      descr=r"""indicates whether HERON and TEAL are meant to solve for the levelized 
+      descr=r"""indicates whether HERON and TEAL are meant to solve for the levelized
                 price related to this cashflow.""",
     )
 
@@ -143,9 +151,9 @@ class CashFlow:
     x = InputData.parameterInputFactory(
       "scaling_factor_x",
       contentType=InputTypes.FloatType,
-      descr=r"""determines the scaling factor for this CashFlow. Corresponds to 
-                $x$ in the CashFlow equation. If $x$ is less than one, the per-unit 
-                price decreases as the units sold increases above the \xmlNode{reference_driver}, 
+      descr=r"""determines the scaling factor for this CashFlow. Corresponds to
+                $x$ in the CashFlow equation. If $x$ is less than one, the per-unit
+                price decreases as the units sold increases above the \xmlNode{reference_driver},
                 and vice versa.""",
     )
     cf.addSub(x)
@@ -153,8 +161,8 @@ class CashFlow:
     depreciate = InputData.parameterInputFactory(
       "depreciate",
       contentType=InputTypes.IntegerType,
-      descr=r"""indicates the number of cycles over which this CashFlow should be 
-                depreciated. Depreciation schemes are assumed to be MACRS and available 
+      descr=r"""indicates the number of cycles over which this CashFlow should be
+                depreciated. Depreciation schemes are assumed to be MACRS and available
                 cycles are listed in the CashFlow submodule of RAVEN.""",
     )
     cf.addSub(depreciate)
@@ -168,9 +176,7 @@ class CashFlow:
     @ Out, None
     """
     # assert component is not None # TODO is this necessary? What if it's not a component-based cash flow?
-    self._component = (
-      component  # component instance to whom this cashflow belongs, if any
-    )
+    self._component = (component)  # component instance to whom this cashflow belongs, if any
     # equation values
     self._driver = None  # ValuedParam "quantity produced", D
     self._alpha = None  # ValuedParam "price per produced", a
@@ -189,6 +195,11 @@ class CashFlow:
     self._signals = set()  # variable values needed for this cash flow
     self._crossrefs = defaultdict(dict)
 
+  def _set_value(self, name, spec):
+    """
+    """
+    setattr(self, name, spec.value)
+
   def read_input(self, item):
     """
     Sets settings from input file
@@ -204,22 +215,20 @@ class CashFlow:
     self._npv_exempt = item.parameterValues.get("npv_exempt", False)
     # the remainder of the entries are ValuedParams, so they'll be evaluated as-needed
     for sub in item.subparts:
-      if sub.getName() == "driver":
-        self._driver = item.value
-        # self._set_valued_param('_driver', sub)
-      elif sub.getName() == "reference_price":
-        price_is_levelized = False
-       # price_is_levelized = self.set_reference_price(sub)  # setting "_alpha" here
-      elif sub.getName() == "reference_driver":
-        self._reference = item.value
-        # self._set_valued_param('_reference', sub)
-      elif sub.getName() == "scaling_factor_x":
-        self._scale = item.value
-        # self._set_valued_param('_scale', sub)
-      elif sub.getName() == "depreciate":
+      # Magic variables are dumb, but here we are.
+      name = sub.getName()
+      if name == "driver":
+        self._set_value("_driver", sub)
+      elif name == "reference_price":
+        price_is_levelized = self.set_reference_price(sub)
+      elif name == "reference_driver":
+        self._set_value("_reference", sub)
+      elif name == "scaling_factor_x":
+        self._set_value("_scale", sub)
+      elif name == "depreciate":
         self._depreciate = sub.value
       else:
-        raise IOError(f'Unrecognized "CashFlow" node: {sub.getName()}')
+        raise IOError(f"Unrecognized 'CashFlow' node: {sub.getName()}")
 
     # resolve levelized cost
     self._mult_target = price_is_levelized
@@ -235,9 +244,9 @@ class CashFlow:
     var_names = ["_reference", "_scale"]
     for name in var_names:
       if getattr(self, name) is None:
-        setattr(self, name, 1)
+        # setattr(self, name, 1)
         # TODO raise a warning?
-        # self._set_fixed_param(name, 1)
+        self._set_fixed_param(name, 1)
 
   def set_reference_price(self, node):
     """
@@ -252,7 +261,7 @@ class CashFlow:
         __ = node.popSub("levelized_cost")
 
     try:
-      self._set_valued_param("_alpha", node)
+      self._set_value("_alpha", node)
     except AttributeError as e:
       if levelized_cost:
         self._set_fixed_param("_alpha", 1)
@@ -332,19 +341,9 @@ class CashFlow:
     @ Out, params, dict, dictionary of parameters mapped to values including the cost
     """
     # TODO maybe don't cast these as floats, as they could be symbolic expressions (seems unlikely)
-    Dp = float(
-      self._reference.evaluate(values_dict, target_var="reference_driver")[0][
-        "reference_driver"
-      ]
-    )
-    x = float(
-      self._scale.evaluate(values_dict, target_var="scaling_factor_x")[0][
-        "scaling_factor_x"
-      ]
-    )
-    a = self._alpha.evaluate(values_dict, target_var="reference_price")[0][
-      "reference_price"
-    ]
+    Dp = float(self._reference.evaluate(values_dict, target_var="reference_driver")[0]["reference_driver"])
+    x = float(self._scale.evaluate(values_dict, target_var="scaling_factor_x")[0]["scaling_factor_x"])
+    a = self._alpha.evaluate(values_dict, target_var="reference_price")[0]["reference_price"]
     D = self._driver.evaluate(values_dict, target_var="driver")[0]["driver"]
     cost = a * (D / Dp) ** x
     params = {
