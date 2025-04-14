@@ -6,13 +6,15 @@ from unittest.mock import MagicMock, call, patch
 import numpy as np
 
 from DOVE.src.Dispatch.PyomoModelHandler import PyomoModelHandler
+from DOVE.src.Components import Component
+from DOVE.src.Interactions import Interaction
 
 class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
   def setUp(self):
     # Create patchers
-    pyomoRuleLibraryPatcher = patch("DOVE.src.Dispatch.PyomoModelHandler.prl")
-    pyomoStatePatcher = patch("DOVE.src.Dispatch.PyomoModelHandler.PyomoState")
+    pyomoRuleLibraryPatcher = patch("DOVE.src.Dispatch.PyomoModelHandler.prl", autospec=True)
+    pyomoStatePatcher = patch("DOVE.src.Dispatch.PyomoModelHandler.PyomoState", autospec=True)
 
     # Start patchers and store mocks
     self.mockPRL = pyomoRuleLibraryPatcher.start()
@@ -23,10 +25,11 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Additional mocks
     self.mockCase = MagicMock(name="mockCase")
-    self.mockComponent1 = MagicMock(name="mockComponent1")
-    self.mockComponent2 = MagicMock(name="mockComponent2")
+    self.mockComponent1 = MagicMock(name="mockComponent1", spec=Component)
+    self.mockComponent2 = MagicMock(name="mockComponent2", spec=Component)
     self.mockInitialStorage = MagicMock(name="mockInitialStorage")
     self.mockMeta = MagicMock(name="mockMeta")
+    self.mockInteraction = MagicMock(name="mockInteraction", spec=Interaction)
 
     # Helpful variables for PMH construction
     self.time = np.array([2, 4, 6, 8])
@@ -82,8 +85,8 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Set up test-specific patchers
     processComponentPatcher = patch.object(PyomoModelHandler, "_process_component")
-    createConservationPatcher = patch.object(PyomoModelHandler, "_create_conservation")
-    createObjectivePatcher = patch.object(PyomoModelHandler, "_create_objective")
+    createConservationPatcher = patch.object(PyomoModelHandler, "_create_conservation", autospec=True)
+    createObjectivePatcher = patch.object(PyomoModelHandler, "_create_objective", autospec=True)
 
     # Start test-specific patchers and store mocks
     mockProcessComponent = processComponentPatcher.start()
@@ -112,6 +115,80 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Check other calls
     mockCreateConservation.assert_called_once()
     mockCreateObjective.assert_called_once()
+
+  def testProcessComponent(self):
+
+    # Set up test-specific patchers
+    processGovernedComponentPatcher = patch.object(PyomoModelHandler, "_process_governed_component")
+    createStoragePatcher = patch.object(PyomoModelHandler, "_create_storage")
+    createProductionPatcher = patch.object(PyomoModelHandler, "_create_production")
+
+    # Start test-specific patchers and store mocks
+    mockProcessGovernedComponent = processGovernedComponentPatcher.start()
+    mockCreateStorage = createStoragePatcher.start()
+    mockCreateProduction = createProductionPatcher.start()
+
+    # Additional mock configuration
+    self.mockComponent1.get_interaction.return_value = self.mockInteraction
+
+    # Create PMH instance
+    testPMH = PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.mockMeta
+    )
+
+    ### With governed component
+
+    # Configure mock interaction
+    self.mockInteraction.is_governed.return_value = True
+
+    # Call method under test
+    testPMH._process_component(self.mockComponent1)
+
+    # Check that only correct function called
+    mockProcessGovernedComponent.assert_called_once_with(self.mockComponent1, self.mockInteraction)
+    mockCreateStorage.assert_not_called()
+    mockCreateProduction.assert_not_called()
+
+    ### With storage
+
+    # Configure mocks
+    self.mockInteraction.is_governed.return_value = False
+    self.mockInteraction.is_type.return_value = True
+
+    mockProcessGovernedComponent.reset_mock()
+
+    # Call method under test
+    testPMH._process_component(self.mockComponent1)
+
+    # Check type
+    self.mockInteraction.is_type.assert_called_once_with("HeronStorage")
+
+    # Check that only correct function called
+    mockProcessGovernedComponent.assert_not_called()
+    mockCreateStorage.assert_called_once_with(self.mockComponent1)
+    mockCreateProduction.assert_not_called()
+
+    ### With production
+
+    # Configure mocks
+    self.mockInteraction.is_type.return_value = False
+
+    mockCreateStorage.reset_mock()
+
+    # Call method under test
+    testPMH._process_component(self.mockComponent1)
+
+    # Check that only correct function called
+    mockProcessGovernedComponent.assert_not_called()
+    mockCreateStorage.assert_not_called()
+    mockCreateProduction.assert_called_once_with(self.mockComponent1)
+
 
 if __name__ == "__main__":
   unittest.main()
