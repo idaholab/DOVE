@@ -89,8 +89,8 @@ class TestInteraction(unittest.TestCase):
 
     # Reset mocks
     self.mockParameterInputFactory.side_effect = [self.mockSpecs, self.mockCapacity, self.mockCapFactor, self.mockMinimum]
-    self.mockParameterInputFactory.call_args_list = [] # This is crude, but it gets the job done
-    self.mockSpecs.addParam.call_args_list = []
+    self.mockParameterInputFactory.reset_mock()
+    self.mockSpecs.addParam.reset_mock()
 
     class testStorage(Interaction):
       tag = "stores"
@@ -110,8 +110,8 @@ class TestInteraction(unittest.TestCase):
 
     # Reset mocks
     self.mockParameterInputFactory.side_effect = [self.mockSpecs, self.mockCapacity, self.mockCapFactor, self.mockMinimum]
-    self.mockParameterInputFactory.call_args_list = []
-    self.mockSpecs.addParam.call_args_list = []
+    self.mockParameterInputFactory.call_args_list.reset_mock()
+    self.mockSpecs.addParam.call_args_list.reset_mock()
 
     class testDemand(Interaction):
       tag = "demands"
