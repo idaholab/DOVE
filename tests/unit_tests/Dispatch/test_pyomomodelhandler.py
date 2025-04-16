@@ -8,6 +8,7 @@ import numpy as np
 from DOVE.src.Dispatch.PyomoModelHandler import PyomoModelHandler
 from DOVE.src.Components import Component
 from DOVE.src.Interactions import Interaction
+from DOVE.src.Interactions import Storage
 
 class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
@@ -247,6 +248,88 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Check that only correct function called
     mockProcessStorageComponent.assert_not_called()
     mockCreateProductionParam.assert_called_once_with(self.mockComponent1, "expected_activity_value")
+
+  def testProcessStorageComponent(self):
+
+    # Set up test-specific patchers
+    createProductionParamPatcher = patch.object(PyomoModelHandler, "_create_production_param")
+
+    # Start test-specific patchers and store mocks
+    mockCreateProductionParam = createProductionParamPatcher.start()
+
+    # Configure additional mocks
+    self.mockInteraction.mock_add_spec(Storage)
+    activity = [0, 1, 3, 1]
+    # FIXME: Uncomment the below lines once get_strategy bug is fixed
+    # self.mockInteraction.get_strategy.return_value.evaluate.return_value = [{"level": activity}]
+    self.mockInteraction.get_initial_level.return_value = 1
+
+    self.mockComponent1.get_sqrt_RTE.return_value = 0.5
+
+    # Create PMH instance
+    testPMH = PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    testPMH._process_storage_component(self.mockComponent1, self.mockInteraction)
+
+    # Check interaction calls
+    self.mockInteraction.get_strategy.return_value.evaluate.assert_called_once_with(self.meta)
+    self.mockInteraction.get_initial_level.assert_called_once_with(self.meta)
+
+    # Check CreateProductionParam calls
+    # Equality checks don't work on entire numpy arrays, so we have to go through the calls manually
+
+    levelCallFound = False
+    chargeCallFound = False
+    dischargeCallFound = False
+
+    expectedCharge = np.array([0, -1, -2, 0])
+    expectedDischarge = np.array([0.25, 0, 0, 0.5])
+
+    expectedLevelCall = call(self.mockComponent1, activity, tag="level")
+    expectedChargeCall = call(self.mockComponent1, expectedCharge, tag="charge")
+    expectedDischargeCall = call(self.mockComponent1, expectedDischarge, tag="discharge")
+
+    # The equality operator returns an array of booleans; .all() checks that all elements are true
+    # Format: Call list -> specific call -> args/kwargs -> specific arg/kwarg
+    for cppCall in mockCreateProductionParam.call_args_list:
+      if cppCall[0][0] is self.mockComponent1 and cppCall[0][1] is activity and cppCall[1]["tag"] == "level":
+        levelCallFound = True
+      elif cppCall[0][0] is self.mockComponent1 and (cppCall[0][1] == expectedCharge).all() and cppCall[1]["tag"] == "charge":
+        chargeCallFound = True
+      elif cppCall[0][0] is self.mockComponent1 and (cppCall[0][1] == expectedDischarge).all() and cppCall[1]["tag"] == "discharge":
+        dischargeCallFound = True
+      else:
+        message =   "Unexpected call to PyomoModelHandler._create_production_param.\n"
+        expected = f"Expected: {[expectedLevelCall, expectedChargeCall, expectedDischargeCall]}\n"
+        actual =   f"  Actual: {cppCall}"
+        raise AssertionError(message + expected + actual)
+
+    if not levelCallFound:
+      message =   "Expected call to PyomoModelHandler._create_production_param not found.\n"
+      expected = f"Expected: {expectedLevelCall}\n"
+      actual =   f"  Actual: {mockCreateProductionParam.call_args_list}"
+      raise AssertionError(message + expected + actual)
+
+    if not chargeCallFound:
+      message =   "Expected call to PyomoModelHandler._create_production_param not found.\n"
+      expected = f"Expected: {expectedChargeCall}\n"
+      actual =   f"  Actual: {mockCreateProductionParam.call_args_list}"
+      raise AssertionError(message + expected + actual)
+
+    if not dischargeCallFound:
+      message =   "Expected call to PyomoModelHandler._create_production_param not found.\n"
+      expected = f"Expected: {expectedDischargeCall}\n"
+      actual =   f"  Actual: {mockCreateProductionParam.call_args_list}"
+      raise AssertionError(message + expected + actual)
 
 
 if __name__ == "__main__":
