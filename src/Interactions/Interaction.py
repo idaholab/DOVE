@@ -114,9 +114,7 @@ class Interaction(Base):
     """
     Base.__init__(self, **kwargs)
     self._capacity = None  # upper limit of this interaction
-    self._capacity_var = (
-      None  # which variable limits the capacity (could be produced or consumed?)
-    )
+    self._capacity_var = None  # which variable limits the capacity (could be produced or consumed?)
     self._capacity_factor = None  # ratio of actual output as fraction of _capacity
     self._signals = set()  # dependent signals for this interaction
     self._crossrefs = defaultdict(dict)  # crossrefs objects needed (e.g. armas, etc), as {attr: {tag, name, obj})
@@ -131,7 +129,7 @@ class Interaction(Base):
     self._sqrt_rte = 1.0  # sqrt of the round-trip efficiency for this interaction
     self._tracking_vars = []  # list of trackable variables for dispatch activity
 
-  def _set_fixed_value(name, value):
+  def _set_fixed_value(self, name, value):
     setattr(self, '_' + name, value)
 
   def _set_value(self, name, comp_name, spec):
@@ -177,13 +175,13 @@ class Interaction(Base):
           f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!',
         )
 
-  def finalize_init(self):
-    """
-    Post-input reading final initialization.
-    @ In, None
-    @ Out, None
-    """
-    # nothing to do in general
+  # def finalize_init(self):
+  #   """
+  #   Post-input reading final initialization.
+  #   @ In, None
+  #   @ Out, None
+  #   """
+  #   # nothing to do in general
 
   def get_capacity(self):
     """
@@ -313,56 +311,6 @@ class Interaction(Base):
     """
     # Default option is False; specifics by interaction type
     return False
-
-  def check_expected_present(self, data, expected, premessage):
-    """
-    checks dict to make sure members are present and not None
-    @ In, data, dict, variable set to check against
-    @ In, expected, list, list of expected entries
-    @ In, premessage, str, prepend message to add to print
-    @ Out, None
-    """
-    # check missing
-    missing = list(d for d in expected if d not in data)
-    if missing:
-      self.raiseAWarning(premessage, "| Expected variables are missing:", missing)
-    # check None
-    nones = list(d for d, v in data.items() if (v is None and v in expected))
-    if nones:
-      self.raiseAWarning(premessage, "| Expected variables are None:", nones)
-    if missing or nones:
-      self.raiseAnError(
-        RuntimeError,
-        "Some variables were missing or None! See warning messages above for details!",
-      )
-
-  def _check_capacity_limit(self, res, amt, balance, meta, raven_vars, dispatch, t):
-    """
-    Check to see if capacity limits of this component have been violated.
-    @ In, res, str, name of capacity-limiting resource
-    @ In, amt, float, requested amount of resource used in interaction
-    @ In, balance, dict, results of requested interaction
-    @ In, meta, dict, additional variable passthrough
-    @ In, raven_vars, dict, TODO part of meta! consolidate!
-    @ In, dispatch, dict, TODO part of meta! consolidate!
-    @ In, t, int, TODO part of meta! consolidate!
-    @ Out, balance, dict, new results of requested action, possibly modified if capacity hit
-    @ Out, meta, dict, additional variable passthrough
-    """
-    cap = self.get_capacity(meta)[0][self._capacity_var]
-    try:
-      if abs(balance[self._capacity_var]) > abs(cap):
-        # ttttt
-        # do the inverse problem: how much can we make?
-        balance, meta = self.produce_max(meta, raven_vars, dispatch, t)
-        print(
-          f"The full requested amount ({res}: {amt}) was not possible, so accessing maximum available instead ({res}: {balance[res]})."
-        )
-    except KeyError:
-      raise SyntaxError(
-        f'Resource "{self._capacity_var}" is listed as capacity limiter, but not an output of the component! Got: {balance}'
-      )
-    return balance, meta
 
   def get_transfer(self):
     """

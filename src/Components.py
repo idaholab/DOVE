@@ -46,7 +46,7 @@ class Component(Base):
     input_specs.addSub(CashFlowGroup.get_input_specs())
     return input_specs
 
-  def __init__(self, **kwargs):
+  def __init__(self, **kwargs) -> None:
     """
     Constructor
     @ In, kwargs, dict, optional, arguments to pass to other constructors
@@ -61,7 +61,7 @@ class Component(Base):
     self._economics = None
     self.levelized_meta = {}
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     """
     String representation.
     @ In, None
@@ -69,38 +69,39 @@ class Component(Base):
     """
     return f'<DOVE Component "{self.name}">'
 
-  def handle_produces(self, item):
+  def handle_produces(self, item) -> None:
     """ """
     producer = Producer(messageHandler=self.messageHandler)
     producer.read_input(item, self.name)
     self._interaction = producer
 
-  def handle_stores(self, item):
+  def handle_stores(self, item) -> None:
     """ """
     storage = Storage(messageHandler=self.messageHandler)
     storage.read_input(item, self.name)
     self._interaction = storage
 
-  def handle_demands(self, item):
-    """ """
+  def handle_demands(self, item) -> None:
+    """
+
+    """
     demands = Demand(messageHandler=self.messageHandler)
     demands.read_input(item, self.name)
     self._interaction = demands
 
-  def handle_economics(self, item):
+  def handle_economics(self, item) -> None:
     """ """
     cf_group = CashFlowGroup(messageHandler=self.messageHandler)
     cf_group.read_input(item)
     self._economics = cf_group
 
-  def read_input(self, xml):
+  def read_input(self, xml) -> None:
     """
     Sets settings from input file
     @ In, xml, xml.etree.ElementTree.Element, input from user
     @ In, mode, string, case mode to operate in (e.g. 'sweep' or 'opt')
     @ Out, None
     """
-    print("HELLO")
     # get specs for allowable inputs
     specs = self.get_input_specs()()
     specs.parseNode(xml)
@@ -152,7 +153,7 @@ class Component(Base):
     # if anything left, there's an issue
     assert not refs
 
-  def get_interaction(self):
+  def get_interaction(self) -> Producer | Storage | Demand:
     """
     Return the interactions this component uses.
     TODO could this just return the only non-empty one, since there can only be one?
@@ -334,7 +335,7 @@ class Component(Base):
     """
     return self.get_economics().evaluate_cfs(activity, meta, marginal=marginal)
 
-  def get_economics(self):
+  def get_economics(self) -> CashFlowGroup:
     """
       Accessor for economics.
       @ In, None

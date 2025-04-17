@@ -25,7 +25,7 @@ class Storage(Interaction):
     # initial stored
     descr = r"""indicates what percent of the storage unit is full at the start of each optimization sequence,
               from 0 to 1. \default{0.0}. """
-    sub = InputData.parameterInputFactory("initial_stored", contentType=InputTypes.FloatOrIntType, descr=descr)  
+    sub = InputData.parameterInputFactory("initial_stored", contentType=InputTypes.FloatOrIntType, descr=descr)
     # vp_factory.make_input_specs('initial_stored', descr=descr)
     specs.addSub(sub)
 
@@ -41,7 +41,7 @@ class Storage(Interaction):
     specs.addSub(InputData.parameterInputFactory("strategy", contentType=InputTypes.StringType, descr=descr))
     # specs.addSub(vp_factory.make_input_specs('strategy', allowed=['Function'], descr=descr))
     # round trip efficiency
-    
+
     descr = r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
     specs.addSub(InputData.parameterInputFactory("RTE", contentType=InputTypes.FloatType, descr=descr))
     return specs
@@ -154,74 +154,6 @@ class Storage(Interaction):
     self.raiseADebug(pre + "  stores:", self._stores)
     self.raiseADebug(pre + "  rate:", self._rate)
     self.raiseADebug(pre + "  capacity:", self._capacity)
-
-  def _check_capacity_limit(
-    self, res, amt, balance, meta, raven_vars, dispatch, t, level
-  ):
-    """
-    Check to see if capacity limits of this component have been violated.
-    overloads Interaction method, since units for storage are "res" not "res per second"
-    @ In, res, str, name of capacity-limiting resource
-    @ In, amt, float, requested amount of resource used in interaction
-    @ In, balance, dict, results of requested interaction
-    @ In, meta, dict, additional variable passthrough
-    @ In, raven_vars, dict, TODO part of meta! consolidate!
-    @ In, dispatch, dict, TODO part of meta! consolidate!
-    @ In, t, int, TODO part of meta! consolidate!
-    @ In, level, float, current level of storage
-    @ Out, balance, dict, new results of requested action, possibly modified if capacity hit
-    @ Out, meta, dict, additional variable passthrough
-    """
-    # note "amt" has units of AMOUNT not RATE (resource, not resource per second)
-    sign = np.sign(amt)
-    # are we storing or providing?
-    # print('DEBUGG supposed current level:', level)
-    if sign < 0:
-      # we are being asked to consume some
-      cap, meta = self.get_capacity(meta, raven_vars, dispatch, t)
-      available_amount = cap[res] - level
-      # print('Supposed Capacity, Only calculated ins sign<0 (being asked to consumer)',cap)
-    else:
-      # we are being asked to produce some
-      available_amount = level
-    # the amount we can consume is the minimum of the requested or what's available
-    delta = sign * min(available_amount, abs(amt))
-    return {res: delta}, meta
-
-  def _check_rate_limit(self, res, amt, balance, meta, raven_vars, dispatch, t):
-    """
-    Determines the limiting rate of in/out production for storage
-    @ In, res, str, name of capacity-limiting resource
-    @ In, amt, float, requested amount of resource used in interaction
-    @ In, balance, dict, results of requested interaction
-    @ In, meta, dict, additional variable passthrough
-    @ In, raven_vars, dict, TODO part of meta! consolidate!
-    @ In, dispatch, dict, TODO part of meta! consolidate!
-    @ In, t, int, TODO part of meta! consolidate!
-    @ Out, balance, dict, new results of requested action, possibly modified if capacity hit
-    @ Out, meta, dict, additional variable passthrough
-    """
-    # TODO distinct up/down rates
-    # check limiting rate for resource flow in/out, if any
-    if self._rate:
-      request = {res: None}
-      inputs = {
-        "request": request,
-        "meta": meta,
-        "raven_vars": raven_vars,
-        "dispatch": dispatch,
-        "t": t,
-      }
-      max_rate = self._rate.evaluate(inputs, target_var=res)[0][res]
-      delta = np.sign(amt) * min(max_rate, abs(amt))
-      print(
-        "max_rate in _check_rate_limit",
-        max_rate,
-        "delta (min of maxrate and abs(amt)",
-        delta,
-      )
-      return {res: delta}, meta
-    return {res: amt}, meta
 
   def get_initial_level(self, meta):
     """

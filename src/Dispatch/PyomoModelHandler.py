@@ -5,6 +5,7 @@ This module constructs the dispatch optimization model used by HERON.
 """
 
 import numpy as np
+import numpy.typing as npt
 import pyomo.environ as pyo
 from typing import cast
 
@@ -19,7 +20,7 @@ class PyomoModelHandler:
 
   _eps = 1e-9
 
-  def __init__(self, time, time_offset, case, components, resources, initial_storage, meta) -> None:
+  def __init__(self, time: npt.NDArray[np.float64], time_offset: int, case, components, resources, initial_storage, meta) -> None:
     """
     Initializes a PyomoModelHandler instance.
     @ In, time, np.array(float), time values to evaluate; may be length 1 or longer
@@ -112,7 +113,7 @@ class PyomoModelHandler:
     """
     activity = interaction.get_strategy().evaluate(self.meta)[0]["level"]
     self._create_production_param(component, activity, tag="level")
-    dt = self.model.Times.at(1) - self.model.Times.at(0)
+    dt = self.model.Times[1] - self.model.Times[0]
     rte2 = component.get_sqrt_RTE()
     deltas = np.zeros(len(activity))
     deltas[1:] = activity[1:] - activity[:-1]
@@ -447,7 +448,7 @@ class PyomoModelHandler:
     # periodic boundary condition for storage level
     if comp.get_interaction().apply_periodic_level:
       level_var = getattr(self.model, level_name)
-      initial = level_var[(r, self.model.T.at(-1))]
+      initial = level_var[(r, self.model.T[-1])]
     else:
       initial = self.initial_storage[comp]
     rule = lambda mod, t: prl.level_rule(comp, level_name, charge_name, discharge_name, initial, r, mod, t)
