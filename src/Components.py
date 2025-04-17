@@ -26,9 +26,9 @@ class Component(Base):
       "Component",
       ordered=False,
       baseNode=None,
-      descr=r"""defines a component as an element of the grid system.
+      descr="""defines a component as an element of the grid system.
                 Components are defined by the action they perform such as
-                \xmlNode{produces} or \xmlNode{consumes}; see details below.""",
+                \\xmlNode{produces} or \\xmlNode{consumes}; see details below.""",
     )
 
     input_specs.addParam(
@@ -55,9 +55,9 @@ class Component(Base):
     Base.__init__(self, **kwargs)
     self.name = None
     self._interaction = None
-    self._produces = []
-    self._stores = []
-    self._demands = []
+    # self._produces = []
+    # self._stores = []
+    # self._demands = []
     self._economics = None
     self.levelized_meta = {}
 

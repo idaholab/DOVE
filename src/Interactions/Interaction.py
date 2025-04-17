@@ -175,14 +175,6 @@ class Interaction(Base):
           f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!',
         )
 
-  # def finalize_init(self):
-  #   """
-  #   Post-input reading final initialization.
-  #   @ In, None
-  #   @ Out, None
-  #   """
-  #   # nothing to do in general
-
   def get_capacity(self):
     """
     Returns the capacity of this interaction.
