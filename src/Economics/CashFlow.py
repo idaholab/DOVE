@@ -1,7 +1,12 @@
-from collections import defaultdict
+# Copyright 2020, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+"""
+CashFlow Module
+"""
 import numpy as np
-from ravenframework.utils import InputData, InputTypes
+from collections import defaultdict
 
+from ravenframework.utils import InputData, InputTypes
 
 class CashFlow:
   """
@@ -14,7 +19,7 @@ class CashFlow:
     D' is the nominal amount of widgets sold
     x is the scaling factor
   """
-  def __repr__(self):
+  def __repr__(self) -> str:
     """
     String representation.
     @ In, None
@@ -23,7 +28,7 @@ class CashFlow:
     return f'<DOVE CashFlow "{self.name}">'
 
   @classmethod
-  def get_input_specs(cls):
+  def get_input_specs(cls) -> type[InputData.ParameterInput]:
     """
     Collects input specifications for this class.
     @ In, None
@@ -50,7 +55,7 @@ class CashFlow:
 
     cf.addParam(
       "type",
-      param_type=InputTypes.makeEnumType("CFType", "CFType", ["one-time", "repeating"]),
+      param_type=InputTypes.makeEnumType("CFType", "CFType", ["one-time", "repeating"]), #type: ignore
       required=True,
       descr=r"""the type of CashFlow to calculate. \xmlString{one-time}
                 is suitable for capital expenditure CashFlows, while \xmlString{repeating}
@@ -60,7 +65,7 @@ class CashFlow:
 
     cf.addParam(
       "taxable",
-      param_type=InputTypes.BoolType,
+      param_type=InputTypes.BoolType, #type: ignore
       required=True,
       descr=r"""determines whether this CashFlow is taxed every cycle.""",
     )
@@ -75,7 +80,7 @@ class CashFlow:
 
     cf.addParam(
       "mult_target",
-      param_type=InputTypes.BoolType,
+      param_type=InputTypes.BoolType, #type: ignore
       required=False,
       descr=r"""\WARNING{DEPRECATED} indicates whether this parameter should be
                 a target of the multiplication factor for NPV matching analyses.
@@ -87,9 +92,9 @@ class CashFlow:
 
     cf.addParam(
       "npv_exempt",
-      param_type=InputTypes.BoolType,
+      param_type=InputTypes.BoolType, #type: ignore
       required=False,
-      default=False,
+      default=False, #type: ignore
       descr=r"""indicates whether this CashFlow should be exempt from
                 Net Present Value (NPV) calculations. Setting this parameter to
                 ``True'' will allow the CashFlow to be used within the dispatch
@@ -102,9 +107,7 @@ class CashFlow:
 
     cf.addParam(
       "period",
-      param_type=InputTypes.makeEnumType(
-        "period_opts", "period_opts", ["hour", "year"]
-      ),
+      param_type=InputTypes.makeEnumType("period_opts", "period_opts", ["hour", "year"]), #type: ignore
       required=False,
       descr=r"""for a \xmlNode{CashFlow} with \xmlAttr{type} \xmlString{repeating},
                 indicates whether the CashFlow repeats every time step (\xmlString{hour})
@@ -169,58 +172,57 @@ class CashFlow:
 
     return cf
 
-  def __init__(self, component=None):
+  def __init__(self, component) -> None:
     """
     Constructor
     @ In, component, CashFlowUser instance, cash flow user to which this cash flow belongs
     @ Out, None
     """
-    # assert component is not None # TODO is this necessary? What if it's not a component-based cash flow?
-    self._component = (component)  # component instance to whom this cashflow belongs, if any
-    # equation values
+    self._component = component  # component instance to whom this cashflow belongs, if any
     self._driver = None  # ValuedParam "quantity produced", D
     self._alpha = None  # ValuedParam "price per produced", a
     self._reference = None  # ValuedParam "where price is accurate", D'
     self._scale = None  # ValuedParam "economy of scale", x
-    # other params
     self.name = None  # base name of cash flow
     self._type = None  # needed? one-time, yearly, repeating
     self._taxable = None  # apply tax or not
     self._inflation = None  # apply inflation or not
-    self._mult_target = None  # not clear
     self._npv_exempt = None  # inlcude cashflow in NPV calculation
     self._depreciate = None
     self._period = None  # period for recurring cash flows
-    # other members
     self._signals = set()  # variable values needed for this cash flow
     self._crossrefs = defaultdict(dict)
+    self._price_is_levelized = False
 
-  def _set_value(self, name, spec):
+  def _set_value(self, name, spec) -> None:
     """
     """
     setattr(self, name, spec.value)
 
-  def read_input(self, item):
+  def _set_fixed_param(self, name, value) -> None:
+    """
+    """
+    setattr(self, name, value)
+
+  def read_input(self, item) -> None:
     """
     Sets settings from input file
     @ In, item, InputData.ParameterInput, parsed specs from user
     @ Out, None
     """
     self.name = item.parameterValues["name"]
-    # handle type directly here momentarily
     self._taxable = item.parameterValues["taxable"]
     self._inflation = item.parameterValues["inflation"]
     self._type = item.parameterValues["type"]
     self._period = item.parameterValues.get("period", "hour")
     self._npv_exempt = item.parameterValues.get("npv_exempt", False)
-    # the remainder of the entries are ValuedParams, so they'll be evaluated as-needed
+    
     for sub in item.subparts:
-      # Magic variables are dumb, but here we are.
       name = sub.getName()
       if name == "driver":
         self._set_value("_driver", sub)
       elif name == "reference_price":
-        price_is_levelized = self.set_reference_price(sub)
+        self.set_reference_price(sub)
       elif name == "reference_driver":
         self._set_value("_reference", sub)
       elif name == "scaling_factor_x":
@@ -230,47 +232,32 @@ class CashFlow:
       else:
         raise IOError(f"Unrecognized 'CashFlow' node: {sub.getName()}")
 
-    # resolve levelized cost
-    self._mult_target = price_is_levelized
-    # user asked to find Time Invariant levelized cost
-    if self._alpha is None and price_is_levelized:
-      self._set_fixed_param("_alpha", 1)
-
-    # driver is required!
     if self._driver is None:
       raise IOError(f"No <driver> node provided for CashFlow {self.name}!")
 
-    # defaults
     var_names = ["_reference", "_scale"]
     for name in var_names:
       if getattr(self, name) is None:
-        # setattr(self, name, 1)
-        # TODO raise a warning?
         self._set_fixed_param(name, 1)
 
-  def set_reference_price(self, node):
+  def set_reference_price(self, node) -> None:
     """
     Sets the reference_price attribute based on given ValuedParam or if Levelized Cost
     @ In, node, InputParams.ParameterInput, reference_price head node
     @ Out, price_is_levelized, bool, are we computing levelized cost for this cashflow?
     """
-    levelized_cost = False
     for sub in node.subparts:
       if sub.name == "levelized_cost":
-        levelized_cost = True
+        self._price_is_levelized = True
         __ = node.popSub("levelized_cost")
 
     try:
       self._set_value("_alpha", node)
     except AttributeError as e:
-      if levelized_cost:
+      if self._price_is_levelized:
         self._set_fixed_param("_alpha", 1)
       else:
-        raise IOError(
-          f"No <reference_price> node provided for CashFlow {self.name}!"
-        ) from e
-    price_is_levelized = bool(levelized_cost)
-    return price_is_levelized
+        raise IOError(f"No <reference_price> node provided for CashFlow {self.name}!") from e
 
   # Not none set it to default 1
   def get_period(self):
@@ -355,17 +342,6 @@ class CashFlow:
     }  # TODO float(cost) except in pyomo it's not a float
     return params
 
-  #######
-  # API #
-  #######
-  def get_price(self):
-    """
-    Getter for Cashflow Price
-    @ In, None
-    @ Out, alpha, ValuedParam, valued param for the cash flow price
-    """
-    return self._alpha
-
   def get_driver(self):
     """
     Getter for Cashflow Driver
@@ -373,22 +349,6 @@ class CashFlow:
     @ Out, driver, ValuedParam, valued param for the cash flow driver
     """
     return self._driver
-
-  def get_reference(self):
-    """
-    Getter for Cashflow Reference Driver
-    @ In, None
-    @ Out, reference, ValuedParam, valued param for the cash flow reference driver
-    """
-    return self._reference
-
-  def get_scale(self):
-    """
-    Getter for Cashflow Scale
-    @ In, None
-    @ Out, scale, ValuedParam, valued param for the cash flow economy of scale
-    """
-    return self._scale
 
   def get_type(self):
     """
@@ -428,7 +388,7 @@ class CashFlow:
     @ In, None
     @ Out, taxable, bool, is cashflow a multiplier target?
     """
-    return self._mult_target
+    return self._price_is_levelized
 
   def is_npv_exempt(self):
     """

@@ -2,12 +2,10 @@
 Defines the Economics entity.
 Each component (or source?) can have one of these to describe its economics.
 """
-
-from ravenframework.utils import InputData, InputTypes
-
 from DOVE.src import Base
 from DOVE.src.Economics.CashFlow import CashFlow
 
+from ravenframework.utils import InputData, InputTypes
 
 class CashFlowGroup(Base):
   """
@@ -17,11 +15,11 @@ class CashFlowGroup(Base):
   tag = "economics"
 
   @classmethod
-  def get_input_specs(cls):
+  def get_input_specs(cls) -> type[InputData.ParameterInput]:
     """
     Collects input specifications for this class.
-    @ In, None
-    @ Out, input_specs, InputData, specs
+    @In, None
+    @Out, input_specs, ParameterInput, specs
     """
     specs = InputData.parameterInputFactory(
       "economics",
@@ -44,7 +42,7 @@ class CashFlowGroup(Base):
     specs.addSub(CashFlow.get_input_specs())
     return specs
 
-  def __init__(self, component=None, **kwargs):
+  def __init__(self, component, **kwargs):
     """
     Constructor.
     @ In, component, CashFlowUser instance, object to which this group belongs
@@ -56,28 +54,21 @@ class CashFlowGroup(Base):
     self._lifetime = None  # lifetime of the component
     self._cash_flows = []
 
-  def read_input(self, source, xml=False):
+  def read_input(self, specs: InputData.ParameterInput) -> None:
     """
     Sets settings from input file
     @ In, source, InputData.ParameterInput, input from user
     @ In, xml, bool, if True then XML is passed in, not input data
     @ Out, None
     """
-    # allow read_input argument to be either xml or input specs
-    if xml:
-      specs = self.get_input_specs()()
-      specs.parseNode(source)
-    else:
-      specs = source
-    # read in specs
     for item in specs.subparts:
-      if item.getName() == "lifetime":
+      item_name = item.getName()
+      if item_name == "lifetime":
         self._lifetime = item.value
-      elif item.getName() == "CashFlow":
-        new = CashFlow()
+      elif item_name == "CashFlow":
+        new = CashFlow(self._component)
         new.read_input(item)
         self._cash_flows.append(new)
-    return self
 
   def get_crossrefs(self):
     """
@@ -102,11 +93,7 @@ class CashFlowGroup(Base):
           break
       else:
         cf.set_crossrefs({})
-    # perform checks
 
-  #######
-  # API #
-  #######
   def evaluate_cfs(self, activity, meta, marginal=False):
     """
     Calculates the incremental cost of a particular system configuration.

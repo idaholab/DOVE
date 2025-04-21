@@ -1,13 +1,13 @@
+# Copyright 2020, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 """
-Defines the Component entity.
+Component Module
 """
-
-from ravenframework.utils import InputData, InputTypes
-
 from DOVE.src import Base
 from DOVE.src.Economics import CashFlowGroup
 from DOVE.src.Interactions import Demand, Producer, Storage
 
+from ravenframework.utils import InputData, InputTypes
 
 class Component(Base):
   """
@@ -16,7 +16,7 @@ class Component(Base):
   and a single CashFlowGroup which is a container for component associated cashflows.
   """
   @classmethod
-  def get_input_specs(cls):
+  def get_input_specs(cls) -> type[InputData.ParameterInput]:
     """
     Collects input specifications for this class.
     @ In, None
@@ -27,8 +27,8 @@ class Component(Base):
       ordered=False,
       baseNode=None,
       descr="""defines a component as an element of the grid system.
-                Components are defined by the action they perform such as
-                \\xmlNode{produces} or \\xmlNode{consumes}; see details below.""",
+               Components are defined by the action they perform such as
+              \\xmlNode{produces} or \\xmlNode{consumes}; see details below.""",
     )
 
     input_specs.addParam(
@@ -55,9 +55,6 @@ class Component(Base):
     Base.__init__(self, **kwargs)
     self.name = None
     self._interaction = None
-    # self._produces = []
-    # self._stores = []
-    # self._demands = []
     self._economics = None
     self.levelized_meta = {}
 
@@ -69,61 +66,40 @@ class Component(Base):
     """
     return f'<DOVE Component "{self.name}">'
 
-  def handle_produces(self, item) -> None:
-    """ """
-    producer = Producer(messageHandler=self.messageHandler)
-    producer.read_input(item, self.name)
-    self._interaction = producer
-
-  def handle_stores(self, item) -> None:
-    """ """
-    storage = Storage(messageHandler=self.messageHandler)
-    storage.read_input(item, self.name)
-    self._interaction = storage
-
-  def handle_demands(self, item) -> None:
-    """
-
-    """
-    demands = Demand(messageHandler=self.messageHandler)
-    demands.read_input(item, self.name)
-    self._interaction = demands
-
-  def handle_economics(self, item) -> None:
-    """ """
-    cf_group = CashFlowGroup(messageHandler=self.messageHandler)
-    cf_group.read_input(item)
-    self._economics = cf_group
-
   def read_input(self, xml) -> None:
     """
     Sets settings from input file
-    @ In, xml, xml.etree.ElementTree.Element, input from user
-    @ In, mode, string, case mode to operate in (e.g. 'sweep' or 'opt')
-    @ Out, None
+    @In, xml, xml.etree.ElementTree.Element, component information from xml input file. 
+    @Out, None
     """
     # get specs for allowable inputs
     specs = self.get_input_specs()()
     specs.parseNode(xml)
     self.name = specs.parameterValues["name"]
-
-    handlers = {
-      "produces": self.handle_produces,
-      "stores": self.handle_stores,
-      "demands": self.handle_demands,
-      "economics": self.handle_economics,
+    interaction_map = {
+      "produces": Producer,
+      "stores": Storage,
+      "demands": Demand
     }
 
+    found_interactions: dict
+    not_found_in_spec: list
+    found_interactions, not_found_in_spec = specs.findNodesAndExtractValues(interaction_map.keys())
+    if all((interaction == 'no-default' for interaction in found_interactions.values())):
+      self.raiseAnError(NotImplementedError, f"No interaction found for Component '{self.name}'")
+    elif len(not_found_in_spec) < 2:
+      self.raiseAnError(NotImplementedError, f"A Component can only have one interaction! Check Component '{self.name}'")
+       
     for item in specs.subparts:
       item_name = item.getName()
-      if self.get_interaction() and item_name in ["produces", "stores", "demands"]:
-        self.raiseAnError(
-          NotImplementedError,
-          f'Currently each Component can only have one interaction (produces, stores, demands)! Check Component "{self.name}"',
-        )
-      handler = handlers.get(item_name)
-      if handler:
-        handler(item)
+      if item_name in interaction_map:
+        interaction_instance = interaction_map[item_name](messageHandler=self.messageHandler)
+        interaction_instance.read_input(item, self.name)
+        self._interaction = interaction_instance
+      elif item_name == 'economics':
+        cashflows = CashFlowGroup(self, messageHander=self.messageHandler)
+        cashflows.read_input(item)
+        self._economics = cashflows
 
   def get_crossrefs(self):
     """

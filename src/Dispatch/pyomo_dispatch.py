@@ -6,6 +6,7 @@ pyomo-based dispatch strategy
 
 import pprint
 import time as time_mod
+from typing import Optional
 
 import numpy as np
 import pyomo.environ as pyo
@@ -97,7 +98,7 @@ class Pyomo(Dispatcher):
     # TODO specific for pyomo dispatcher
     return specs
 
-  def __init__(self):
+  def __init__(self) -> None:
     """
     Constructor.
     @ In, None
@@ -144,19 +145,9 @@ class Pyomo(Dispatcher):
       if key is not None:
         self.solve_options[key] = solver_tol
       else:
-        raise ValueError(
-          f"Tolerance setting not available for solver '{self._solver}'."
-        )
+        raise ValueError(f"Tolerance setting not available for solver '{self._solver}'.")
 
-  def get_solver(self):
-    """
-    Retrieves the solver information (if applicable)
-    @ In, None
-    @ Out, solver, str, name of solver used
-    """
-    return self._solver
-
-  def dispatch(self, case, components, sources, meta):
+  def dispatch(self, case, components, sources, meta) -> Optional[NumpyState]:
     """
     Performs dispatch.
     @ In, case, HERON Case, Case that this dispatch is part of
@@ -198,9 +189,7 @@ class Pyomo(Dispatcher):
       for comp in components:
         for tag in comp.get_tracking_vars():
           for res, values in subdisp[comp.name][tag].items():
-            dispatch.set_activity_vector(
-              comp, res, values, tracker=tag, start_idx=start_index, end_idx=end_index
-            )
+            dispatch.set_activity_vector(comp, res, values, tracker=tag, start_idx=start_index, end_idx=end_index)
       start_index = end_index
 
     return dispatch
@@ -229,9 +218,7 @@ class Pyomo(Dispatcher):
     @ Out, subdisp, dict, results of window dispatch.
     """
     start = time_mod.time()
-    subdisp = self._dispatch_window(
-      specific_time, start_index, case, components, resources, initial_levels, meta
-    )
+    subdisp = self._dispatch_window(specific_time, start_index, case, components, resources, initial_levels, meta)
 
     if self._needs_convergence(components):
       conv_counter = 0
@@ -240,27 +227,19 @@ class Pyomo(Dispatcher):
 
       while not converged and conv_counter < self._picard_limit:
         conv_counter += 1
-        print(
-          f"DEBUGG iteratively solving window, iteration {conv_counter}/{self._picard_limit} ..."
-        )
-        subdisp = self._dispatch_window(
-          specific_time, start_index, case, components, resources, initial_levels, meta
-        )
+        print(f"DEBUGG iteratively solving window, iteration {conv_counter}/{self._picard_limit} ...")
+        subdisp = self._dispatch_window(specific_time, start_index, case, components, resources, initial_levels, meta)
         converged = self._check_if_converged(subdisp, previous, components)
         previous = subdisp
 
       if conv_counter >= self._picard_limit and not converged:
-        raise DispatchError(
-          f"Convergence not reached after {self._picard_limit} iterations."
-        )
+        raise DispatchError(f"Convergence not reached after {self._picard_limit} iterations.")
 
     end = time_mod.time()
     solve_time = end - start
     return subdisp, solve_time
 
-  def _dispatch_window(
-    self, time, time_offset, case, components, resources, initial_storage, meta
-  ):
+  def _dispatch_window(self, time, time_offset, case, components, resources, initial_storage, meta):
     """
     Dispatches one part of a rolling window.
     @ In, time, np.array, value of time to evaluate
@@ -273,9 +252,7 @@ class Pyomo(Dispatcher):
     @ In, meta, dict, additional variables passed through
     @ Out, result, dict, results of window dispatch
     """
-    model = PyomoModelHandler(
-      time, time_offset, case, components, resources, initial_storage, meta
-    )
+    model = PyomoModelHandler(time, time_offset, case, components, resources, initial_storage, meta)
     model.populate_model()
     result = self._solve_dispatch(model, meta)
     return result
@@ -356,9 +333,7 @@ class Pyomo(Dispatcher):
 
       # try validating
       print("DEBUGG ... validating ...")
-      validation_errs = self.validate(
-        m.model.Components, m.model.Activity, m.model.Times, meta
-      )
+      validation_errs = self.validate(m.model.Components, m.model.Activity, m.model.Times, meta)
       if validation_errs:
         done_and_checked = False
         print("DEBUGG ... validation concerns raised:")

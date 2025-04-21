@@ -1,7 +1,9 @@
 """ """
 
 from collections import defaultdict
+from numbers import Real
 from ravenframework.utils import InputData, InputTypes
+from ravenframework.utils.InputData import ParameterInput
 
 from DOVE.src.Base import Base
 
@@ -14,7 +16,7 @@ class Interaction(Base):
   tag = "interacts"  # node name in input file
 
   @classmethod
-  def get_input_specs(cls):
+  def get_input_specs(cls) -> type[ParameterInput]:
     """
     Collects input specifications for this class.
     @ In, None
@@ -106,7 +108,7 @@ class Interaction(Base):
 
     return specs
 
-  def __init__(self, **kwargs):
+  def __init__(self, **kwargs) -> None:
     """
     Constructor
     @ In, kwargs, dict, arbitrary pass-through arguments
@@ -123,19 +125,21 @@ class Interaction(Base):
     self._minimum_var = None  # limiting variable for minimum
     self.ramp_limit = None  # limiting change of production in a time step
     self.ramp_freq = None  # time steps required between production ramping events
-    self._function_method_map = {}  # maps things that call functions to the method within the function that needs calling
     self._transfer = None  # the production rate (if any), in produces per consumes
-    #   for example, {(Producer, 'capacity'): 'method'}
     self._sqrt_rte = 1.0  # sqrt of the round-trip efficiency for this interaction
     self._tracking_vars = []  # list of trackable variables for dispatch activity
 
-  def _set_fixed_value(self, name, value):
-    setattr(self, '_' + name, value)
+  def _set_fixed_value(self, name: str, value: Real) -> None:
+    """
+    """
+    setattr(self, name, value)
 
-  def _set_value(self, name, comp_name, spec):
+  def _set_value(self, name: str, comp_name: str, spec: InputData.ParameterInput) -> None:
+    """
+    """
     setattr(self, name, spec.value)
 
-  def read_input(self, specs, comp_name):
+  def read_input(self, specs: InputData.ParameterInput, comp_name: str) -> None:
     """
     Sets settings from input file
     @ In, specs, InputData, specs
@@ -161,19 +165,13 @@ class Interaction(Base):
       if len(resources) == 1:
         self._capacity_var = list(resources)[0]
       else:
-        self.raiseAnError(
-          IOError,
-          f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!',
-        )
+        self.raiseAnError(IOError,f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!')
     ## minimum: basically the same as capacity, functionally
     if self._minimum and self._minimum_var is None:
       if len(resources) == 1:
         self._minimum_var = list(resources)[0]
       else:
-        self.raiseAnError(
-          IOError,
-          f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!',
-        )
+        self.raiseAnError(IOError, f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!')
 
   def get_capacity(self):
     """
@@ -287,7 +285,7 @@ class Interaction(Base):
     """
     return self._dispatchable
 
-  def is_type(self, typ):
+  def is_type(self, typ: str) -> bool:
     """
     Checks if this interaction matches the request.
     @ In, typ, string, name to check against
@@ -295,13 +293,12 @@ class Interaction(Base):
     """
     return typ == self.__class__.__name__
 
-  def is_governed(self):
+  def is_governed(self) -> bool:
     """
     Determines if this interaction is optimizable or governed by some function.
     @ In, None
     @ Out, is_governed, bool, whether this component is governed.
     """
-    # Default option is False; specifics by interaction type
     return False
 
   def get_transfer(self):
