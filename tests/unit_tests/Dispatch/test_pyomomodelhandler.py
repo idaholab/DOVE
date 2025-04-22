@@ -1,11 +1,12 @@
 import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, call, patch, ANY
 
 import numpy as np
+import pyomo.environ as pyo
 
-from DOVE.src.Dispatch.PyomoModelHandler import PyomoModelHandler
+from DOVE.src.Dispatch import PyomoModelHandler as pmh
 from DOVE.src.Components import Component
 from DOVE.src.Interactions import Interaction
 from DOVE.src.Interactions import Storage
@@ -41,7 +42,7 @@ class TestPyomoModelHandler(unittest.TestCase):
   def testBuildModel(self):
 
     # Create instance of PMH to trigger __init__, which calls build_model
-    testPMH = PyomoModelHandler(
+    testPMH = pmh.PyomoModelHandler(
       self.time,
       self.time_offset,
       self.mockCase,
@@ -85,9 +86,9 @@ class TestPyomoModelHandler(unittest.TestCase):
   def testPopulateModel(self):
 
     # Set up test-specific patchers
-    processComponentPatcher = patch.object(PyomoModelHandler, "_process_component")
-    createConservationPatcher = patch.object(PyomoModelHandler, "_create_conservation", autospec=True)
-    createObjectivePatcher = patch.object(PyomoModelHandler, "_create_objective", autospec=True)
+    processComponentPatcher = patch.object(pmh.PyomoModelHandler, "_process_component")
+    createConservationPatcher = patch.object(pmh.PyomoModelHandler, "_create_conservation", autospec=True)
+    createObjectivePatcher = patch.object(pmh.PyomoModelHandler, "_create_objective", autospec=True)
 
     # Start test-specific patchers and store mocks
     mockProcessComponent = processComponentPatcher.start()
@@ -95,7 +96,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockCreateObjective = createObjectivePatcher.start()
 
     # Create PMH instance and call method under test
-    testPMH = PyomoModelHandler(
+    testPMH = pmh.PyomoModelHandler(
       self.time,
       self.time_offset,
       self.mockCase,
@@ -120,9 +121,9 @@ class TestPyomoModelHandler(unittest.TestCase):
   def testProcessComponent(self):
 
     # Set up test-specific patchers
-    processGovernedComponentPatcher = patch.object(PyomoModelHandler, "_process_governed_component")
-    createStoragePatcher = patch.object(PyomoModelHandler, "_create_storage")
-    createProductionPatcher = patch.object(PyomoModelHandler, "_create_production")
+    processGovernedComponentPatcher = patch.object(pmh.PyomoModelHandler, "_process_governed_component")
+    createStoragePatcher = patch.object(pmh.PyomoModelHandler, "_create_storage")
+    createProductionPatcher = patch.object(pmh.PyomoModelHandler, "_create_production")
 
     # Start test-specific patchers and store mocks
     mockProcessGovernedComponent = processGovernedComponentPatcher.start()
@@ -133,7 +134,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     self.mockComponent1.get_interaction.return_value = self.mockInteraction
 
     # Create PMH instance
-    testPMH = PyomoModelHandler(
+    testPMH = pmh.PyomoModelHandler(
       self.time,
       self.time_offset,
       self.mockCase,
@@ -194,8 +195,8 @@ class TestPyomoModelHandler(unittest.TestCase):
   def testProcessGovernedComponent(self):
 
     # Set up test-specific patchers
-    processStorageComponentPatcher = patch.object(PyomoModelHandler, "_process_storage_component")
-    createProductionParamPatcher = patch.object(PyomoModelHandler, "_create_production_param")
+    processStorageComponentPatcher = patch.object(pmh.PyomoModelHandler, "_process_storage_component")
+    createProductionParamPatcher = patch.object(pmh.PyomoModelHandler, "_create_production_param")
 
     # Start test-specific patchers and store mocks
     mockProcessStorageComponent = processStorageComponentPatcher.start()
@@ -206,7 +207,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     # self.mockInteraction.get_strategy.return_value.evaluate.return_value = [{"level": "expected_activity_value"}]
 
     # Create PMH instance
-    testPMH = PyomoModelHandler(
+    testPMH = pmh.PyomoModelHandler(
       self.time,
       self.time_offset,
       self.mockCase,
@@ -252,7 +253,7 @@ class TestPyomoModelHandler(unittest.TestCase):
   def testProcessStorageComponent(self):
 
     # Set up test-specific patchers
-    createProductionParamPatcher = patch.object(PyomoModelHandler, "_create_production_param")
+    createProductionParamPatcher = patch.object(pmh.PyomoModelHandler, "_create_production_param")
 
     # Start test-specific patchers and store mocks
     mockCreateProductionParam = createProductionParamPatcher.start()
@@ -267,7 +268,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     self.mockComponent1.get_sqrt_RTE.return_value = 0.5
 
     # Create PMH instance
-    testPMH = PyomoModelHandler(
+    testPMH = pmh.PyomoModelHandler(
       self.time,
       self.time_offset,
       self.mockCase,
@@ -330,6 +331,64 @@ class TestPyomoModelHandler(unittest.TestCase):
       expected = f"Expected: {expectedDischargeCall}\n"
       actual =   f"  Actual: {mockCreateProductionParam.call_args_list}"
       raise AssertionError(message + expected + actual)
+
+  def testCreateProductionLimit(self):
+
+    # Configure mocks
+    def fake_prod_limit_rule(prod_name, r, limits, kind, t, m):
+      return pyo.Constraint.Feasible
+
+    mockFakeProdLimitRule = MagicMock(name="mockFakeProdLimitRule", wraps=fake_prod_limit_rule) # To track calls
+    self.mockPRL.prod_limit_rule = mockFakeProdLimitRule
+
+    mockConstraint = MagicMock(name="mockConstraint")
+    mockConstraint.Feasible = pyo.Constraint.Feasible # For fake rule
+    mockConstraint.return_value = "fake_constr"
+
+    # Add patcher to track calls to pyo.Constraint and control return value
+    constraintPatcher = patch.object(pmh.pyo, "Constraint", mockConstraint)
+    constraintPatcher.start()
+
+    # Modify arguments for constructor
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 1}}
+    self.mockComponent1.name = "comp1_name"
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Set up validation dict for input to method under test
+    validation = {
+      "component": self.mockComponent1,
+      "resource": "electricity",
+      "time_index": 2,
+      "limit": 3,
+      "limit_type": "upper"
+    }
+
+    # Call method under test
+    testPMH._create_production_limit(validation)
+
+    # Check that constraint was created from rule
+    rule = mockConstraint.call_args[1]["rule"]
+    # Checks that the rule added is a lambda function
+    self.assertEqual(rule.__name__, "<lambda>")
+
+    # Check that rule was set up correctly
+    rule("fake_mod") # Call the lambda function so we can read the other call args off the mock
+    mockFakeProdLimitRule.assert_called_once_with("comp1_name_production", 1, ANY, "upper", 2, "fake_mod")
+    # Have to check limits arg explicitly since it's a numpy array
+    self.assertTrue((mockFakeProdLimitRule.call_args[0][2] == np.array([0, 0, 3, 0])).all()) # All elements are the same
+
+    # Check that constraint was added to model correctly
+    self.assertIs(testPMH.model.comp1_name_electricity_2_vld_limit_constr_1, "fake_constr")
 
 
 if __name__ == "__main__":
