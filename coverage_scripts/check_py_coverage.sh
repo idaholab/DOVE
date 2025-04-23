@@ -54,8 +54,8 @@ OMIT_FILES=($SRC_DIR/Dispatch/twin_pyomo_test.py,$SRC_DIR/Dispatch/twin_pyomo_te
 EXTRA="--source=${SOURCE_DIRS[@]} --omit=${OMIT_FILES[@]} --parallel-mode"
 export COVERAGE_FILE=`pwd`/.coverage
 coverage erase
-($RAVEN_DIR/run_tests "$@" --re=$REGEX --python-command="coverage run $EXTRA" ||
-                                            echo run_tests done but some tests failed)
+($RAVEN_DIR/run_tests "$@" --re=$REGEX --python-command="coverage run $EXTRA")
+TESTS_SUCCESS=$?
 
 # Prepare data and generate the html documents
 coverage combine
@@ -63,3 +63,10 @@ coverage html
 
 # See report_py_coverage.sh file for explanation of script separation
 (bash $DOVE_LOC/coverage_scripts/report_py_coverage.sh --data-file=$COVERAGE_FILE --coverage-rc-file=$COVERAGE_RCFILE)
+
+if [ $TESTS_SUCCESS -ne 0 ]
+then
+  echo "run_tests finished but some tests failed"
+fi
+
+exit $TESTS_SUCCESS
