@@ -51,8 +51,8 @@ class CashFlowGroup(Base):
     Base.__init__(self, **kwargs)
     self.name = component.name
     self._component = component  # component this one
-    self._lifetime = None  # lifetime of the component
-    self._cash_flows = []
+    self._lifetime: int | None = None  # lifetime of the component
+    self._cash_flows: list[CashFlow] = []
 
   def read_input(self, specs: InputData.ParameterInput) -> None:
     """
@@ -69,6 +69,9 @@ class CashFlowGroup(Base):
         new = CashFlow(self._component)
         new.read_input(item)
         self._cash_flows.append(new)
+
+    if self._lifetime is None:
+      self.raiseAnError(IOError, f'Component "{self.name}" is missing its <lifetime> node!')
 
   def get_crossrefs(self):
     """
@@ -117,7 +120,7 @@ class CashFlowGroup(Base):
       )
     return cost
 
-  def get_cashflows(self):
+  def get_cashflows(self) -> list[CashFlow]:
     """
     Getter.
     @ In, None
@@ -141,31 +144,3 @@ class CashFlowGroup(Base):
     """
     return self._lifetime
 
-  def check_if_finalized(self):
-    """
-    Check finalization status of cashflows for this group.
-    @ In, None
-    @ Out, finalized, bool, True if all are finalized
-    """
-    return all(k.is_finalized() for k in self._cash_flows)
-
-  def finalize(self, activity, raven_vars, meta, times=None):
-    """
-    Evaluate the parameters for member cash flows, and freeze values so they aren't changed again.
-    @ In, activity, dict, mapping of variables to values (may be np.arrays)
-    @ In, raven_vars, dict, TODO part of meta! Consolidate!
-    @ In, times, list, optional, times to finalize values for
-    @ Out, None
-    """
-    info = {"raven_vars": raven_vars, "meta": meta}
-    for cf in self._cash_flows:
-      cf.finalize(activity, info, times=times)
-
-  def calculate_lifetime_cashflows(self):
-    """
-    Passthrough to CashFlow method of the same name.
-    @ In, None
-    @ Out, None
-    """
-    for cf in self._cash_flows:
-      cf.calculate_lifetime_cashflow(self._lifetime)

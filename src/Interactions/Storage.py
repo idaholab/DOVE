@@ -162,7 +162,6 @@ class Storage(Interaction):
     pre = tab * tabs
     self.raiseADebug(pre + "Storage:")
     self.raiseADebug(pre + "  stores:", self._stores)
-    #self.raiseADebug(pre + "  rate:", self._rate)
     self.raiseADebug(pre + "  capacity:", self._capacity)
 
   def get_initial_level(self, meta):

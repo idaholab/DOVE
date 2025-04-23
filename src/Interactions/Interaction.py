@@ -1,6 +1,5 @@
 """ """
 from collections import defaultdict
-from numbers import Real
 
 from DOVE.src.Base import Base
 
@@ -46,6 +45,7 @@ class Interaction(Base):
     specs.addParam(
       "dispatch",
       param_type=InputTypes.makeEnumType("dispatch_opts", "dispatch_opts", ["fixed", "independent", "dependent"]),
+      required=True,
       descr=r"""describes the way this component should be dispatched, or its flexibility.
               \texttt{fixed} indicates the component always fully dispatched at
               its maximum level. \texttt{independent} indicates the component is
@@ -119,15 +119,15 @@ class Interaction(Base):
     self._capacity_factor = None  # ratio of actual output as fraction of _capacity
     self._signals = set()  # dependent signals for this interaction
     self._crossrefs = defaultdict(dict)  # crossrefs objects needed (e.g. armas, etc), as {attr: {tag, name, obj})
-    self._dispatchable = None  # independent, dependent, or fixed?
+    self._dispatchable = "independent"  # independent, dependent, or fixed?
     self._minimum = None  # lowest interaction level, if dispatchable
     self._minimum_var = None  # limiting variable for minimum
     self.ramp_limit = None  # limiting change of production in a time step
     self.ramp_freq = None  # time steps required between production ramping events
     self._transfer = None  # the production rate (if any), in produces per consumes
-    self._tracking_vars = []  # list of trackable variables for dispatch activity
+    self._tracking_vars: list[str] = []  # list of trackable variables for dispatch activity
 
-  def _set_fixed_value(self, name: str, value: Real) -> None:
+  def _set_fixed_value(self, name: str, value: float) -> None:
     """
     """
     setattr(self, name, value)
@@ -191,7 +191,7 @@ class Interaction(Base):
       return self._capacity
     return self._capacity * self._capacity_factor
 
-  def get_capacity_var(self):
+  def get_capacity_var(self) -> str:
     """
     Returns the resource variable that is used to define the capacity limits of this interaction.
     @ In, None
@@ -227,7 +227,7 @@ class Interaction(Base):
     """
     return self._crossrefs
 
-  def set_crossrefs(self, refs):
+  def set_crossrefs(self, refs) -> None:
     """
     Setter.
     @ In, refs, dict, resource cross-reference objects
@@ -257,7 +257,7 @@ class Interaction(Base):
     """
     return set()
 
-  def get_resources(self) -> list:
+  def get_resources(self) -> list[str]:
     """
     Returns set of resources used by this interaction.
     @ In, None
@@ -265,7 +265,7 @@ class Interaction(Base):
     """
     return list(self.get_inputs()) + list(self.get_outputs())
 
-  def get_tracking_vars(self) -> list:
+  def get_tracking_vars(self) -> list[str]:
     """
     Provides the variables used by this component to track dispatch
     @ In, None

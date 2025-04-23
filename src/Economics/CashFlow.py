@@ -181,15 +181,15 @@ class CashFlow:
     self._component = component  # component instance to whom this cashflow belongs, if any
     self._driver = None  # ValuedParam "quantity produced", D
     self._alpha = None  # ValuedParam "price per produced", a
-    self._reference = None  # ValuedParam "where price is accurate", D'
-    self._scale = None  # ValuedParam "economy of scale", x
+    self._reference_driver = None  # ValuedParam "where price is accurate", D'
+    self._scaling_factor_x = None  # ValuedParam "economy of scale", x
     self.name = None  # base name of cash flow
     self._type = None  # needed? one-time, yearly, repeating
     self._taxable = None  # apply tax or not
     self._inflation = None  # apply inflation or not
-    self._npv_exempt = None  # inlcude cashflow in NPV calculation
+    self._npv_exempt: bool = False  # inlcude cashflow in NPV calculation
     self._depreciate = None
-    self._period = None  # period for recurring cash flows
+    self._period: str = "hour"  # period for recurring cash flows
     self._signals = set()  # variable values needed for this cash flow
     self._crossrefs = defaultdict(dict)
     self._price_is_levelized = False
@@ -219,26 +219,22 @@ class CashFlow:
     
     for sub in item.subparts:
       name = sub.getName()
-      if name == "driver":
-        self._set_value("_driver", sub)
-      elif name == "reference_price":
-        self.set_reference_price(sub)
-      elif name == "reference_driver":
-        self._set_value("_reference", sub)
-      elif name == "scaling_factor_x":
-        self._set_value("_scale", sub)
-      elif name == "depreciate":
-        self._depreciate = sub.value
-      else:
-        raise IOError(f"Unrecognized 'CashFlow' node: {sub.getName()}")
+      match (name := sub.getName()):
+        case "driver" | "reference_driver" | "scaling_factor_x":
+          self._set_value(f"_{name}", sub)
+        case "reference_price":
+          self.set_reference_price(sub)
+        case "depreciate":
+          self._depreciate = sub.value
+        case _:
+          raise IOError(f"Unrecognized 'CashFlow' node: {sub.getName()}")
 
     if self._driver is None:
       raise IOError(f"No <driver> node provided for CashFlow {self.name}!")
-
-    var_names = ["_reference", "_scale"]
-    for name in var_names:
-      if getattr(self, name) is None:
-        self._set_fixed_param(name, 1)
+    if self._reference_driver is None:
+      self._set_fixed_param("_reference_driver", 1)
+    if self._scaling_factor_x is None:
+      self._set_fixed_param("_scaling_factor_x", 1)
 
   def set_reference_price(self, node) -> None:
     """
@@ -260,30 +256,13 @@ class CashFlow:
         raise IOError(f"No <reference_price> node provided for CashFlow {self.name}!") from e
 
   # Not none set it to default 1
-  def get_period(self):
+  def get_period(self) -> str:
     """
     Getter for Recurring cashflow period type.
     @ In, None
     @ Out, period, str, 'hourly' or 'yearly'
     """
     return self._period
-
-  def get_alpha_extension(self):
-    """
-    creates multiplier for the valued shape the alpha cashflow parameter should be in
-    @ In, None,
-    @ Out, ext, multiplier for "alpha" values based on CashFlow type
-    """
-    life = self._component.get_economics().get_lifetime()
-    if self._type == "one-time":
-      ext = np.zeros(life + 1, dtype=float)
-      ext[0] = 1.0
-    elif self._type == "repeating":
-      ext = np.ones(life + 1, dtype=float)
-      ext[0] = 0.0
-    else:
-      raise NotImplementedError(f"type is: {self._type}")
-    return ext
 
   def get_crossrefs(self):
     """
@@ -293,7 +272,7 @@ class CashFlow:
     """
     return self._crossrefs
 
-  def set_crossrefs(self, refs):
+  def set_crossrefs(self, refs) -> None:
     """
     Setter for cross-referenced entities needed by this cashflow.
     @ In, refs, dict, cross referenced entities
@@ -328,8 +307,8 @@ class CashFlow:
     @ Out, params, dict, dictionary of parameters mapped to values including the cost
     """
     # TODO maybe don't cast these as floats, as they could be symbolic expressions (seems unlikely)
-    Dp = float(self._reference.evaluate(values_dict, target_var="reference_driver")[0]["reference_driver"])
-    x = float(self._scale.evaluate(values_dict, target_var="scaling_factor_x")[0]["scaling_factor_x"])
+    Dp = float(self._reference_driver.evaluate(values_dict, target_var="reference_driver")[0]["reference_driver"])
+    x = float(self._scaling_factor_x.evaluate(values_dict, target_var="scaling_factor_x")[0]["scaling_factor_x"])
     a = self._alpha.evaluate(values_dict, target_var="reference_price")[0]["reference_price"]
     D = self._driver.evaluate(values_dict, target_var="driver")[0]["driver"]
     cost = a * (D / Dp) ** x
@@ -390,7 +369,7 @@ class CashFlow:
     """
     return self._price_is_levelized
 
-  def is_npv_exempt(self):
+  def is_npv_exempt(self) -> bool:
     """
     Getter for Cashflow npv_exempt boolean
     @ In, None

@@ -4,7 +4,7 @@
 Component Module
 """
 from DOVE.src import Base
-from DOVE.src.Economics import CashFlowGroup
+from DOVE.src.Economics import CashFlowGroup, CashFlow
 from DOVE.src.Interactions import Demand, Producer, Storage
 
 from ravenframework.utils import InputData, InputTypes
@@ -53,7 +53,7 @@ class Component(Base):
     @ Out, None
     """
     Base.__init__(self, **kwargs)
-    self.name = None
+    self.name = "placeholder" # Name is required, so just initialize with a temp name. 
     self._interaction = None
     self._economics = None
     self.levelized_meta = {}
@@ -107,8 +107,7 @@ class Component(Base):
     @ In, None
     @ Out, crossrefs, dict, mapping of dictionaries with information about the entities required.
     """
-    inter = self.get_interaction()
-    crossrefs = {inter: inter.get_crossrefs()}
+    crossrefs = {self._interaction: self._interaction.get_crossrefs()}
     crossrefs.update(self._economics.get_crossrefs())
     return crossrefs
 
@@ -118,7 +117,7 @@ class Component(Base):
     @ In, refs, dict, dictionary of entity information
     @ Out, None
     """
-    try_match = self.get_interaction()
+    try_match = self._interaction
     for interaction in list(refs.keys()):
       # find associated interaction
       if try_match == interaction:
@@ -129,10 +128,9 @@ class Component(Base):
     # if anything left, there's an issue
     assert not refs
 
-  def get_interaction(self) -> Producer | Storage | Demand:
+  def get_interaction(self):
     """
     Return the interactions this component uses.
-    TODO could this just return the only non-empty one, since there can only be one?
     @ In, None
     @ Out, interactions, list, list of Interaction instances
     """
@@ -145,7 +143,7 @@ class Component(Base):
     @ In, None
     @ Out, RTE, float, round-trip efficiency as a multiplier
     """
-    return self.get_interaction().get_sqrt_RTE()
+    return self._interaction.get_sqrt_RTE()
 
   def print_me(self, tabs=0, tab="  "):
     """
@@ -157,7 +155,7 @@ class Component(Base):
     pre = tab * tabs
     self.raiseADebug(pre + "Component:")
     self.raiseADebug(pre + "  name:", self.name)
-    self.get_interaction().print_me(tabs=tabs + 1, tab=tab)
+    self._interaction.print_me(tabs=tabs + 1, tab=tab)
 
   def get_inputs(self):
     """
@@ -167,7 +165,7 @@ class Component(Base):
     """
     inputs = set()
     # simply combine the inputs for the interaction
-    inputs.update(self.get_interaction().get_inputs())
+    inputs.update(self._interaction.get_inputs())
     return inputs
 
   def get_outputs(self):
@@ -177,7 +175,7 @@ class Component(Base):
     @ Out, outputs, set, set of output resources as strings (resources that are produced/provided)
     """
     outputs = set()
-    outputs.update(self.get_interaction().get_outputs())
+    outputs.update(self._interaction.get_outputs())
     return outputs
 
   def get_resources(self):
@@ -198,7 +196,7 @@ class Component(Base):
     @ In, raw, bool, optional, if True then return the ValuedParam instance for capacity, instead of the evaluation
     @ Out, capacity, float (or ValuedParam), the capacity of this component's interaction
     """
-    return self.get_interaction().get_capacity()
+    return self._interaction.get_capacity()
 
   def get_minimum(self, meta, raw=False):
     """
@@ -207,7 +205,7 @@ class Component(Base):
     @ In, raw, bool, optional, if True then return the ValuedParam instance for capacity, instead of the evaluation
     @ Out, capacity, float (or ValuedParam), the capacity of this component's interaction
     """
-    return self.get_interaction().get_minimum(meta)
+    return self._interaction.get_minimum(meta)
 
   def get_capacity_var(self):
     """
@@ -215,15 +213,15 @@ class Component(Base):
     @ In, None
     @ Out, var, str, name of capacity resource
     """
-    return self.get_interaction().get_capacity_var()
+    return self._interaction.get_capacity_var()
 
-  def get_tracking_vars(self):
+  def get_tracking_vars(self) -> list[str]:
     """
     Provides the variables used by this component to track dispatch
     @ In, None
     @ Out, get_tracking_vars, list, variable name list
     """
-    return self.get_interaction().get_tracking_vars()
+    return self._interaction.get_tracking_vars()
 
   def is_dispatchable(self):
     """
@@ -232,15 +230,15 @@ class Component(Base):
     @ In, None
     @ Out, dispatchable, str, dispatchability (e.g. independent, dependent, fixed)
     """
-    return self.get_interaction().is_dispatchable()
+    return self._interaction.is_dispatchable()
 
-  def is_governed(self):
+  def is_governed(self) -> bool:
     """
     Determines if this component is optimizable or governed by some function.
     @ In, None
     @ Out, is_governed, bool, whether this component is governed.
     """
-    return self.get_interaction().is_governed()
+    return self._interaction.is_governed()
 
   def set_capacity(self, cap):
     """
@@ -248,7 +246,7 @@ class Component(Base):
     @ In, cap, float, value
     @ Out, None
     """
-    return self.get_interaction().set_capacity(cap)
+    return self._interaction.set_capacity(cap)
 
   @property
   def ramp_limit(self):
@@ -257,7 +255,7 @@ class Component(Base):
     @ In, None
     @ Out, limit, float, limit
     """
-    return self.get_interaction().ramp_limit
+    return self._interaction.ramp_limit
 
   @property
   def ramp_freq(self):
@@ -266,9 +264,9 @@ class Component(Base):
     @ In, None
     @ Out, limit, float, limit
     """
-    return self.get_interaction().ramp_freq
+    return self._interaction.ramp_freq
 
-  def set_levelized_cost_meta(self, cashflows):
+  def set_levelized_cost_meta(self, cashflows) -> None:
     """
     Create a dictionary for determining the correct resource to use per cashflow
     when using a levelized inner objective.
@@ -284,7 +282,7 @@ class Component(Base):
       resource = cf.get_driver()._vp.get_resource()
       self.levelized_meta[cf.name] = {tracker: resource}
 
-  def get_cashflows(self):
+  def get_cashflows(self) -> list[CashFlow]:
     """
       Getter.
       @ In, None
@@ -300,7 +298,7 @@ class Component(Base):
       @ In, marginal, bool, optional, if True then only get marginal costs
       @ Out, cost, dict, cost of activity as a breakdown
     """
-    return self.get_economics().evaluate_cfs(activity, meta, marginal=marginal)
+    return self._economics.evaluate_cfs(activity, meta, marginal=marginal)
 
   def get_economics(self) -> CashFlowGroup:
     """
