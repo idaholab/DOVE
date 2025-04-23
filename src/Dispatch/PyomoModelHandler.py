@@ -88,6 +88,7 @@ class PyomoModelHandler:
       self._process_governed_component(component, interaction)
     elif interaction.is_type("HeronStorage"):
       self._create_storage(component)
+
     else:
       self._create_production(component)
 

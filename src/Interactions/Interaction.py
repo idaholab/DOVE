@@ -1,12 +1,11 @@
 """ """
-
 from collections import defaultdict
 from numbers import Real
-from ravenframework.utils import InputData, InputTypes
-from ravenframework.utils.InputData import ParameterInput
 
 from DOVE.src.Base import Base
 
+from ravenframework.utils import InputData, InputTypes
+from ravenframework.utils.InputData import ParameterInput
 
 class Interaction(Base):
   """
@@ -126,7 +125,6 @@ class Interaction(Base):
     self.ramp_limit = None  # limiting change of production in a time step
     self.ramp_freq = None  # time steps required between production ramping events
     self._transfer = None  # the production rate (if any), in produces per consumes
-    self._sqrt_rte = 1.0  # sqrt of the round-trip efficiency for this interaction
     self._tracking_vars = []  # list of trackable variables for dispatch activity
 
   def _set_fixed_value(self, name: str, value: Real) -> None:
@@ -149,23 +147,30 @@ class Interaction(Base):
     """
     self.raiseADebug(f' ... loading interaction "{self.tag}"')
     self._dispatchable = specs.parameterValues["dispatch"]
+    self._capacity_var = specs.parameterValues["resource"][0]
+
     for item in specs.subparts:
-      name = "_" + item.getName()
-      if name in ["_capacity", "_capacity_factor", "_minimum"]:
-        # common reading for valued params
-        self._set_value(name, comp_name, item)
-        if name == "_capacity":
-          self._capacity_var = item.parameterValues.get("resource", None)
-        elif item.getName() == "minimum":
-          self._minimum_var = item.parameterValues.get("resource", None)
+      match (item_name := item.getName()):
+        case "capacity_factor":
+          self._set_value(f"_{item_name}", comp_name, item)
+        case "capacity":
+          self._capacity_var = item.parameterValues.get("resource", self._capacity_var)
+          self._set_value(f"_{item_name}", comp_name, item)
+        case "minimum":
+          self._minimum_var = item.parameterValues.get("resource", self._capacity_var)
+          self._set_value(f"_{item_name}", comp_name, item)
+
     # finalize some values
     resources = set(list(self.get_inputs()) + list(self.get_outputs()))
+
     ## capacity: if "variable" is None and only one resource in interactions, then that must be it
     if self._capacity_var is None:
+      print(len(resources))
       if len(resources) == 1:
         self._capacity_var = list(resources)[0]
       else:
         self.raiseAnError(IOError,f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!')
+
     ## minimum: basically the same as capacity, functionally
     if self._minimum and self._minimum_var is None:
       if len(resources) == 1:
@@ -214,15 +219,6 @@ class Interaction(Base):
     """
     return self._minimum
 
-  def get_sqrt_RTE(self):
-    """
-    Provide the square root of the round-trip efficiency for this component.
-    Note we use the square root due to splitting loss across the input and output.
-    @ In, None
-    @ Out, RTE, float, round-trip efficiency as a multiplier
-    """
-    return self._sqrt_rte
-
   def get_crossrefs(self):
     """
     Getter.
@@ -245,7 +241,7 @@ class Interaction(Base):
     for attr, vp in self.get_crossrefs().items():
       vp.crosscheck(self)
 
-  def get_inputs(self):
+  def get_inputs(self) -> set[str]:
     """
     Returns the set of resources that are inputs to this interaction.
     @ In, None
@@ -253,7 +249,7 @@ class Interaction(Base):
     """
     return set()
 
-  def get_outputs(self):
+  def get_outputs(self) -> set[str]:
     """
     Returns the set of resources that are outputs to this interaction.
     @ In, None
@@ -261,7 +257,7 @@ class Interaction(Base):
     """
     return set()
 
-  def get_resources(self):
+  def get_resources(self) -> list:
     """
     Returns set of resources used by this interaction.
     @ In, None
@@ -269,7 +265,7 @@ class Interaction(Base):
     """
     return list(self.get_inputs()) + list(self.get_outputs())
 
-  def get_tracking_vars(self):
+  def get_tracking_vars(self) -> list:
     """
     Provides the variables used by this component to track dispatch
     @ In, None
@@ -277,7 +273,7 @@ class Interaction(Base):
     """
     return self._tracking_vars
 
-  def is_dispatchable(self):
+  def is_dispatchable(self) -> str:
     """
     Getter. Indicates if this interaction is Fixed, Dependent, or Independent.
     @ In, None

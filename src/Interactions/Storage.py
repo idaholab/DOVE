@@ -25,34 +25,34 @@ class Storage(Interaction):
     @ Out, input_specs, InputData, specs
     """
     specs = super().get_input_specs()
-    
+
     specs.addSub(InputData.parameterInputFactory(
-      "initial_stored", 
-      contentType=InputTypes.FloatOrIntType, 
-      descr=r"""indicates what percent of the storage unit is full at the start 
+      "initial_stored",
+      contentType=InputTypes.FloatOrIntType,
+      descr=r"""indicates what percent of the storage unit is full at the start
                 of each optimization sequence, from 0 to 1. \default{0.0}."""
     ))
-    
+
     specs.addSub(InputData.parameterInputFactory(
-      "periodic_level", 
-      contentType=InputTypes.BoolType, 
+      "periodic_level",
+      contentType=InputTypes.BoolType,
       descr=r"""indicates whether the level of the storage should be required to
-                return to its initial level within each modeling window. If True, 
-                this reduces the flexibility of the storage, but if False, can 
+                return to its initial level within each modeling window. If True,
+                this reduces the flexibility of the storage, but if False, can
                 result in breaking conservation of resources. \default{True}."""
     ))
 
     # TODO: Need to revisit strategy param for DOVE since no functions are expected.
     specs.addSub(InputData.parameterInputFactory(
-      "strategy", 
-      contentType=InputTypes.StringType, 
-      descr=r"""control strategy for operating the storage. If not specified, 
+      "strategy",
+      contentType=InputTypes.StringType,
+      descr=r"""control strategy for operating the storage. If not specified,
                 uses a perfect foresight strategy. """
     ))
 
     specs.addSub(InputData.parameterInputFactory(
-      "RTE", 
-      contentType=InputTypes.FloatType, 
+      "RTE",
+      contentType=InputTypes.FloatType,
       descr=r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
     ))
 
@@ -70,6 +70,7 @@ class Storage(Interaction):
     self._initial_stored = None  # how much resource does this component start with stored?
     self._strategy = None  # how to operate storage unit
     self._tracking_vars = ["level", "charge", "discharge",]  # stored quantity, charge activity, discharge activity
+    self._sqrt_rte = 1.0
 
   def read_input(self, specs, comp_name: str) -> None:
     """
@@ -93,11 +94,19 @@ class Storage(Interaction):
         self.apply_periodic_level = item.value
       elif item_name == "RTE":
         self._sqrt_rte = np.sqrt(item.value)
-    
+
     if self._initial_stored is None:
       self.raiseAWarning(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')
       self._set_fixed_value('_initial_stored', 0.0)
 
+  def get_sqrt_RTE(self):
+    """
+    Provide the square root of the round-trip efficiency for this component.
+    Note we use the square root due to splitting loss across the input and output.
+    @ In, None
+    @ Out, RTE, float, round-trip efficiency as a multiplier
+    """
+    return self._sqrt_rte
 
   def get_inputs(self):
     """

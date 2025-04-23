@@ -69,7 +69,7 @@ class Component(Base):
   def read_input(self, xml) -> None:
     """
     Sets settings from input file
-    @In, xml, xml.etree.ElementTree.Element, component information from xml input file. 
+    @In, xml, xml.etree.ElementTree.Element, component information from xml input file.
     @Out, None
     """
     # get specs for allowable inputs
@@ -89,7 +89,7 @@ class Component(Base):
       self.raiseAnError(NotImplementedError, f"No interaction found for Component '{self.name}'")
     elif len(not_found_in_spec) < 2:
       self.raiseAnError(NotImplementedError, f"A Component can only have one interaction! Check Component '{self.name}'")
-       
+
     for item in specs.subparts:
       item_name = item.getName()
       if item_name in interaction_map:
@@ -267,15 +267,6 @@ class Component(Base):
     @ Out, limit, float, limit
     """
     return self.get_interaction().ramp_freq
-
-  def get_capacity_param(self):
-    """
-    Provides direct access to the ValuedParam for the capacity of this component.
-    @ In, None
-    @ Out, cap, ValuedParam, capacity valued param
-    """
-    intr = self.get_interaction()
-    return intr.get_capacity(None, None, None, None, raw=True)
 
   def set_levelized_cost_meta(self, cashflows):
     """
