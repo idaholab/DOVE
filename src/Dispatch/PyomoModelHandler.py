@@ -12,6 +12,8 @@ from typing import cast
 from . import PyomoRuleLibrary as prl
 from .DispatchState import PyomoState
 
+from DOVE.src.Interactions.Storage import Storage
+
 
 class PyomoModelHandler:
   """
@@ -83,10 +85,10 @@ class PyomoModelHandler:
     @ In, component, HERON Component, component to process
     @ Out, None
     """
-    interaction = component.get_interaction()
+    interaction = component.interaction
     if interaction.is_governed():
       self._process_governed_component(component, interaction)
-    elif interaction.is_type("HeronStorage"):
+    elif isinstance(interaction, Storage): #.is_type("HeronStorage"):
       self._create_storage(component)
 
     else:
@@ -100,7 +102,7 @@ class PyomoModelHandler:
     @ Out, None
     """
     self.meta["request"] = {"component": component, "time": self.time}
-    if interaction.is_type("HeronStorage"):
+    if isinstance(interaction, Storage): #.is_type("HeronStorage"):
       self._process_storage_component(component, interaction)
     else:
       activity = interaction.get_strategy().evaluate(self.meta)[0]["level"]
@@ -115,7 +117,7 @@ class PyomoModelHandler:
     activity = interaction.get_strategy().evaluate(self.meta)[0]["level"]
     self._create_production_param(component, activity, tag="level")
     dt = self.model.Times[1] - self.model.Times[0]
-    rte2 = component.get_sqrt_RTE()
+    rte2 = component.interaction.sqrt_rte
     deltas = np.zeros(len(activity))
     deltas[1:] = activity[1:] - activity[:-1]
     deltas[0] = activity[0] - interaction.get_initial_level(self.meta)
@@ -189,7 +191,7 @@ class PyomoModelHandler:
     # transfer function governs input -> output relationship
     self._create_transfer(comp, prod_name)
     # ramp rates
-    if comp.ramp_limit is not None:
+    if comp.interaction.ramp_limit is not None:
       self._create_ramp_limit(comp, prod_name)
     return prod_name
 
@@ -205,7 +207,7 @@ class PyomoModelHandler:
     if tag is None:
       tag = "production"
     name = comp.name
-    cap_res = comp.get_capacity_var()  # name of resource that defines capacity
+    cap_res = comp.interaction.capacity_var  # name of resource that defines capacity
     limit_r = self.model.resource_index_map[comp][cap_res]  # production index of the governing resource
     # create pyomo indexer for this component's resources
     indexer_name = f"{name}_res_index_map"
@@ -237,7 +239,7 @@ class PyomoModelHandler:
     # FIXME initials! Should be lambda with mins for tracking var!
     prod = pyo.Var(indexer, self.model.T, initialize=initial, bounds=bounds, **kwargs)
     # TODO it may be that we need to set variable values to avoid problems in some solvers.
-    # if comp.is_dispatchable() == 'fixed':
+    # if comp.interaction.dispatch_flexibility == 'fixed':
     #   for t, _ in enumerate(m.Times):
     #     prod[limit_r, t].fix(caps[t])
     setattr(self.model, prod_name, prod)
@@ -251,22 +253,22 @@ class PyomoModelHandler:
     @ Out, None
     """
     # ramping is defined in terms of the capacity variable
-    cap_res = comp.get_capacity_var()  # name of resource that defines capacity
-    cap = comp.get_capacity(self.meta)[0][cap_res]
+    cap_res = comp.interaction.capacity_var  # name of resource that defines capacity
+    cap = comp.interaction.get_capacity(self.meta)[0][cap_res]
     r = self.model.resource_index_map[comp][
       cap_res
     ]  # production index of the governing resource
     # NOTE: this includes the built capacity * capacity factor, if any, which assumes
     # the ramp rate depends on the available capacity, not the built capacity.
     limit_delta = (
-      comp.ramp_limit * cap
+      comp.interaction.ramp_limit * cap
     )  # NOTE: if cap is negative, then this is negative.
     if limit_delta < 0:
       neg_cap = True
     else:
       neg_cap = False
     # if we're limiting ramp frequency, make vars and rules for that
-    if comp.ramp_freq:
+    if comp.interaction.ramp_freq:
       # create binaries for tracking ramping
       up = pyo.Var(self.model.T, initialize=0, domain=pyo.Binary)
       down = pyo.Var(self.model.T, initialize=0, domain=pyo.Binary)
@@ -290,7 +292,7 @@ class PyomoModelHandler:
     constr = pyo.Constraint(self.model.T, rule=ramp_rule_up)
     setattr(self.model, f"{comp.name}_ramp_up_constr", constr)
     # if ramping frequency limit, impose binary constraints
-    if comp.ramp_freq:
+    if comp.interaction.ramp_freq:
       # binaries rule, for exclusive choice up/down/steady
       binaries_rule = lambda mod, t: prl.ramp_freq_bins_rule(down, up, steady, t, mod)
       constr = pyo.Constraint(self.model.T, rule=binaries_rule)
@@ -298,7 +300,7 @@ class PyomoModelHandler:
       # limit frequency of ramping
       # TODO calculate "tao" window using ramp freq and dt
       # -> for now, just use the integer for number of windows
-      freq_rule = lambda mod, t: prl.ramp_freq_rule(down, up, comp.ramp_freq, t, mod)
+      freq_rule = lambda mod, t: prl.ramp_freq_rule(down, up, comp.interaction.ramp_freq, t, mod)
       constr = pyo.Constraint(self.model.T, rule=freq_rule)
       setattr(self.model, f"{comp.name}_ramp_freq_constr", constr)
 
@@ -309,7 +311,7 @@ class PyomoModelHandler:
     @ In, prod_name, str, name of production variable
     @ Out, None
     """
-    cap_res = comp.get_capacity_var()  # name of resource that defines capacity
+    cap_res = comp.interaction.capacity_var  # name of resource that defines capacity
     r = self.model.resource_index_map[comp][
       cap_res
     ]  # production index of the governing resource
@@ -340,7 +342,7 @@ class PyomoModelHandler:
     @ Out, caps, array, max production values by time
     @ Out, mins, array, min production values by time
     """
-    cap_res = comp.get_capacity_var()  # name of resource that defines capacity
+    cap_res = comp.interaction.capacity_var  # name of resource that defines capacity
     # production is always lower than capacity
     ## NOTE get_capacity returns (data, meta) and data is dict
     ## TODO does this work with, e.g., ARMA-based capacities?
@@ -349,14 +351,12 @@ class PyomoModelHandler:
     mins = []
     for t, time in enumerate(self.model.Times):
       self.meta["HERON"]["time_index"] = t + self.model.time_offset
-      cap = comp.get_capacity(self.meta)[0][
-        cap_res
-      ]  # value of capacity limit (units of governing resource)
+      cap = comp.interaction.get_capacity(self.meta)[0][cap_res]  # value of capacity limit (units of governing resource)
       caps.append(cap)
-      if comp.is_dispatchable() == "fixed":
+      if comp.interaction.dispatch_flexibility == "fixed":
         minimum = cap
       else:
-        minimum = comp.get_minimum(self.meta)[0][cap_res]
+        minimum = comp.interaction.get_minimum(self.meta)[0][cap_res]
       mins.append(minimum)
     return caps, mins
 
@@ -367,7 +367,7 @@ class PyomoModelHandler:
     @ In, prod_name, str, name of production variable
     @ Out, None
     """
-    transfer = comp.get_interaction().get_transfer()
+    transfer = comp.interaction.get_transfer()
     if transfer is None:
       return
     if transfer.type == "Ratio":
@@ -375,9 +375,7 @@ class PyomoModelHandler:
     elif transfer.type == "Polynomial":
       self._create_transfer_poly(transfer, comp, prod_name)
     else:
-      raise NotImplementedError(
-        f'Transfer function type "{transfer.type}" not implemented for PyomoModelHandler!'
-      )
+      raise NotImplementedError(f'Transfer function type "{transfer.type}" not implemented for PyomoModelHandler!')
 
   def _create_transfer_ratio(self, transfer, comp, prod_name):
     """
@@ -447,7 +445,7 @@ class PyomoModelHandler:
     # rule = lambda mod, t: prl.level_rule(comp, level_name, charge_name, discharge_name, self.initial_storage, r, mod, t)
     # setattr(self.model, level_rule_name, pyo.Constraint(self.model.T, rule=rule))
     # periodic boundary condition for storage level
-    if comp.get_interaction().apply_periodic_level:
+    if comp.interaction.apply_periodic_level:
       level_var = getattr(self.model, level_name)
       initial = level_var[(r, self.model.T[-1])]
     else:
@@ -535,7 +533,7 @@ class PyomoModelHandler:
         # print(f'DEBUGG ... ... time {t}')
         # NOTE care here to assure that pyomo-indexed variables work here too
         specific_activity = {}
-        for tracker in comp.get_tracking_vars():
+        for tracker in comp.interaction.tracking_vars:
           specific_activity[tracker] = {}
           for resource in resource_indexer[comp]:
             specific_activity[tracker][resource] = activity.get_activity(
@@ -543,7 +541,7 @@ class PyomoModelHandler:
             )
         specific_meta["HERON"]["time_index"] = t + time_offset
         specific_meta["HERON"]["time_value"] = time
-        cfs = comp.get_state_cost(specific_activity, specific_meta, marginal=True)
+        cfs = comp.economics.evaluate_cfs(specific_activity, specific_meta, marginal=True)
         time_subtotal = sum(cfs.values())
         comp_subtotal += time_subtotal
       total += comp_subtotal
@@ -585,7 +583,7 @@ class PyomoModelHandler:
       for t, time in enumerate(times):
         # NOTE care here to assure that pyomo-indexed variables work here too
         specific_activity = {}
-        for tracker in comp.get_tracking_vars():
+        for tracker in comp.interaction.tracking_vars:
           specific_activity[tracker] = {}
           for resource in resource_indexer[comp]:
             specific_activity[tracker][resource] = activity.get_activity(
@@ -593,7 +591,7 @@ class PyomoModelHandler:
             )
         specific_meta["HERON"]["time_index"] = t + time_offset
         specific_meta["HERON"]["time_value"] = time
-        cfs = comp.get_state_cost(specific_activity, specific_meta, marginal=True)
+        cfs = comp.economics.evaluate_cfs(specific_activity, specific_meta, marginal=True)
 
         # there is an assumption here that if a component has a levelized cost, marginal cashflow
         # then it is the only marginal cashflow

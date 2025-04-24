@@ -1,5 +1,6 @@
 """ """
 from collections import defaultdict
+from typing import Any
 
 from DOVE.src.Base import Base
 
@@ -20,31 +21,30 @@ class Interaction(Base):
     @ In, None
     @ Out, input_specs, InputData, specs
     """
-    if cls.tag == "produces":
-      desc = r"""indicates that this component produces one or more resources by
-                 consuming other resources."""
-      resource_desc = r"""the resource produced by this component's activity."""
-
-    elif cls.tag == "stores":
-      desc = r"""indicates that this component stores one resource, potentially
-                 absorbing or providing that resource."""
-      resource_desc = r"""the resource stored by this component."""
-
-    elif cls.tag == "demands":
-      desc = r"""indicates that this component exclusively consumes a resource."""
-      resource_desc = r"""the resource consumed by this component."""
+    match cls.tag:
+      case "produces":
+        desc = r"indicates that this component produces one or more resources by consuming other resources."
+        resource_desc = "the resource produced by this component's activity."
+      case "stores":
+        desc = "indicates that this component stores one resource, potentially absorbing or providing that resource."
+        resource_desc = "the resource stored by this component."
+      case "demands":
+        desc = "indicates that this component exclusively consumes a resource."
+        resource_desc = "the resource consumed by this component."
+      case _:
+        raise NotImplementedError(f"Class '{cls.tag}' not implemented!")
 
     specs = InputData.parameterInputFactory(cls.tag, ordered=False, descr=desc)
     specs.addParam(
       "resource",
-      param_type=InputTypes.StringListType,
+      param_type=InputTypes.StringListType, # type: ignore
       required=True,
       descr=resource_desc,
     )
 
     specs.addParam(
       "dispatch",
-      param_type=InputTypes.makeEnumType("dispatch_opts", "dispatch_opts", ["fixed", "independent", "dependent"]),
+      param_type=InputTypes.makeEnumType("dispatch_opts", "dispatch_opts", ["fixed", "independent", "dependent"]), # type: ignore
       required=True,
       descr=r"""describes the way this component should be dispatched, or its flexibility.
               \texttt{fixed} indicates the component always fully dispatched at
@@ -115,17 +115,19 @@ class Interaction(Base):
     """
     Base.__init__(self, **kwargs)
     self._capacity = None  # upper limit of this interaction
-    self._capacity_var = None  # which variable limits the capacity (could be produced or consumed?)
     self._capacity_factor = None  # ratio of actual output as fraction of _capacity
     self._signals = set()  # dependent signals for this interaction
-    self._crossrefs = defaultdict(dict)  # crossrefs objects needed (e.g. armas, etc), as {attr: {tag, name, obj})
-    self._dispatchable = "independent"  # independent, dependent, or fixed?
+    self._crossrefs: defaultdict[str, Any] = defaultdict(dict)  # crossrefs objects needed (e.g. armas, etc), as {attr: {tag, name, obj})
     self._minimum = None  # lowest interaction level, if dispatchable
     self._minimum_var = None  # limiting variable for minimum
+    self._transfer = None  # the production rate (if any), in produces per consumes
     self.ramp_limit = None  # limiting change of production in a time step
     self.ramp_freq = None  # time steps required between production ramping events
-    self._transfer = None  # the production rate (if any), in produces per consumes
-    self._tracking_vars: list[str] = []  # list of trackable variables for dispatch activity
+    self.dispatch_flexibility = "independent"
+    self.capacity_var = None  # which variable limits the capacity (could be produced or consumed?)
+    self.tracking_vars: list[str] = []  # list of trackable variables for dispatch activity
+    self.inputs: set[str] = set()
+    self.outputs: set[str] = set()
 
   def _set_fixed_value(self, name: str, value: float) -> None:
     """
@@ -140,36 +142,34 @@ class Interaction(Base):
   def read_input(self, specs: InputData.ParameterInput, comp_name: str) -> None:
     """
     Sets settings from input file
-    @ In, specs, InputData, specs
-    @ In, mode, string, case mode to operate in (e.g. 'sweep' or 'opt')
-    @ In, comp_name, string, name of component this Interaction belongs to
+    @ In, specs, InputData.ParameterInput, defined input specification
+    @ In, comp_name, str, name of component this Interaction belongs to
     @ Out, None
     """
     self.raiseADebug(f' ... loading interaction "{self.tag}"')
-    self._dispatchable = specs.parameterValues["dispatch"]
-    self._capacity_var = specs.parameterValues["resource"][0]
+    self.dispatch_flexibility = specs.parameterValues["dispatch"]
+    self.capacity_var = specs.parameterValues["resource"][0]
 
     for item in specs.subparts:
       match (item_name := item.getName()):
         case "capacity_factor":
           self._set_value(f"_{item_name}", comp_name, item)
         case "capacity":
-          self._capacity_var = item.parameterValues.get("resource", self._capacity_var)
+          self.capacity_var = item.parameterValues.get("resource", self.capacity_var)
           self._set_value(f"_{item_name}", comp_name, item)
         case "minimum":
-          self._minimum_var = item.parameterValues.get("resource", self._capacity_var)
+          self._minimum_var = item.parameterValues.get("resource", self.capacity_var)
           self._set_value(f"_{item_name}", comp_name, item)
 
     # finalize some values
-    resources = set(list(self.get_inputs()) + list(self.get_outputs()))
+    resources = set(list(self.inputs) + list(self.outputs))
 
     ## capacity: if "variable" is None and only one resource in interactions, then that must be it
-    if self._capacity_var is None:
-      print(len(resources))
+    if self.capacity_var is None:
       if len(resources) == 1:
-        self._capacity_var = list(resources)[0]
+        self.capacity_var = list(resources)[0]
       else:
-        self.raiseAnError(IOError,f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!')
+        self.raiseAnError(IOError, f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!')
 
     ## minimum: basically the same as capacity, functionally
     if self._minimum and self._minimum_var is None:
@@ -178,116 +178,12 @@ class Interaction(Base):
       else:
         self.raiseAnError(IOError, f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!')
 
-  def get_capacity(self):
-    """
-    Returns the capacity of this interaction.
-    Returns an evaluated value unless "raw" is True, then gives ValuedParam
-    @ In, meta, dict, additional variables to pass through
-    @ In, raw, bool, optional, if True then provide ValuedParam instead of evaluation
-    @ Out, evaluated, float or ValuedParam, requested value
-    @ Out, meta, dict, additional variable passthrough
-    """
-    if self._capacity_factor is None:
-      return self._capacity
-    return self._capacity * self._capacity_factor
-
-  def get_capacity_var(self) -> str:
-    """
-    Returns the resource variable that is used to define the capacity limits of this interaction.
-    @ In, None
-    @ Out, capacity_var, string, name of capacity-limiting resource
-    """
-    return self._capacity_var
-
-  def set_capacity(self, cap):
-    """
-    Allows hard-setting the capacity of this interaction.
-    This destroys any underlying ValuedParam that was there before.
-    @ In, cap, float, capacity value
-    @ Out, None
-    """
-    self._capacity.set_value(float(cap))
-
-  def get_minimum(self, meta):
-    """
-    Returns the minimum level of this interaction.
-    Returns an evaluated value unless "raw" is True, then gives ValuedParam
-    @ In, meta, dict, additional variables to pass through
-    @ In, raw, bool, optional, if True then provide ValuedParam instead of evaluation
-    @ Out, evaluated, float or ValuedParam, requested value
-    @ Out, meta, dict, additional variable passthrough
-    """
-    return self._minimum
-
-  def get_crossrefs(self):
-    """
-    Getter.
-    @ In, None
-    @ Out, crossrefs, dict, resource references
-    """
-    return self._crossrefs
-
-  def set_crossrefs(self, refs) -> None:
-    """
-    Setter.
-    @ In, refs, dict, resource cross-reference objects
-    @ Out, None
-    """
-    # connect references to ValuedParams (Placeholder objects)
-    for attr, obj in refs.items():
-      valued_param = self._crossrefs[attr]
-      valued_param.set_object(obj)
-    # perform crosscheck that VPs have what they need
-    for attr, vp in self.get_crossrefs().items():
-      vp.crosscheck(self)
-
-  def get_inputs(self) -> set[str]:
-    """
-    Returns the set of resources that are inputs to this interaction.
-    @ In, None
-    @ Out, inputs, set, set of inputs
-    """
-    return set()
-
-  def get_outputs(self) -> set[str]:
-    """
-    Returns the set of resources that are outputs to this interaction.
-    @ In, None
-    @ Out, outputs, set, set of outputs
-    """
-    return set()
-
-  def get_resources(self) -> list[str]:
-    """
-    Returns set of resources used by this interaction.
-    @ In, None
-    @ Out, resources, set, set of resources
-    """
-    return list(self.get_inputs()) + list(self.get_outputs())
-
-  def get_tracking_vars(self) -> list[str]:
-    """
-    Provides the variables used by this component to track dispatch
-    @ In, None
-    @ Out, get_tracking_vars, list, variable name list
-    """
-    return self._tracking_vars
-
-  def is_dispatchable(self) -> str:
-    """
-    Getter. Indicates if this interaction is Fixed, Dependent, or Independent.
-    @ In, None
-    @ Out, dispatchable, string, one of 'fixed', 'dependent', or 'independent'
-    """
-    return self._dispatchable
-
-  def is_type(self, typ: str) -> bool:
-    """
-    Checks if this interaction matches the request.
-    @ In, typ, string, name to check against
-    @ Out, is_type, bool, whether there is a match or not.
-    """
-    return typ == self.__class__.__name__
+  @property
+  def resources(self) -> set[str]:
+    res: set[str] = set()
+    res.update(self.inputs)
+    res.update(self.outputs)
+    return res
 
   def is_governed(self) -> bool:
     """

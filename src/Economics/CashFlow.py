@@ -3,6 +3,7 @@
 """
 CashFlow Module
 """
+from typing import Any
 import numpy as np
 from collections import defaultdict
 
@@ -184,14 +185,16 @@ class CashFlow:
     self._reference_driver = None  # ValuedParam "where price is accurate", D'
     self._scaling_factor_x = None  # ValuedParam "economy of scale", x
     self.name = None  # base name of cash flow
-    self._type = None  # needed? one-time, yearly, repeating
-    self._taxable = None  # apply tax or not
-    self._inflation = None  # apply inflation or not
+
+
+    self.inflation = False  # apply inflation or not
     self._npv_exempt: bool = False  # inlcude cashflow in NPV calculation
-    self._depreciate = None
-    self._period: str = "hour"  # period for recurring cash flows
+    self.depreciation = None
+    self.taxable = False
+    self.type: str = "repeating"  # needed? one-time, yearly, repeating
+    self.period: str = "hour"  # period for recurring cash flows
     self._signals = set()  # variable values needed for this cash flow
-    self._crossrefs = defaultdict(dict)
+    self._crossrefs: defaultdict[str, Any] = defaultdict(dict)
     self._price_is_levelized = False
 
   def _set_value(self, name, spec) -> None:
@@ -211,23 +214,22 @@ class CashFlow:
     @ Out, None
     """
     self.name = item.parameterValues["name"]
-    self._taxable = item.parameterValues["taxable"]
-    self._inflation = item.parameterValues["inflation"]
-    self._type = item.parameterValues["type"]
-    self._period = item.parameterValues.get("period", "hour")
+    self.taxable = item.parameterValues["taxable"]
+    self.inflation = item.parameterValues["inflation"]
+    self.type = item.parameterValues["type"]
+    self.period = item.parameterValues.get("period", "hour")
     self._npv_exempt = item.parameterValues.get("npv_exempt", False)
-    
+
     for sub in item.subparts:
-      name = sub.getName()
-      match (name := sub.getName()):
+      match (item_name := sub.getName()):
         case "driver" | "reference_driver" | "scaling_factor_x":
-          self._set_value(f"_{name}", sub)
+          self._set_value(f"_{item_name}", sub)
         case "reference_price":
           self.set_reference_price(sub)
         case "depreciate":
-          self._depreciate = sub.value
+          self.depreciation = sub.value
         case _:
-          raise IOError(f"Unrecognized 'CashFlow' node: {sub.getName()}")
+          raise IOError(f"Unrecognized 'CashFlow' node: {item_name}")
 
     if self._driver is None:
       raise IOError(f"No <driver> node provided for CashFlow {self.name}!")
@@ -253,73 +255,13 @@ class CashFlow:
       if self._price_is_levelized:
         self._set_fixed_param("_alpha", 1)
       else:
-        raise IOError(f"No <reference_price> node provided for CashFlow {self.name}!") from e
+        raise IOError(f"No <reference_price> node provided for CashFlow {self.name}!")
 
-  # Not none set it to default 1
-  def get_period(self) -> str:
-    """
-    Getter for Recurring cashflow period type.
-    @ In, None
-    @ Out, period, str, 'hourly' or 'yearly'
-    """
-    return self._period
+  def evaluate_cost(self, activity, meta):
+    pass
 
-  def get_crossrefs(self):
-    """
-    Accessor for cross-referenced entities needed by this cashflow.
-    @ In, None
-    @ Out, crossrefs, dict, cross-referenced requirements dictionary
-    """
-    return self._crossrefs
-
-  def set_crossrefs(self, refs) -> None:
-    """
-    Setter for cross-referenced entities needed by this cashflow.
-    @ In, refs, dict, cross referenced entities
-    @ Out, None
-    """
-    # set up pointers
-    for attr, obj in refs.items():
-      valued_param = self._crossrefs[attr]
-      valued_param.set_object(obj)
-    # check on VP setup
-    for attr, vp in self._crossrefs.items():
-      vp.crosscheck(self._component.get_interaction())
-
-  def evaluate_cost(self, activity, values_dict):
-    """
-    Evaluates cost of a particular scenario provided by "activity".
-    @ In, activity, pandas.Series, multi-indexed array of scenario activities
-    @ In, values_dict, dict, additional values that may be needed to evaluate cost
-    @ In, t, int, time index at which cost should be evaluated
-    @ Out, cost, float, cost of activity
-    """
-    # note this method gets called a LOT, so speedups here are quite effective
-    # add the activity to the dictionary
-    values_dict["HERON"]["activity"] = activity
-    params = self.calculate_params(values_dict)
-    return params["cost"]
-
-  def calculate_params(self, values_dict):
-    """
-    Calculates the value of the cash flow parameters.
-    @ In, values_dict, dict, mapping from simulation variable names to their values (as floats or numpy arrays)
-    @ Out, params, dict, dictionary of parameters mapped to values including the cost
-    """
-    # TODO maybe don't cast these as floats, as they could be symbolic expressions (seems unlikely)
-    Dp = float(self._reference_driver.evaluate(values_dict, target_var="reference_driver")[0]["reference_driver"])
-    x = float(self._scaling_factor_x.evaluate(values_dict, target_var="scaling_factor_x")[0]["scaling_factor_x"])
-    a = self._alpha.evaluate(values_dict, target_var="reference_price")[0]["reference_price"]
-    D = self._driver.evaluate(values_dict, target_var="driver")[0]["driver"]
-    cost = a * (D / Dp) ** x
-    params = {
-      "alpha": a,
-      "driver": D,
-      "ref_driver": Dp,
-      "scaling": x,
-      "cost": cost,
-    }  # TODO float(cost) except in pyomo it's not a float
-    return params
+  def calculate_params(self, meta):
+    pass
 
   def get_driver(self):
     """
@@ -328,38 +270,6 @@ class CashFlow:
     @ Out, driver, ValuedParam, valued param for the cash flow driver
     """
     return self._driver
-
-  def get_type(self):
-    """
-    Getter for Cashflow Type
-    @ In, None
-    @ Out, type, str, one-time, yearly, repeating
-    """
-    return self._type
-
-  def get_depreciation(self):
-    """
-    Getter for Cashflow depreciation
-    @ In, None
-    @ Out, depreciate, int or None
-    """
-    return self._depreciate
-
-  def is_taxable(self):
-    """
-    Getter for Cashflow taxable boolean
-    @ In, None
-    @ Out, taxable, bool, is cashflow taxable?
-    """
-    return self._taxable
-
-  def is_inflation(self):
-    """
-    Getter for Cashflow inflation boolean
-    @ In, None
-    @ Out, inflation, bool, is inflation applied to cashflow?
-    """
-    return self._inflation
 
   def is_mult_target(self):
     """

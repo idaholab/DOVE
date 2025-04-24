@@ -58,19 +58,18 @@ class Storage(Interaction):
 
     return specs
 
-  def __init__(self, **kwargs):
+  def __init__(self, **kwargs) -> None:
     """
     Constructor
     @ In, kwargs, dict, passthrough args
     @ Out, None
     """
     Interaction.__init__(self, **kwargs)
-    self.apply_periodic_level = True  # whether to apply periodic boundary conditions for the level of the storage
-    self._stores: str = ""  # the resource stored by this interaction
     self._initial_stored = None  # how much resource does this component start with stored?
     self._strategy = None  # how to operate storage unit
-    self._tracking_vars = ["level", "charge", "discharge",]  # stored quantity, charge activity, discharge activity
-    self._sqrt_rte = 1.0
+    self.tracking_vars = ["level", "charge", "discharge",]
+    self.sqrt_rte = 1.0
+    self.apply_periodic_level = True
 
   def read_input(self, specs, comp_name: str) -> None:
     """
@@ -82,59 +81,28 @@ class Storage(Interaction):
     """
     # specs were already checked in Component
     Interaction.read_input(self, specs, comp_name)
-    self._stores = specs.parameterValues["resource"][0]
+    self.inputs = self.outputs = set(specs.parameterValues["resource"])
 
     for item in specs.subparts:
-      item_name = item.getName()
-      if item_name == "initial_stored":
-        self._set_value('_initial_stored', comp_name, item)
-      elif item_name == "strategy":
-        self._set_value('_strategy', comp_name, item)
-      elif item_name == "periodic_level":
-        self.apply_periodic_level = item.value
-      elif item_name == "RTE":
-        self._sqrt_rte = np.sqrt(item.value)
+      match (name := item.getName()):
+        case "initial_stored" | "strategy":
+          self._set_value(f"_{name}", comp_name, item)
+        case "periodic_level":
+          self.apply_periodic_level = item.value
+        case "RTE":
+          self.sqrt_rte = np.sqrt(item.value)
 
     if self._initial_stored is None:
       self.raiseAWarning(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')
       self._set_fixed_value('_initial_stored', 0.0)
 
-  def get_sqrt_RTE(self):
-    """
-    Provide the square root of the round-trip efficiency for this component.
-    Note we use the square root due to splitting loss across the input and output.
-    @ In, None
-    @ Out, RTE, float, round-trip efficiency as a multiplier
-    """
-    return self._sqrt_rte
-
-  def get_inputs(self):
-    """
-    Returns the set of resources that are inputs to this interaction.
-    @ In, None
-    @ Out, inputs, set, set of inputs
-    """
-    inputs = Interaction.get_inputs(self)
-    inputs.update(np.atleast_1d(self._stores))
-    return inputs
-
-  def get_outputs(self):
-    """
-    Returns the set of resources that are outputs to this interaction.
-    @ In, None
-    @ Out, outputs, set, set of outputs
-    """
-    outputs = Interaction.get_outputs(self)
-    outputs.update(np.atleast_1d(self._stores))
-    return outputs
-
-  def get_resource(self):
+  def get_stored_resource(self):
     """
     Returns the resource this unit stores.
     @ In, None
     @ Out, stores, str, resource stored
     """
-    return self._stores
+    return list(self.inputs)[0]
 
   def get_strategy(self):
     """
@@ -161,24 +129,5 @@ class Storage(Interaction):
     """
     pre = tab * tabs
     self.raiseADebug(pre + "Storage:")
-    self.raiseADebug(pre + "  stores:", self._stores)
+    self.raiseADebug(pre + "  stores:", self.inputs)
     self.raiseADebug(pre + "  capacity:", self._capacity)
-
-  def get_initial_level(self, meta):
-    """
-    Find initial level of the storage
-    @ In, meta, dict, additional variable passthrough
-    @ Out, initial, float, initial level
-    """
-    res = self.get_resource()
-    request = {res: None}
-    meta["request"] = request
-    pct = self._initial_stored.evaluate(meta, target_var=res)[0][res]
-    if not (0 <= pct <= 1):
-      self.raiseAnError(
-        ValueError,
-        f'While calculating initial storage level for storage "{self.tag}", '
-        + f"an invalid percent was provided/calculated ({pct}). Initial levels should be between 0 and 1, inclusive.",
-      )
-    amt = pct * self.get_capacity(meta)[0][res]
-    return amt

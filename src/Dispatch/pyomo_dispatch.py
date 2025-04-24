@@ -187,7 +187,7 @@ class Pyomo(Dispatcher):
 
       # Store Results of optimization into dispatch container
       for comp in components:
-        for tag in comp.get_tracking_vars():
+        for tag in comp.interaction.tracking_vars:
           for res, values in subdisp[comp.name][tag].items():
             dispatch.set_activity_vector(comp, res, values, tracker=tag, start_idx=start_index, end_idx=end_index)
       start_index = end_index
@@ -270,13 +270,13 @@ class Pyomo(Dispatcher):
       return False
 
     for comp in components:
-      intr = comp.get_interaction()
+      intr = comp.interaction
       if intr.is_governed():  # by "is_governed" we mean "isn't optimized in pyomo"
         # check activity L2 norm as a differ
         # TODO this may be specific to storage right now
         name = comp.name
-        tracker = comp.get_tracking_vars()[0]
-        res = intr.get_resource()
+        tracker = comp.interaction.tracking_vars[0]
+        res = intr.get_stored_resource()
         scale = np.max(old[name][tracker][res])
         # Avoid division by zero
         if scale == 0:
@@ -295,7 +295,7 @@ class Pyomo(Dispatcher):
     @ In, components, list, HERON component list
     @ Out, needs_convergence, bool, True if iteration is needed
     """
-    return any(comp.get_interaction().is_governed() for comp in components)
+    return any(comp.interaction.is_governed() for comp in components)
 
   def _solve_dispatch(self, m, meta):
     """

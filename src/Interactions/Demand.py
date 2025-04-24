@@ -3,14 +3,11 @@ import numpy as np
 from DOVE.src.Interactions.Interaction import Interaction
 from ravenframework.utils.InputData import ParameterInput
 
-
 class Demand(Interaction):
   """
   Explains a particular interaction, where a resource is demanded
   """
-
   tag = "demands"  # node name in input file
-
   @classmethod
   def get_input_specs(cls) -> type[ParameterInput]:
     """
@@ -28,8 +25,7 @@ class Demand(Interaction):
     @ Out, None
     """
     Interaction.__init__(self, **kwargs)
-    self._tracking_vars: list[str] = ["production"]
-    self._demands: list[str] = []
+    self.tracking_vars = ["production"]
 
   def read_input(self, specs, comp_name):
     """
@@ -38,20 +34,8 @@ class Demand(Interaction):
     @ In, comp_name, string, name of component this Interaction belongs to
     @ Out, None
     """
-    # specs were already checked in Component
-    # must set demands first, so that "capacity" can access it
     Interaction.read_input(self, specs, comp_name)
-    self._demands = specs.parameterValues["resource"]
-
-  def get_inputs(self) -> set[str]:
-    """
-    Returns the set of resources that are inputs to this interaction.
-    @ In, None
-    @ Out, inputs, set, set of inputs
-    """
-    inputs = Interaction.get_inputs(self)
-    inputs.update(np.atleast_1d(self._demands))
-    return inputs
+    self.inputs = set(specs.parameterValues["resource"])
 
   def print_me(self, tabs: int = 0, tab: str = "  ") -> None:
     """
@@ -62,5 +46,5 @@ class Demand(Interaction):
     """
     pre = tab * tabs
     self.raiseADebug(pre + "Demand/Load:")
-    self.raiseADebug(pre + "  demands:", self._demands)
+    self.raiseADebug(pre + "  demands:", self.inputs)
     self.raiseADebug(pre + "  capacity:", self._capacity)

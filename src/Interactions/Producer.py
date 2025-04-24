@@ -9,9 +9,7 @@ class Producer(Interaction):
   """
   Explains a particular interaction, where resources are consumed to produce other resources
   """
-
   tag = "produces"  # node name in input file
-
   @classmethod
   def get_input_specs(cls):
     """
@@ -53,28 +51,28 @@ class Producer(Interaction):
       InputData.parameterInputFactory(
         "ramp_freq",
         contentType=InputTypes.IntegerType,
-        descr=r"""Places a limit on the number of time steps between successive production level
-                  ramping events. For example, if time steps are an hour long and the ramp frequency
-                      is set to 4, then once this component has changed production levels, 4 hours must
-                      pass before another production change can occur. Note this limit introduces binary
-                      variables and may require selection of appropriate solvers. \default{0}""",
+        descr=r"""Places a limit on the number of time steps between successive
+                  production level ramping events. For example, if time steps are
+                  an hour long and the ramp frequency is set to 4, then once this
+                  component has changed production levels, 4 hours must pass before
+                  another production change can occur. Note this limit introduces
+                  binary variables and may require selection of appropriate solvers.
+                  \default{0}""",
       )
     )
 
     return specs
 
-  def __init__(self, **kwargs):
+  def __init__(self, **kwargs) -> None:
     """
     Constructor
     @ In, None
     @ Out, None
     """
     Interaction.__init__(self, **kwargs)
-    self._produces: list[str] = []  # the resource(s) produced by this interaction
-    self._consumes: list[str] = []  # the resource(s) consumed by this interaction
-    self._tracking_vars = ["production"]
+    self.tracking_vars = ["production"]
 
-  def read_input(self, specs, comp_name):
+  def read_input(self, specs, comp_name) -> None:
     """
     Sets settings from input file
     @ In, specs, InputData, specs
@@ -83,28 +81,28 @@ class Producer(Interaction):
     @ Out, None
     """
     Interaction.read_input(self, specs, comp_name)
-    self._produces: list[str] = specs.parameterValues["resource"]
+    self.outputs = set(specs.parameterValues["resource"])
 
     for item in specs.subparts:
       match item.getName():
         case "transfer":
           self._set_transfer_func("_transfer", comp_name, item)
         case "consumes":
-          self._consumes = item.value
+          self.inputs = set(item.value)
         case "ramp_limit":
           self.ramp_limit = item.value
         case "ramp_freq":
           self.ramp_freq = item.value
 
-    if self._transfer is None and self._consumes:
+    if self._transfer is None and self.inputs:
         self.raiseAnError(
           IOError, "Any component that consumes a resource must have a transfer function describing the production process!"
         )
 
     ## transfer elements are all in IO list
     if self._transfer is not None:
-      self._transfer.check_io(self.get_inputs(), self.get_outputs(), comp_name)
-      self._transfer.set_io_signs(self.get_inputs(), self.get_outputs())
+      self._transfer.check_io(self.inputs, self.outputs, comp_name)
+      self._transfer.set_io_signs(self.inputs, self.outputs)
 
     ## ramp limit is (0, 1]
     if self.ramp_limit is not None and not 0 < self.ramp_limit <= 1:
@@ -128,26 +126,6 @@ class Producer(Interaction):
         self._transfer.read(comp, spec)
         found = True
 
-  def get_inputs(self) -> set[str]:
-    """
-    Returns the set of resources that are inputs to this interaction.
-    @ In, None
-    @ Out, inputs, set, set of inputs
-    """
-    inputs = Interaction.get_inputs(self)
-    inputs.update(np.atleast_1d(self._consumes))
-    return inputs
-
-  def get_outputs(self) -> set[str]:
-    """
-    Returns the set of resources that are outputs to this interaction.
-    @ In, None
-    @ Out, outputs, set, set of outputs
-    """
-    outputs = Interaction.get_outputs(self)
-    outputs.update(np.atleast_1d(self._produces))
-    return outputs
-
   def print_me(self, tabs: int = 0, tab: str = "  ") -> None:
     """
     Prints info about self
@@ -157,7 +135,7 @@ class Producer(Interaction):
     """
     pre = tab * tabs
     self.raiseADebug(pre + "Producer:")
-    self.raiseADebug(pre + "  produces:", self._produces)
-    self.raiseADebug(pre + "  consumes:", self._consumes)
+    self.raiseADebug(pre + "  produces:", self.outputs)
+    self.raiseADebug(pre + "  consumes:", self.inputs)
     self.raiseADebug(pre + "  transfer:", self._transfer)
     self.raiseADebug(pre + "  capacity:", self._capacity)

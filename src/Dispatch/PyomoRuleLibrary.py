@@ -7,6 +7,8 @@ Library of Pyomo rules for HERON dispatch.
 import pyomo.environ as pyo
 from typing import Optional
 
+from DOVE.src.Interactions.Storage import Storage
+
 
 def charge_rule(charge_name, bin_name, large_eps, r, m, t) -> bool:
   """
@@ -65,7 +67,7 @@ def level_rule(comp, level_name, charge_name, discharge_name, initial_storage, r
   else:
     previous = initial_storage
     dt = m.Times[1] - m.Times[0]
-  rte2 = comp.get_sqrt_RTE()  # square root of the round-trip efficiency
+  rte2 = comp.interaction.sqrt_rte  # square root of the round-trip efficiency
   production = -rte2 * charge_var[r, t] - discharge_var[r, t] / rte2
   return level_var[r, t] == previous + production * dt
 
@@ -274,8 +276,8 @@ def conservation_rule(res, m, t) -> bool:
     if res in res_dict:
       # activity information depends on if storage or component
       r = res_dict[res]
-      intr = comp.get_interaction()
-      if intr.is_type("HeronStorage"):
+      intr = comp.interaction
+      if isinstance(intr, Storage): #.is_type("HeronStorage"):
         # Storages have 3 variables: level, charge, and discharge
         # -> so calculate activity
         charge = getattr(m, f"{comp.name}_charge")
