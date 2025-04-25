@@ -128,6 +128,6 @@ class Storage(Interaction):
     @ Out, None
     """
     pre = tab * tabs
-    self.raiseADebug(pre + "Storage:")
-    self.raiseADebug(pre + "  stores:", self.inputs)
-    self.raiseADebug(pre + "  capacity:", self._capacity)
+    print(pre + "Storage:")
+    print(pre + "  stores:", self.inputs)
+    print(pre + "  capacity:", self._capacity)

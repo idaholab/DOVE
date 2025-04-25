@@ -134,8 +134,8 @@ class Producer(Interaction):
     @ Out, None
     """
     pre = tab * tabs
-    self.raiseADebug(pre + "Producer:")
-    self.raiseADebug(pre + "  produces:", self.outputs)
-    self.raiseADebug(pre + "  consumes:", self.inputs)
-    self.raiseADebug(pre + "  transfer:", self._transfer)
-    self.raiseADebug(pre + "  capacity:", self._capacity)
+    print(pre + "Producer:")
+    print(pre + "  produces:", self.outputs)
+    print(pre + "  consumes:", self.inputs)
+    print(pre + "  transfer:", self._transfer)
+    print(pre + "  capacity:", self._capacity)

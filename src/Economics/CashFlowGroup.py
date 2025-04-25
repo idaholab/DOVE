@@ -51,8 +51,8 @@ class CashFlowGroup(Base):
     Base.__init__(self, **kwargs)
     self.name = component.name
     self._component = component  # component this one
-    self._lifetime: int | None = None  # lifetime of the component
-    self._cash_flows: list[CashFlow] = []
+    self.lifetime: int | None = None  # lifetime of the component
+    self.cashflows: list[CashFlow] = []
 
   def read_input(self, specs: InputData.ParameterInput) -> None:
     """
@@ -63,28 +63,15 @@ class CashFlowGroup(Base):
     for item in specs.subparts:
       match item.getName():
         case "lifetime":
-          self._lifetime = item.value
+          self.lifetime = item.value
         case "CashFlow":
           new = CashFlow(self._component)
           new.read_input(item)
-          self._cash_flows.append(new)
+          self.cashflows.append(new)
 
-    if self._lifetime is None:
+    if self.lifetime is None:
       self.raiseAnError(IOError, f'Component "{self.name}" is missing its <lifetime> node!')
 
-  @property
-  def component(self):
-    return self._component
-
-  @property
-  def lifetime(self) -> int:
-    if self._lifetime is None:
-      raise AttributeError(f"component '{self._component.name}' economics object has no attribute 'lifetime'!")
-    return self._lifetime
-
-  @property
-  def cashflows(self) -> list[CashFlow]:
-    return self._cash_flows
 
   def evaluate_cfs(self, activity, meta, marginal=False):
     pass

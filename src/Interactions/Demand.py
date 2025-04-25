@@ -45,6 +45,6 @@ class Demand(Interaction):
     @ Out, None
     """
     pre = tab * tabs
-    self.raiseADebug(pre + "Demand/Load:")
-    self.raiseADebug(pre + "  demands:", self.inputs)
-    self.raiseADebug(pre + "  capacity:", self._capacity)
+    print(pre + "Demand/Load:")
+    print(pre + "  demands:", self.inputs)
+    print(pre + "  capacity:", self._capacity)

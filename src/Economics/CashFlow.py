@@ -4,7 +4,6 @@
 CashFlow Module
 """
 from typing import Any
-import numpy as np
 from collections import defaultdict
 
 from ravenframework.utils import InputData, InputTypes
@@ -67,14 +66,16 @@ class CashFlow:
     cf.addParam(
       "taxable",
       param_type=InputTypes.BoolType, #type: ignore
-      required=True,
+      required=False,
+      default=True, # type: ignore
       descr=r"""determines whether this CashFlow is taxed every cycle.""",
     )
 
     cf.addParam(
       "inflation",
       param_type=InputTypes.StringType,
-      required=True,
+      required=False,
+      default=False, # type: ignore
       descr=r"""determines how inflation affects this CashFlow every cycle.
                 See the CashFlow submodule of RAVEN.""",
     )
@@ -115,6 +116,16 @@ class CashFlow:
                 or every cycle (\xmlString{year})). Generally, CashFlows such as fixed
                 operations and maintenance costs are per-cycle, whereas variable costs
                 such as fuel and maintenance as well as sales are repeated every time step.""",
+    )
+
+    cf.addParam(
+      "depreciate",
+      param_type=InputTypes.IntegerType, # type: ignore
+      required=False,
+      default=None, # type: ignore
+      descr=r"""indicates the number of cycles over which this CashFlow should be
+                depreciated. Depreciation schemes are assumed to be MACRS and available
+                cycles are listed in the CashFlow submodule of RAVEN.""",
     )
 
     driver = InputData.parameterInputFactory(
@@ -179,23 +190,25 @@ class CashFlow:
     @ In, component, CashFlowUser instance, cash flow user to which this cash flow belongs
     @ Out, None
     """
-    self._component = component  # component instance to whom this cashflow belongs, if any
+    
     self._driver = None  # ValuedParam "quantity produced", D
     self._alpha = None  # ValuedParam "price per produced", a
     self._reference_driver = None  # ValuedParam "where price is accurate", D'
     self._scaling_factor_x = None  # ValuedParam "economy of scale", x
-    self.name = None  # base name of cash flow
 
-
-    self.inflation = False  # apply inflation or not
-    self._npv_exempt: bool = False  # inlcude cashflow in NPV calculation
-    self.depreciation = None
-    self.taxable = False
+    self.component = component  # component instance to whom this cashflow belongs, if any
+    self.name: str = "placeholder"  # base name of cash flow
+    self.has_inflation: bool = False  # apply inflation or not
+    self.is_npv_exempt: bool = False  # exclude cashflow in NPV calculation?
+    self.is_price_levelized: bool = False
+    self.is_taxable: bool = True
+    self.depreciation: None | int = None
+    
     self.type: str = "repeating"  # needed? one-time, yearly, repeating
     self.period: str = "hour"  # period for recurring cash flows
     self._signals = set()  # variable values needed for this cash flow
     self._crossrefs: defaultdict[str, Any] = defaultdict(dict)
-    self._price_is_levelized = False
+    
 
   def _set_value(self, name, spec) -> None:
     """
@@ -213,21 +226,20 @@ class CashFlow:
     @ In, item, InputData.ParameterInput, parsed specs from user
     @ Out, None
     """
-    self.name = item.parameterValues["name"]
-    self.taxable = item.parameterValues["taxable"]
-    self.inflation = item.parameterValues["inflation"]
-    self.type = item.parameterValues["type"]
-    self.period = item.parameterValues.get("period", "hour")
-    self._npv_exempt = item.parameterValues.get("npv_exempt", False)
-
+    self.name = item.parameterValues["name"] # required or fails
+    self.type = item.parameterValues["type"] # required or fails
+    self.period = item.parameterValues.get("period", self.period)
+    self.is_taxable = item.parameterValues.get("taxable", self.is_taxable)
+    self.is_npv_exempt = item.parameterValues.get("npv_exempt", self.is_npv_exempt)
+    self.has_inflation = item.parameterValues.get("inflation", self.has_inflation)
+    self.depreciation = item.parameterValues.get("depreciate", self.depreciation)
+    
     for sub in item.subparts:
       match (item_name := sub.getName()):
         case "driver" | "reference_driver" | "scaling_factor_x":
           self._set_value(f"_{item_name}", sub)
         case "reference_price":
           self.set_reference_price(sub)
-        case "depreciate":
-          self.depreciation = sub.value
         case _:
           raise IOError(f"Unrecognized 'CashFlow' node: {item_name}")
 
@@ -246,13 +258,13 @@ class CashFlow:
     """
     for sub in node.subparts:
       if sub.name == "levelized_cost":
-        self._price_is_levelized = True
+        self.is_price_levelized = True
         __ = node.popSub("levelized_cost")
 
     try:
       self._set_value("_alpha", node)
     except AttributeError as e:
-      if self._price_is_levelized:
+      if self.is_price_levelized:
         self._set_fixed_param("_alpha", 1)
       else:
         raise IOError(f"No <reference_price> node provided for CashFlow {self.name}!")
@@ -270,19 +282,3 @@ class CashFlow:
     @ Out, driver, ValuedParam, valued param for the cash flow driver
     """
     return self._driver
-
-  def is_mult_target(self):
-    """
-    Getter for Cashflow mult_target boolean
-    @ In, None
-    @ Out, taxable, bool, is cashflow a multiplier target?
-    """
-    return self._price_is_levelized
-
-  def is_npv_exempt(self) -> bool:
-    """
-    Getter for Cashflow npv_exempt boolean
-    @ In, None
-    @ Out, npv_exempt, bool, is cashflow exempt from NPV calculations?
-    """
-    return self._npv_exempt

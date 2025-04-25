@@ -9,6 +9,12 @@ from DOVE.src.Interactions import Demand, Producer, Storage
 
 from ravenframework.utils import InputData, InputTypes
 
+class ComponentError(Exception):
+  """
+  Custom exception for component errors.
+  """
+  pass
+
 class Component(Base):
   """
   Represents a system component in the grid analysis. Each component has a
@@ -75,20 +81,22 @@ class Component(Base):
     # get specs for allowable inputs
     specs = self.get_input_specs()()
     specs.parseNode(xml)
-    self.name = specs.parameterValues["name"]
-    interaction_map = {
-      "produces": Producer,
-      "stores": Storage,
-      "demands": Demand
-    }
+    interaction_map = {"produces": Producer, "stores": Storage, "demands": Demand}
+    self.assign_attrs_from_specs(specs, interaction_map, CashFlowGroup)
 
+
+  def assign_attrs_from_specs(self, specs, interaction_map, cfg_type) -> None:
+    """
+    """
+    self.name = specs.parameterValues["name"]
+    
     found_interactions: dict
     not_found_in_spec: list
     found_interactions, not_found_in_spec = specs.findNodesAndExtractValues(interaction_map.keys())
     if all((interaction == 'no-default' for interaction in found_interactions.values())):
-      self.raiseAnError(IOError, f"No interaction found for Component '{self.name}'")
+      raise ComponentError(f"No interaction found for Component '{self.name}'")
     elif len(not_found_in_spec) < 2:
-      self.raiseAnError(IOError, f"A Component can only have one interaction! Check Component '{self.name}'")
+      raise ComponentError(f"A Component can only have one interaction! Check Component '{self.name}'")
 
     for item in specs.subparts:
       item_name = item.getName()
@@ -97,9 +105,10 @@ class Component(Base):
         interaction_instance.read_input(item, self.name)
         self._interaction = interaction_instance
       elif item_name == 'economics':
-        cashflows = CashFlowGroup(self, messageHander=self.messageHandler)
+        cashflows = cfg_type(self, messageHander=self.messageHandler)
         cashflows.read_input(item)
         self._economics = cashflows
+
 
   @property
   def interaction(self) -> Demand | Producer | Storage:
@@ -121,8 +130,8 @@ class Component(Base):
     @ Out, None
     """
     pre = tab * tabs
-    self.raiseADebug(pre + "Component:")
-    self.raiseADebug(pre + "  name:", self.name)
+    print(pre + "Component:")
+    print(pre + "  name:", self.name)
     self.interaction.print_me(tabs=tabs + 1, tab=tab)
 
   def set_levelized_cost_meta(self, cashflows) -> None:

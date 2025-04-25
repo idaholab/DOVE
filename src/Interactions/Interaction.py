@@ -61,6 +61,7 @@ class Interaction(Base):
               usage from the changing behavior of other components.""",
     )
 
+
     cap = InputData.parameterInputFactory(
       "capacity",
       contentType=InputTypes.FloatOrIntType,
