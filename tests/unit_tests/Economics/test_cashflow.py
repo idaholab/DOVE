@@ -106,15 +106,15 @@ class TestCashFlow(unittest.TestCase):
     self.assertIs(specs, self.mockCashFlow)
 
   def testReadInput(self):
-    # Note that this test also checks __init__(mostly), _set_value, and 11 getter functions
+    # Note that this test also checks __init__ (mostly), _set_value, and 3 getter functions
 
-    # Set up mocks
+    # Set up mocks and patchers
     mockComponent = MagicMock(name="mockComponent")
 
     self.mockCashFlow.parameterValues = {
       "name": "testCashFlowName",
-      "taxable": False,
-      "inflation": False,
+      "taxable": True,
+      "inflation": True,
       "type": "one-time",
       "period": "yearly",
       "npv_exempt": True
@@ -137,10 +137,12 @@ class TestCashFlow(unittest.TestCase):
     mockSetReferencePrice = MagicMock(name="mockSetReferencePrice")
     mockSetReferencePrice.return_value = False
 
+    setReferencePricePatcher = patch.object(CashFlow, "set_reference_price", mockSetReferencePrice)
+    setReferencePricePatcher.start()
+
     # Create CashFlow instance and call method under test
-    with patch.object(CashFlow, "set_reference_price", mockSetReferencePrice):
-      testCashFlow = CashFlow(mockComponent)
-      testCashFlow.read_input(self.mockCashFlow)
+    testCashFlow = CashFlow(mockComponent)
+    testCashFlow.read_input(self.mockCashFlow)
 
     # Assertions to verify behavior
 
@@ -149,38 +151,53 @@ class TestCashFlow(unittest.TestCase):
 
     # Check param values
     self.assertEqual(testCashFlow.name, "testCashFlowName")
-    self.assertEqual(testCashFlow.is_taxable(), False)
-    self.assertEqual(testCashFlow.is_inflation(), False)
-    self.assertEqual(testCashFlow.get_type(), "one-time")
-    self.assertEqual(testCashFlow.get_period(), "yearly")
+    self.assertEqual(testCashFlow.taxable, True)
+    self.assertEqual(testCashFlow.inflation, True)
+    self.assertEqual(testCashFlow.type, "one-time")
+    self.assertEqual(testCashFlow.period, "yearly")
     self.assertEqual(testCashFlow.is_npv_exempt(), True)
 
     self.assertEqual(testCashFlow.get_driver(), self.mockDriver.value)
-    self.assertEqual(testCashFlow.get_reference(), self.mockReferenceDriver.value)
-    self.assertEqual(testCashFlow.get_scale(), self.mockScalingFactorX.value)
-    # self.assertEqual(testCashFlow.get_price(), 1)
-    self.assertEqual(testCashFlow.get_depreciation(), self.mockDepreciate.value)
+    self.assertEqual(testCashFlow._reference_driver, self.mockReferenceDriver.value)
+    self.assertEqual(testCashFlow._scaling_factor_x, self.mockScalingFactorX.value)
+    self.assertEqual(testCashFlow.depreciation, self.mockDepreciate.value)
 
     # Check correct call to set_reference_price
     mockSetReferencePrice.assert_called_once_with(self.mockReferencePrice)
-    self.assertEqual(testCashFlow.is_mult_target(), False)
+    self.assertEqual(testCashFlow.is_mult_target(), False) # default value
 
     # Test that default attribute values work properly
 
-    # Remove attributes with defaults from mock
+    # Remove attributes with defaults from mocks
+    del self.mockCashFlow.parameterValues["taxable"]
+    del self.mockCashFlow.parameterValues["inflation"]
+    del self.mockCashFlow.parameterValues["type"]
     del self.mockCashFlow.parameterValues["period"]
     del self.mockCashFlow.parameterValues["npv_exempt"]
 
+    self.mockCashFlow.subparts = [
+      self.mockDriver,
+      self.mockReferencePrice,
+      self.mockDepreciate
+    ]
+
     # Create another CashFlow instance and call method under test
     testCashFlowDefaults = CashFlow(mockComponent)
-    with patch.object(CashFlow, "set_reference_price", mockSetReferencePrice):
-      testCashFlowDefaults.read_input(self.mockCashFlow)
+    testCashFlowDefaults.read_input(self.mockCashFlow)
 
-    # Check that defaults were added correctly
-    self.assertEqual(testCashFlowDefaults.get_period(), "hour")
+    # Check defaults that should be set in __init__
+    self.assertEqual(testCashFlowDefaults.taxable, False)
+    self.assertEqual(testCashFlowDefaults.inflation, False)
+    self.assertEqual(testCashFlowDefaults.type, "repeating")
+
+    # Check defaults that should be set in read_input
+    self.assertEqual(testCashFlowDefaults.period, "hour")
     self.assertEqual(testCashFlowDefaults.is_npv_exempt(), False)
 
-    # Test that method returns error with bad subnode
+    self.assertEqual(testCashFlowDefaults._reference_driver, 1)
+    self.assertEqual(testCashFlowDefaults._scaling_factor_x, 1)
+
+    # Test that method raises error with bad subnode
 
     # Create mock and add to subparts
     mockBadSub = MagicMock(name="mockBadSub")
@@ -189,11 +206,10 @@ class TestCashFlow(unittest.TestCase):
 
     # Create another CashFlow instance and call method under test again
     testCashFlowBadSubnode = CashFlow(mockComponent)
-    with patch.object(CashFlow, "set_reference_price", mockSetReferencePrice):
-      with self.assertRaises(IOError):
-        testCashFlowBadSubnode.read_input(self.mockCashFlow)
+    with self.assertRaises(IOError):
+      testCashFlowBadSubnode.read_input(self.mockCashFlow)
 
-    # Test that method returns error with no driver
+    # Test that method raises error with no driver
 
     # Remove driver from subparts in mock
     self.mockCashFlow.subparts = [
@@ -205,13 +221,8 @@ class TestCashFlow(unittest.TestCase):
 
     # Create another CashFlow instance and call method under test again
     testCashFlowNoDriver = CashFlow(mockComponent)
-    with patch.object(CashFlow, "set_reference_price", mockSetReferencePrice):
-      with self.assertRaises(IOError):
-        testCashFlowNoDriver.read_input(self.mockCashFlow)
-
-    ######## TODO ########
-    # Add checks/tests for _alpha, set_reference_price, and related code
-
+    with self.assertRaises(IOError):
+      testCashFlowNoDriver.read_input(self.mockCashFlow)
 
 if __name__ == "__main__":
   unittest.main()
