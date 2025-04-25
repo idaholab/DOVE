@@ -49,10 +49,10 @@ class Dispatcher(MessageUser, InputDataUser):
     self._solver = None
     self._eps = 1e-9  # small constant to add to denominator
 
-  def read_input(self, inputs):
+  def read_input(self, specs):
     """
     Loads settings based on provided inputs
-    @ In, inputs, InputData.InputSpecs, input specifications
+    @ In, specs, InputData.InputSpecs, input specifications
     @ Out, None
     """
     pass  # add here if true for ALL dispatchers
@@ -108,12 +108,13 @@ class Dispatcher(MessageUser, InputDataUser):
   # ---------------------------------------------
   # API
   # TODO make this a virtual method?
-  def dispatch(self, case, components, sources):
+  def dispatch(self, case, components, sources, meta):
     """
     Performs technoeconomic dispatch.
     @ In, case, Case, HERON case
     @ In, components, list, HERON components
     @ In, sources, list, HERON sources
+    @ In, meta, dict, meta information
     @ Out, results, dict, economic and production metrics
     """
     raise NotImplementedError  # must be implemented by inheriting classes

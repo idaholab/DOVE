@@ -5,6 +5,9 @@ Library of Pyomo rules for HERON dispatch.
 """
 
 import pyomo.environ as pyo
+from typing import Optional
+
+from DOVE.src.Interactions.Storage import Storage
 
 
 def charge_rule(charge_name, bin_name, large_eps, r, m, t) -> bool:
@@ -41,9 +44,7 @@ def discharge_rule(discharge_name, bin_name, large_eps, r, m, t) -> bool:
   return discharge_var[r, t] <= bin_var[r, t] * large_eps
 
 
-def level_rule(
-  comp, level_name, charge_name, discharge_name, initial_storage, r, m, t
-) -> bool:
+def level_rule(comp, level_name, charge_name, discharge_name, initial_storage, r, m, t) -> bool:
   """
   Constructs pyomo charge-discharge-level balance constraints.
   For storage units specificially.
@@ -51,7 +52,7 @@ def level_rule(
   @ In, level_name, str, name of level-tracking variable
   @ In, charge_name, str, name of charging variable
   @ In, discharge_name, str, name of discharging variable
-  @ In, initial_storage, dict, initial storage levels by component
+  @ In, initial_storage, float, initial storage levels by component
   @ In, r, int, index of stored resource (is this always 0?)
   @ In, m, pyo.ConcreteModel, associated model
   @ In, t, int, time index for capacity rule
@@ -64,9 +65,9 @@ def level_rule(
     previous = level_var[r, t - 1]
     dt = m.Times[t] - m.Times[t - 1]
   else:
-    previous = initial_storage[comp]
+    previous = initial_storage
     dt = m.Times[1] - m.Times[0]
-  rte2 = comp.get_sqrt_RTE()  # square root of the round-trip efficiency
+  rte2 = comp.interaction.sqrt_rte  # square root of the round-trip efficiency
   production = -rte2 * charge_var[r, t] - discharge_var[r, t] / rte2
   return level_var[r, t] == previous + production * dt
 
@@ -87,7 +88,7 @@ def periodic_level_rule(comp, level_name, initial_storage, r, m, t) -> bool:
   return getattr(m, level_name)[r, m.T[-1]] == initial_storage[comp]
 
 
-def capacity_rule(prod_name, r, caps, m, t) -> bool:
+def capacity_rule(prod_name, r, caps, m, t) -> Optional[bool]:
   """
   Constructs pyomo capacity constraints.
   @ In, prod_name, str, name of production variable
@@ -100,7 +101,7 @@ def capacity_rule(prod_name, r, caps, m, t) -> bool:
   return prod_limit_rule(prod_name, r, caps, kind, t, m)
 
 
-def prod_limit_rule(prod_name, r, limits, kind, t, m) -> bool:
+def prod_limit_rule(prod_name, r, limits, kind, t, m) -> Optional[bool]:
   """
   Constructs pyomo production constraints.
   @ In, prod_name, str, name of production variable
@@ -121,7 +122,7 @@ def prod_limit_rule(prod_name, r, limits, kind, t, m) -> bool:
     raise TypeError('Unrecognized production limit "kind":', kind)
 
 
-def ramp_rule_down(prod_name, r, limit, neg_cap, t, m, bins=None) -> bool:
+def ramp_rule_down(prod_name, r, limit, neg_cap, t, m, bins=None) -> bool | type[pyo.Constraint.Skip]:
   """
   Constructs pyomo production ramping constraints for reducing production level.
   Note that this is number-getting-less-positive for positive-defined capacity, while
@@ -166,7 +167,7 @@ def ramp_rule_down(prod_name, r, limit, neg_cap, t, m, bins=None) -> bool:
       return delta >= -limit * down + eps * up
 
 
-def ramp_rule_up(prod_name, r, limit, neg_cap, t, m, bins=None) -> bool:
+def ramp_rule_up(prod_name, r, limit, neg_cap, t, m, bins=None) -> bool | type[pyo.Constraint.Skip]:
   """
   Constructs pyomo production ramping constraints.
   @ In, prod_name, str, name of production variable
@@ -206,7 +207,7 @@ def ramp_rule_up(prod_name, r, limit, neg_cap, t, m, bins=None) -> bool:
       return delta <= limit * up - eps * down
 
 
-def ramp_freq_rule(Bd, Bu, tao, t, m) -> bool:
+def ramp_freq_rule(Bd, Bu, tao, t, m) -> bool | type[pyo.Constraint.Skip]:
   """
   Constructs pyomo frequency-of-ramp constraints.
   @ In, Bd, bool var, binary tracking down-ramp events
@@ -275,8 +276,8 @@ def conservation_rule(res, m, t) -> bool:
     if res in res_dict:
       # activity information depends on if storage or component
       r = res_dict[res]
-      intr = comp.get_interaction()
-      if intr.is_type("HeronStorage"):
+      intr = comp.interaction
+      if isinstance(intr, Storage): #.is_type("HeronStorage"):
         # Storages have 3 variables: level, charge, and discharge
         # -> so calculate activity
         charge = getattr(m, f"{comp.name}_charge")

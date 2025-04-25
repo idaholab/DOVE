@@ -1,8 +1,9 @@
 # Copyright 2020, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 from io import StringIO
-
 import numpy as np
+
+from DOVE.src.Interactions.Storage import Storage
 
 
 class DispatchState:
@@ -102,7 +103,7 @@ class DispatchState:
     # template = 'Dispatch__{c}__{r}' # standardized via input
     data = {}
     for comp in self._components:
-      for tracker in comp.get_tracking_vars():
+      for tracker in comp.interaction.tracking_vars:
         for res, r in self._resources[comp].items():
           result = np.empty(len(self._times))
           for t in range(len(self._times)):
@@ -135,7 +136,7 @@ class NumpyState(DispatchState):
     DispatchState.initialize(self, components, resources_map, times)
     self._data = {}
     for comp in components:
-      for tag in comp.get_tracking_vars():
+      for tag in comp.interaction.tracking_vars:
         self._data[f"{comp.name}_{tag}"] = np.zeros(
           (len(self._resources[comp]), len(times))
         )
@@ -202,7 +203,7 @@ class NumpyState(DispatchState):
     @ In, end_idx, int, optional, last time index at which activity is provided, Default: None
     @ Out, None
     """
-    if comp.get_interaction().is_type("Storage") and tracker == "production":
+    if isinstance(comp.interaction, Storage) and tracker == "production": #.is_type("Storage")
       raise RuntimeError(
         f'Component "{comp.name}" is Storage and the provided tracker is "production"!'
       )

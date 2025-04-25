@@ -10,6 +10,8 @@ import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.errors import ApplicationError
 
+from DOVE.src.Interactions.Storage import Storage
+
 
 def check_solver_availability(requested_solver: str) -> str:
   """
@@ -61,7 +63,7 @@ def get_all_resources(components):
   """
   res = set()
   for comp in components:
-    res.update(comp.get_resources())
+    res.update(comp.interaction.resources)
   return res
 
 
@@ -75,9 +77,9 @@ def get_initial_storage_levels(components: list, meta: dict, start_index: int) -
   """
   initial_levels = {}
   for comp in components:
-    if comp.get_interaction().is_type("HeronStorage"):
+    if isinstance(comp.interaction, Storage): #.is_type("HeronStorage"):
       if start_index == 0:
-        initial_levels[comp] = comp.get_interaction().get_initial_level(meta)
+        initial_levels[comp] = comp.interaction.get_initial_level(meta)
         # NOTE: There used to be an else conditional here that depended on the
         # variable `subdisp` which was not defined yet. Leaving an unreachable
         # branch of code, thus, I removed it. So currently, this function assumes
@@ -97,7 +99,7 @@ def get_transfer_coeffs(m, comp) -> dict:
   @ In, comp, HERON component, component to get coefficients of
   @ Out, ratios, dict, ratios of transfer function variables
   """
-  transfer = comp.get_interaction().get_transfer()
+  transfer = comp.interaction.get_transfer()
   if transfer is None:
     return {}
 
@@ -124,7 +126,7 @@ def retrieve_solution(m) -> dict:
   return {
     component.name: {
       tag: retrieve_value_from_model(m, component, tag)
-      for tag in component.get_tracking_vars()
+      for tag in component.interaction.tracking_vars
     }
     for component in m.Components
   }
@@ -180,7 +182,7 @@ def debug_print_soln(m) -> None:
   for c, comp in enumerate(m.Components):
     name = comp.name
     output.append(f"  component: {c} {name}")
-    for tracker in comp.get_tracking_vars():
+    for tracker in comp.interaction.tracking_vars:
       prod = getattr(m, f"{name}_{tracker}")
       kind = "Var" if isinstance(prod, pyo.Var) else "Param"
       for res, r in m.resource_index_map[comp].items():

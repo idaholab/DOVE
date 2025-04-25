@@ -179,22 +179,22 @@ class TestComponent(unittest.TestCase):
     # Checks for handle_produces
     self.mockProducer.assert_called_once_with(messageHandler=testComp1.messageHandler)
     self.mockProducer.return_value.read_input.assert_called_once_with(mockProducesNode, "comp1")
-    self.assertIs(testComp1.get_interaction(), self.mockProducer.return_value)
+    self.assertIs(testComp1.interaction, self.mockProducer.return_value)
 
     # Checks for handle_stores
     self.mockStorage.assert_called_once_with(messageHandler=testComp2.messageHandler)
     self.mockStorage.return_value.read_input.assert_called_once_with(mockStoresNode, "comp2")
-    self.assertIs(testComp2.get_interaction(), self.mockStorage.return_value)
+    self.assertIs(testComp2.interaction, self.mockStorage.return_value)
 
     # Checks for handle_demands
     self.mockDemand.assert_called_once_with(messageHandler=testComp3.messageHandler)
     self.mockDemand.return_value.read_input.assert_called_once_with(mockDemandsNode, "comp3")
-    self.assertIs(testComp3.get_interaction(), self.mockDemand.return_value)
+    self.assertIs(testComp3.interaction, self.mockDemand.return_value)
 
     # Checks for handle_economics
     self.mockCashflow.assert_called_once_with(messageHandler=testComp4.messageHandler)
     self.mockCashflow.return_value.read_input.assert_called_once_with(mockEconomicsNode)
-    self.assertIs(testComp4.get_economics(), self.mockCashflow.return_value)
+    self.assertIs(testComp4.economics, self.mockCashflow.return_value)
 
     # comp5 should call none of the handlers
     # If it did call a handler, it would be caught above

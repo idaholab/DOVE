@@ -56,7 +56,7 @@ class TestCashFlowGroup(unittest.TestCase):
     self.assertEqual(specs, self.mockEconomicsParsed)
 
   def testReadInput(self):
-    # Note that this test also checks __init__, get_component, get_lifetime, and get_cashflows
+    # Note that this test also checks __init__, component, lifetime, and cashflows
 
     # Test-specific mock setup
     mockSpecs = MagicMock()
@@ -90,13 +90,13 @@ class TestCashFlowGroup(unittest.TestCase):
     # Checks for __init__
     self.mockBaseInit.assert_called_once_with(testCashFlowGroup)
     self.assertEqual(testCashFlowGroup.name, "test_component")
-    self.assertEqual(testCashFlowGroup.get_component(), mockComponent)
+    self.assertEqual(testCashFlowGroup.component, mockComponent)
 
     # Checks for read_input
-    self.assertEqual(testCashFlowGroup.get_lifetime(), 50)
+    self.assertEqual(testCashFlowGroup.lifetime, 50)
     mockNewCFInstance1.read_input.assert_called_once_with(mockCFNode1)
     mockNewCFInstance2.read_input.assert_called_once_with(mockCFNode2)
-    self.assertEqual(testCashFlowGroup.get_cashflows(), [mockNewCFInstance1, mockNewCFInstance2])
+    self.assertEqual(testCashFlowGroup.cashflows, [mockNewCFInstance1, mockNewCFInstance2])
 
     ### PART 2: XML input
 
@@ -118,8 +118,8 @@ class TestCashFlowGroup(unittest.TestCase):
     mockSpecs.return_value.parseNode.assert_called_once_with(mockXML)
 
     # Check that specs is right by verifying that specs.subparts can be read
-    self.assertEqual(testCashFlowGroup.get_lifetime(), 50)
-    self.assertEqual(testCashFlowGroup.get_cashflows(), [mockNewCFInstance1, mockNewCFInstance2])
+    self.assertEqual(testCashFlowGroup.lifetime, 50)
+    self.assertEqual(testCashFlowGroup.cashflows, [mockNewCFInstance1, mockNewCFInstance2])
 
 if __name__ == "__main__":
   unittest.main()
