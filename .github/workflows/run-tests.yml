@@ -64,4 +64,4 @@ jobs:
           bash ../raven/scripts/establish_conda_env.sh --install --conda-defs $HOME/Miniconda3/etc/profile.d/conda.sh
       - run: cd ../raven; bash ./build_raven
       - run: bash ../raven/run_tests --library-report
-      - run: bash ../raven/run_tests -j4 --re=DOVE
+      - run: bash ../raven/run_tests -j4 --re="DOVE\tests"
