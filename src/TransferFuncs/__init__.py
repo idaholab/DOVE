@@ -1,3 +1,5 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 """
 Transfer functions describe the balance between consumed and produced
 resources for generating components. This module defines the templates

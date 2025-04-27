@@ -1,11 +1,13 @@
-# Copyright 2020, Battelle Energy Alliance, LLC
+# Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
 Component Module
 """
-from DOVE.src import Base
-from DOVE.src.Economics import CashFlowGroup, CashFlow
-from DOVE.src.Interactions import Demand, Producer, Storage
+import xml.etree.ElementTree as ET
+
+from . import Base
+from .Economics import CashFlowGroup
+from .Interactions import Demand, Producer, Storage
 
 from ravenframework.utils import InputData, InputTypes
 
@@ -60,9 +62,9 @@ class Component(Base):
     """
     Base.__init__(self, **kwargs)
     self.name = "placeholder" # Name is required, so just initialize with a temp name.
+    self.levelized_meta = {}
     self._interaction = None
     self._economics = None
-    self.levelized_meta = {}
 
   def __repr__(self) -> str:
     """
@@ -72,30 +74,36 @@ class Component(Base):
     """
     return f'<DOVE Component "{self.name}">'
 
-  def read_input(self, xml) -> None:
+  def read_input(self, xml: ET.Element) -> None:
     """
     Sets settings from input file
-    @In, xml, xml.etree.ElementTree.Element, component information from xml input file.
-    @Out, None
+    @ In, xml, xml.etree.ElementTree.Element, component information from xml input file.
+    @ Out, None
     """
-    # get specs for allowable inputs
     specs = self.get_input_specs()()
     specs.parseNode(xml)
     interaction_map = {"produces": Producer, "stores": Storage, "demands": Demand}
     self.assign_attrs_from_specs(specs, interaction_map, CashFlowGroup)
 
-
-  def assign_attrs_from_specs(self, specs, interaction_map, cfg_type) -> None:
+  def assign_attrs_from_specs(
+      self,
+      specs: InputData.ParameterInput,
+      interaction_map: dict[str, type[Demand | Storage | Producer]],
+      cfg_type: type[CashFlowGroup]
+  ) -> None:
     """
+    Sets class attributes and children nodes based on the type of Interaction and CashFlowGroup
+    @ In, specs, Input.Data.ParameterInput, filled-out input specification.
+    @ In, interaction_map, dict[str, Interaction], dictionary mapping cls.tag to proper class.
+    @ In, cfg_type, CashFlowGroup, a kind of cashflowgroup (i.e. VP or List)
+    @ Out, None
     """
     self.name = specs.parameterValues["name"]
-    
-    found_interactions: dict
-    not_found_in_spec: list
+
     found_interactions, not_found_in_spec = specs.findNodesAndExtractValues(interaction_map.keys())
     if all((interaction == 'no-default' for interaction in found_interactions.values())):
-      raise ComponentError(f"No interaction found for Component '{self.name}'")
-    elif len(not_found_in_spec) < 2:
+      raise ComponentError(f"No interaction found for Component '{self.name}'!")
+    elif len(not_found_in_spec) < 2: # Three allowed -- if less than two not found, we have a problem.
       raise ComponentError(f"A Component can only have one interaction! Check Component '{self.name}'")
 
     for item in specs.subparts:
@@ -109,15 +117,24 @@ class Component(Base):
         cashflows.read_input(item)
         self._economics = cashflows
 
-
   @property
   def interaction(self) -> Demand | Producer | Storage:
+    """
+    Returns private member `_interaction` after making sure it's been set.
+    @ In, None
+    @ Out, interaction, type[Interaction]
+    """
     if self._interaction is None:
       raise AttributeError(f"component '{self.name}' has no attribute 'interaction'!")
     return self._interaction
 
   @property
   def economics(self) -> CashFlowGroup:
+    """
+    Returns private member `_economics` after making sure it's been set.
+    @ In, None
+    @ Out, economics, type[CashFlowGroup]
+    """
     if self._economics is None:
       raise AttributeError(f"component '{self.name}' has no attribute 'economics'!")
     return self._economics
@@ -134,18 +151,3 @@ class Component(Base):
     print(pre + "  name:", self.name)
     self.interaction.print_me(tabs=tabs + 1, tab=tab)
 
-  def set_levelized_cost_meta(self, cashflows) -> None:
-    """
-    Create a dictionary for determining the correct resource to use per cashflow
-    when using a levelized inner objective.
-
-    NOTE: This is only an option when selecting levelized cost as an econ metric.
-
-    :param cashflows: List of Interaction instances.
-    :type cashflows: list
-    :return: None
-    """
-    for cf in cashflows:
-      tracker = cf.get_driver()._vp.get_tracking_var()
-      resource = cf.get_driver()._vp.get_resource()
-      self.levelized_meta[cf.name] = {tracker: resource}

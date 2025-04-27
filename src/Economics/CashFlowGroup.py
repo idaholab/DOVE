@@ -1,9 +1,11 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 """
 Defines the Economics entity.
 Each component (or source?) can have one of these to describe its economics.
 """
-from DOVE.src import Base
-from DOVE.src.Economics.CashFlow import CashFlow
+from .. import Base
+from .CashFlow import CashFlow
 
 from ravenframework.utils import InputData, InputTypes
 
@@ -11,7 +13,6 @@ class CashFlowGroup(Base):
   """
   Container for multiple CashFlows with utility methods.
   """
-
   tag = "economics"
 
   @classmethod
@@ -27,6 +28,17 @@ class CashFlowGroup(Base):
       baseNode=None,
       descr=r"""this node is where all the economic information about this
                 component is placed.""",
+    )
+
+    specs.addParam(
+      "lifetime",
+      param_type=InputTypes.IntegerType, # type: ignore
+      required=False,
+      default="100",
+      descr=r"""indicates the number of \emph{cycles} (often \emph{years}) this
+                unit is expected to operate before replacement. Replacement is
+                represented as overnight capital cost in the year the component
+                is replaced.""",
     )
 
     lifetime_spec = InputData.parameterInputFactory(
@@ -60,10 +72,9 @@ class CashFlowGroup(Base):
     @ In, source, InputData.ParameterInput, input from user
     @ Out, None
     """
+    self.lifetime = specs.parameterValues.get("lifetime", 100)
     for item in specs.subparts:
       match item.getName():
-        case "lifetime":
-          self.lifetime = item.value
         case "CashFlow":
           new = CashFlow(self._component)
           new.read_input(item)

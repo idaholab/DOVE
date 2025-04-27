@@ -1,4 +1,4 @@
-# Copyright 2020, Battelle Energy Alliance, LLC
+# Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
 Defines the TransferFunc entity.
@@ -49,6 +49,7 @@ class TransferFunc(MessageUser):
     @ In, spec, InputData params, input specifications
     @ Out, needs, list, signals needed to evaluate this ValuedParam at runtime
     """
+
 
   def check_io(self, inputs, outputs, comp_name):
     """

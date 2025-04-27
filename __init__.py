@@ -1,3 +1,5 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 import importlib
 import os
 import sys

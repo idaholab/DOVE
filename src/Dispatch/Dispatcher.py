@@ -1,4 +1,4 @@
-# Copyright 2020, Battelle Energy Alliance, LLC
+# Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
 Base class for dispatchers.
@@ -12,7 +12,6 @@ class DispatchError(Exception):
   """
   Custom exception for dispatch errors.
   """
-
   pass
 
 

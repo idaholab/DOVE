@@ -1,4 +1,4 @@
-# Copyright 2020, Battelle Energy Alliance, LLC
+# Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
 Library of Pyomo rules for HERON dispatch.

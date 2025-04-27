@@ -1,8 +1,11 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 """ """
 from collections import defaultdict
 from typing import Any
 
-from DOVE.src.Base import Base
+from ..Base import Base
+from ..TransferFuncs import TransferFunc
 
 from ravenframework.utils import InputData, InputTypes
 from ravenframework.utils.InputData import ParameterInput
@@ -122,8 +125,6 @@ class Interaction(Base):
     self._minimum = None  # lowest interaction level, if dispatchable
     self._minimum_var = None  # limiting variable for minimum
     self._transfer = None  # the production rate (if any), in produces per consumes
-    self.ramp_limit = None  # limiting change of production in a time step
-    self.ramp_freq = None  # time steps required between production ramping events
     self.dispatch_flexibility = "independent"
     self.capacity_var = None  # which variable limits the capacity (could be produced or consumed?)
     self.tracking_vars: list[str] = []  # list of trackable variables for dispatch activity
@@ -147,7 +148,6 @@ class Interaction(Base):
     @ In, comp_name, str, name of component this Interaction belongs to
     @ Out, None
     """
-    self.raiseADebug(f' ... loading interaction "{self.tag}"')
     self.dispatch_flexibility = specs.parameterValues["dispatch"]
     self.capacity_var = specs.parameterValues["resource"][0]
 
@@ -194,7 +194,7 @@ class Interaction(Base):
     """
     return False
 
-  def get_transfer(self):
+  def get_transfer(self) -> None | TransferFunc:
     """
     Returns the transfer function, if any
     @ In, None

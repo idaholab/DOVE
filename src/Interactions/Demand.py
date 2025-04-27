@@ -1,6 +1,6 @@
-import numpy as np
-
-from DOVE.src.Interactions.Interaction import Interaction
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+from .Interaction import Interaction
 from ravenframework.utils.InputData import ParameterInput
 
 class Demand(Interaction):
@@ -27,7 +27,7 @@ class Demand(Interaction):
     Interaction.__init__(self, **kwargs)
     self.tracking_vars = ["production"]
 
-  def read_input(self, specs, comp_name):
+  def read_input(self, specs: ParameterInput, comp_name: str) -> None:
     """
     Sets settings from input file
     @ In, specs, InputData, specs

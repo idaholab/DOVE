@@ -1,4 +1,4 @@
-# Copyright 2020, Battelle Energy Alliance, LLC
+# Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
 CashFlow Module
@@ -67,7 +67,7 @@ class CashFlow:
       "taxable",
       param_type=InputTypes.BoolType, #type: ignore
       required=False,
-      default=True, # type: ignore
+      default="True",
       descr=r"""determines whether this CashFlow is taxed every cycle.""",
     )
 
@@ -75,28 +75,16 @@ class CashFlow:
       "inflation",
       param_type=InputTypes.StringType,
       required=False,
-      default=False, # type: ignore
+      default="none", # type: ignore
       descr=r"""determines how inflation affects this CashFlow every cycle.
                 See the CashFlow submodule of RAVEN.""",
-    )
-
-    cf.addParam(
-      "mult_target",
-      param_type=InputTypes.BoolType, #type: ignore
-      required=False,
-      descr=r"""\WARNING{DEPRECATED} indicates whether this parameter should be
-                a target of the multiplication factor for NPV matching analyses.
-                This parameter is no longer operational. Specifying it in an input
-                file does nothing. To access the equivalent feature users should
-                now specify within the desired Cash Flow: under the ``reference price''
-                node a ``levelized cost'' subnode.""",
     )
 
     cf.addParam(
       "npv_exempt",
       param_type=InputTypes.BoolType, #type: ignore
       required=False,
-      default=False, #type: ignore
+      default="False",
       descr=r"""indicates whether this CashFlow should be exempt from
                 Net Present Value (NPV) calculations. Setting this parameter to
                 ``True'' will allow the CashFlow to be used within the dispatch
@@ -111,6 +99,7 @@ class CashFlow:
       "period",
       param_type=InputTypes.makeEnumType("period_opts", "period_opts", ["hour", "year"]), #type: ignore
       required=False,
+      default="hour",
       descr=r"""for a \xmlNode{CashFlow} with \xmlAttr{type} \xmlString{repeating},
                 indicates whether the CashFlow repeats every time step (\xmlString{hour})
                 or every cycle (\xmlString{year})). Generally, CashFlows such as fixed
@@ -190,7 +179,7 @@ class CashFlow:
     @ In, component, CashFlowUser instance, cash flow user to which this cash flow belongs
     @ Out, None
     """
-    
+
     self._driver = None  # ValuedParam "quantity produced", D
     self._alpha = None  # ValuedParam "price per produced", a
     self._reference_driver = None  # ValuedParam "where price is accurate", D'
@@ -203,12 +192,12 @@ class CashFlow:
     self.is_price_levelized: bool = False
     self.is_taxable: bool = True
     self.depreciation: None | int = None
-    
+
     self.type: str = "repeating"  # needed? one-time, yearly, repeating
     self.period: str = "hour"  # period for recurring cash flows
     self._signals = set()  # variable values needed for this cash flow
     self._crossrefs: defaultdict[str, Any] = defaultdict(dict)
-    
+
 
   def _set_value(self, name, spec) -> None:
     """
@@ -233,7 +222,7 @@ class CashFlow:
     self.is_npv_exempt = item.parameterValues.get("npv_exempt", self.is_npv_exempt)
     self.has_inflation = item.parameterValues.get("inflation", self.has_inflation)
     self.depreciation = item.parameterValues.get("depreciate", self.depreciation)
-    
+
     for sub in item.subparts:
       match (item_name := sub.getName()):
         case "driver" | "reference_driver" | "scaling_factor_x":

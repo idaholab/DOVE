@@ -1,3 +1,5 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 from ravenframework.EntityFactoryBase import EntityFactory
 from ravenframework.utils import InputData
 

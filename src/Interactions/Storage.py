@@ -1,11 +1,11 @@
-# Copyright 2020, Battelle Energy Alliance, LLC
+# Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
 Storage Interaction Module
 """
-import numpy as np
+import math
 
-from DOVE.src.Interactions import Interaction
+from .Interaction import Interaction
 
 from ravenframework.utils import InputData, InputTypes
 from ravenframework.utils.InputData import ParameterInput
@@ -26,11 +26,38 @@ class Storage(Interaction):
     """
     specs = super().get_input_specs()
 
+    specs.addParam(
+      "periodic_level",
+      param_type=InputTypes.BoolType, # type: ignore
+      required=False,
+      default="True",
+      descr=r"""indicates whether the level of the storage should be required to
+                return to its initial level within each modeling window. If True,
+                this reduces the flexibility of the storage, but if False, can
+                result in breaking conservation of resources. \default{True}."""
+    )
+
+    specs.addParam(
+      "rte",
+      param_type=InputTypes.FloatType, # type: ignore
+      required=False,
+      default="1.0",
+      descr=r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
+    )
+
     specs.addSub(InputData.parameterInputFactory(
       "initial_stored",
       contentType=InputTypes.FloatOrIntType,
       descr=r"""indicates what percent of the storage unit is full at the start
                 of each optimization sequence, from 0 to 1. \default{0.0}."""
+    ))
+
+    # TODO: Need to revisit strategy param for DOVE since no functions are expected.
+    specs.addSub(InputData.parameterInputFactory(
+      "strategy",
+      contentType=InputTypes.StringType,
+      descr=r"""control strategy for operating the storage. If not specified,
+                uses a perfect foresight strategy. """
     ))
 
     specs.addSub(InputData.parameterInputFactory(
@@ -40,14 +67,6 @@ class Storage(Interaction):
                 return to its initial level within each modeling window. If True,
                 this reduces the flexibility of the storage, but if False, can
                 result in breaking conservation of resources. \default{True}."""
-    ))
-
-    # TODO: Need to revisit strategy param for DOVE since no functions are expected.
-    specs.addSub(InputData.parameterInputFactory(
-      "strategy",
-      contentType=InputTypes.StringType,
-      descr=r"""control strategy for operating the storage. If not specified,
-                uses a perfect foresight strategy. """
     ))
 
     specs.addSub(InputData.parameterInputFactory(
@@ -82,21 +101,19 @@ class Storage(Interaction):
     # specs were already checked in Component
     Interaction.read_input(self, specs, comp_name)
     self.inputs = self.outputs = set(specs.parameterValues["resource"])
+    self.apply_periodic_level = specs.parameterValues.get("periodic_level", self.apply_periodic_level)
+    self.sqrt_rte = math.sqrt(specs.parameterValues.get("rte", self.sqrt_rte))
 
     for item in specs.subparts:
       match (name := item.getName()):
         case "initial_stored" | "strategy":
           self._set_value(f"_{name}", comp_name, item)
-        case "periodic_level":
-          self.apply_periodic_level = item.value
-        case "RTE":
-          self.sqrt_rte = np.sqrt(item.value)
 
     if self._initial_stored is None:
       self.raiseAWarning(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')
       self._set_fixed_value('_initial_stored', 0.0)
 
-  def get_stored_resource(self):
+  def get_stored_resource(self) -> str:
     """
     Returns the resource this unit stores.
     @ In, None
