@@ -1,7 +1,7 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-from .Interaction import Interaction
 from ravenframework.utils.InputData import ParameterInput
+from . import Interaction
 
 class Demand(Interaction):
   """

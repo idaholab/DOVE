@@ -5,12 +5,12 @@ Defines the TransferFunc entity.
 These define the transfer functions for generating Components.
 """
 
-from ravenframework.BaseClasses import MessageUser
+#from ravenframework.BaseClasses import MessageUser
 from ravenframework.utils import InputData
 
 
 # class for potentially dynamically-evaluated quantities
-class TransferFunc(MessageUser):
+class TransferFunc:
   """
   These define the transfer functions for generating Components.
   """
@@ -76,7 +76,7 @@ class TransferFunc(MessageUser):
         msg += f"\n... Produced but not used in transfer: {excess_outputs}"
       if unrecog:
         msg += f"\n... In transfer but not consumed or produced: {unrecog}"
-      self.raiseAnError(IOError, msg)
+      raise IOError(msg)
 
   def set_io_signs(self, consumed, produced):
     """

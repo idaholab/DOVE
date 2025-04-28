@@ -3,19 +3,17 @@
 """
 This module constructs the dispatch optimization model used by HERON.
 """
-
+from typing import Any, cast
 import numpy as np
 import numpy.typing as npt
 import pyomo.environ as pyo
-from typing import Any, cast
+
 
 from . import PyomoRuleLibrary as prl
 from .DispatchState import PyomoState
 from .. import Component
-from ..TransferFuncs import TransferFunc
-from ..Interactions import Storage, Producer
-
-
+from ..physics import TransferFunc
+from ..interactions import Storage, Producer
 
 class PyomoModelHandler:
   """

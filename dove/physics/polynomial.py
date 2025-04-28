@@ -4,13 +4,11 @@
 Transfer fucntions that are expressed as a polynomial relationship.
 For example, ax^2 + bxy + cy^2 + dx + ey = fm^2 + gmn + hn^2 + im + jn + k
 """
-
 from collections import defaultdict
 
 from ravenframework.utils import InputData, InputTypes
 
-from .TransferFunc import TransferFunc
-
+from .transfer import TransferFunc
 
 class Polynomial(TransferFunc):
   """

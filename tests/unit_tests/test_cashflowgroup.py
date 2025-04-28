@@ -1,13 +1,14 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-import __init__  # Running __init__ here enables importing from DOVE and RAVEN
+# import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 
+from dove.economics import CashFlowGroup
 from ravenframework.utils import InputData, InputTypes
 
-from DOVE.src.Economics import CashFlowGroup
+
 # from DOVE.src.Base import Base
 
 class TestCashFlowGroup(unittest.TestCase):
@@ -15,7 +16,7 @@ class TestCashFlowGroup(unittest.TestCase):
   def setUp(self):
     # Create patchers
     parameterInputFactoryPatcher = patch("ravenframework.utils.InputData.parameterInputFactory")
-    cashFlowPatcher = patch("DOVE.src.Economics.CashFlowGroup.CashFlow")
+    cashFlowPatcher = patch("dove.economics.CashFlow")
     #baseInitpatcher = patch.object(Base, '__init__')
 
     # Start patchers and store mocks

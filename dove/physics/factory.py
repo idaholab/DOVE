@@ -3,8 +3,8 @@
 from ravenframework.EntityFactoryBase import EntityFactory
 from ravenframework.utils import InputData
 
-from .Polynomial import Polynomial
-from .Ratio import Ratio
+from .polynomial import Polynomial
+from .ratio import Ratio
 
 
 class TransferFuncFactory(EntityFactory):

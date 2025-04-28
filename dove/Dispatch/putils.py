@@ -3,15 +3,13 @@
 """
 Pyomo Utilities for Model Dispatch.
 """
-
 import platform
 
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.errors import ApplicationError
 
-from DOVE.src.Interactions.Storage import Storage
-
+from ..interactions import Storage
 
 def check_solver_availability(requested_solver: str) -> str:
   """

@@ -4,11 +4,11 @@
 Values that are expressed as linear ratios of one another.
 Primarily intended for transfer functions.
 """
-
+import warnings
 import numpy as np
 from ravenframework.utils import InputData, InputTypes
 
-from .TransferFunc import TransferFunc
+from .transfer import TransferFunc
 
 
 # class for custom dynamically-evaluated quantities
@@ -71,13 +71,9 @@ class Ratio(TransferFunc):
     if node is None:
       node = spec.findFirst("linear")
       if node is None:
-        self.raiseAnError(
-          IOError,
-          f'Unrecognized transfer function for component "{comp_name}": "{spec.name}"',
-        )
-      self.raiseAWarning(
-        '"linear" has been deprecated and will be removed in the future; see "ratio" transfer function!'
-      )
+        raise IOError(f'Unrecognized transfer function for component "{comp_name}": "{spec.name}"')
+      warnings.warn('"linear" has been deprecated and will be removed in the future; see "ratio" transfer function!')
+
     for rate_node in node.findAll("rate"):
       resource = rate_node.parameterValues["resource"]
       self._coefficients[resource] = rate_node.value

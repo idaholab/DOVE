@@ -1,9 +1,9 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-from .Interaction import Interaction
-from ..TransferFuncs import factory as tf_factory
-
 from ravenframework.utils import InputData, InputTypes
+
+from . import Interaction
+from ..physics import factory as tf_factory
 
 class ProducerError(Exception):
   pass

@@ -1,13 +1,14 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
-from collections import defaultdict
 from typing import Any
-
-from ..TransferFuncs import TransferFunc
+from collections import defaultdict
 
 from ravenframework.utils import InputData, InputTypes
 from ravenframework.utils.InputData import ParameterInput
+
+from ..physics import TransferFunc
+
 
 class Interaction:
   """

@@ -3,11 +3,11 @@
 """
 Library of Pyomo rules for HERON dispatch.
 """
-
-import pyomo.environ as pyo
 from typing import Optional
 
-from DOVE.src.Interactions.Storage import Storage
+import pyomo.environ as pyo
+
+from ..interactions import Storage
 
 
 def charge_rule(charge_name, bin_name, large_eps, r, m, t) -> bool:

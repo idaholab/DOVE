@@ -1,10 +1,10 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 from io import StringIO
+
 import numpy as np
 
-from DOVE.src.Interactions.Storage import Storage
-
+from ..interactions import Storage
 
 class DispatchState:
   """utility that expresses the activity (i.e. production level) of all the components in the system"""
@@ -16,9 +16,7 @@ class DispatchState:
     @ Out, None
     """
     self._components = None  # list of HERON Component objects
-    self._resources = (
-      None  # Map of resources to indices for components, as {comp.name: {res, r}}
-    )
+    self._resources = None  # Map of resources to indices for components, as {comp.name: {res, r}}
     self._times = None  # numpy array of time values, monotonically increasing
 
   def initialize(self, components, resources_map, times):

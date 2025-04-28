@@ -4,7 +4,7 @@
 Defines the Economics entity.
 Each component (or source?) can have one of these to describe its economics.
 """
-from .CashFlow import CashFlow
+from . import CashFlow
 
 from ravenframework.utils import InputData, InputTypes
 

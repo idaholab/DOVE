@@ -1,26 +1,24 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-import __init__  # Running __init__ here enables importing from DOVE and RAVEN
+# import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 import xml.etree.ElementTree as ET
 
+from dove import Component
+
 from ravenframework.utils import InputData
-
-from DOVE.src.Components import Component
-
-
 
 class TestComponent(unittest.TestCase):
   # For convenience, patches and mocks that are needed for all tests are set up here
   def setUp(self):
     # Create patchers
     parameterInputFactoryPatcher = patch("ravenframework.utils.InputData.parameterInputFactory")
-    producerPatcher = patch("DOVE.src.Components.Producer")
-    storagePatcher = patch("DOVE.src.Components.Storage")
-    demandPatcher = patch("DOVE.src.Components.Demand")
-    cashflowPatcher = patch("DOVE.src.Components.CashFlowGroup")
+    producerPatcher = patch("dove.Producer")
+    storagePatcher = patch("dove.Storage")
+    demandPatcher = patch("dove.Demand")
+    cashflowPatcher = patch("dove.CashFlowGroup")
 
     # Start patchers and store mocks
     self.mockParameterInputFactory = parameterInputFactoryPatcher.start()

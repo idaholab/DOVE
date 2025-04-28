@@ -6,10 +6,10 @@ Storage Interaction Module
 import math
 import warnings
 
-from .Interaction import Interaction
-
 from ravenframework.utils import InputData, InputTypes
 from ravenframework.utils.InputData import ParameterInput
+
+from . import Interaction
 
 class Storage(Interaction):
   """

@@ -5,10 +5,10 @@ Component Module
 """
 import xml.etree.ElementTree as ET
 
-from .Economics import CashFlowGroup
-from .Interactions import Demand, Producer, Storage
-
 from ravenframework.utils import InputData, InputTypes
+
+from .economics import CashFlowGroup
+from .interactions import Demand, Producer, Storage
 
 class ComponentError(Exception):
   """

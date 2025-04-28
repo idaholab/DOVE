@@ -41,9 +41,7 @@ class Dispatcher(MessageUser, InputDataUser):
     """
     super().__init__()
     self.name = "BaseDispatcher"
-    self._time_discretization = (
-      None  # (start, end, num_steps) to build time discretization
-    )
+    self._time_discretization = None  # (start, end, num_steps) to build time discretization
     self._validator = None  # can be used to validate activity
     self._solver = None
     self._eps = 1e-9  # small constant to add to denominator
