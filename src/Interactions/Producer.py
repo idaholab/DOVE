@@ -58,47 +58,11 @@ class Producer(Interaction):
                 \default{0}""",
     )
 
-
-    specs.addSub(
-      InputData.parameterInputFactory(
-        "consumes",
-        contentType=InputTypes.StringListType,
-        descr=r"""The producer can either produce or consume a resource.
-                  If the producer is a consumer it must be accompanied with a transfer
-                  function to convert one source of energy to another.""",
-      )
-    )
-
     specs.addSub(
       tf_factory.make_input_specs(
         "transfer",
         descr=r"""describes the balance between consumed and produced resources
                   for this component.""",
-      )
-    )
-    specs.addSub(
-      InputData.parameterInputFactory(
-        "ramp_limit",
-        contentType=InputTypes.FloatType,
-        descr=r"""Limits the rate at which production can change between consecutive
-                  time steps, in either a positive or negative direction, as a
-                  percentage of this component's capacity. For example, a generator
-                  with a ramp limit of 0.10 cannot increase or decrease their
-                  generation rate by more than 10 percent of capacity in a single
-                  time interval. \default{1.0}""",
-      )
-    )
-    specs.addSub(
-      InputData.parameterInputFactory(
-        "ramp_freq",
-        contentType=InputTypes.IntegerType,
-        descr=r"""Places a limit on the number of time steps between successive
-                  production level ramping events. For example, if time steps are
-                  an hour long and the ramp frequency is set to 4, then once this
-                  component has changed production levels, 4 hours must pass before
-                  another production change can occur. Note this limit introduces
-                  binary variables and may require selection of appropriate solvers.
-                  \default{0}""",
       )
     )
 

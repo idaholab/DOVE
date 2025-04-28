@@ -162,15 +162,6 @@ class CashFlow:
     )
     cf.addSub(x)
 
-    depreciate = InputData.parameterInputFactory(
-      "depreciate",
-      contentType=InputTypes.IntegerType,
-      descr=r"""indicates the number of cycles over which this CashFlow should be
-                depreciated. Depreciation schemes are assumed to be MACRS and available
-                cycles are listed in the CashFlow submodule of RAVEN.""",
-    )
-    cf.addSub(depreciate)
-
     return cf
 
   def __init__(self, component) -> None:

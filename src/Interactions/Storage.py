@@ -4,6 +4,7 @@
 Storage Interaction Module
 """
 import math
+import warnings
 
 from .Interaction import Interaction
 
@@ -60,21 +61,6 @@ class Storage(Interaction):
                 uses a perfect foresight strategy. """
     ))
 
-    specs.addSub(InputData.parameterInputFactory(
-      "periodic_level",
-      contentType=InputTypes.BoolType,
-      descr=r"""indicates whether the level of the storage should be required to
-                return to its initial level within each modeling window. If True,
-                this reduces the flexibility of the storage, but if False, can
-                result in breaking conservation of resources. \default{True}."""
-    ))
-
-    specs.addSub(InputData.parameterInputFactory(
-      "RTE",
-      contentType=InputTypes.FloatType,
-      descr=r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
-    ))
-
     return specs
 
   def __init__(self, **kwargs) -> None:
@@ -110,7 +96,7 @@ class Storage(Interaction):
           self._set_value(f"_{name}", comp_name, item)
 
     if self._initial_stored is None:
-      self.raiseAWarning(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')
+      warnings.warn(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')
       self._set_fixed_value('_initial_stored', 0.0)
 
   def get_stored_resource(self) -> str:

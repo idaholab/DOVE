@@ -4,12 +4,11 @@
 Defines the Economics entity.
 Each component (or source?) can have one of these to describe its economics.
 """
-from .. import Base
 from .CashFlow import CashFlow
 
 from ravenframework.utils import InputData, InputTypes
 
-class CashFlowGroup(Base):
+class CashFlowGroup:
   """
   Container for multiple CashFlows with utility methods.
   """
@@ -41,16 +40,6 @@ class CashFlowGroup(Base):
                 is replaced.""",
     )
 
-    lifetime_spec = InputData.parameterInputFactory(
-      "lifetime",
-      contentType=InputTypes.IntegerType,
-      descr=r"""indicates the number of \emph{cycles} (often \emph{years}) this
-                unit is expected to operate before replacement. Replacement is
-                represented as overnight capital cost in the year the component
-                is replaced.""",
-    )
-
-    specs.addSub(lifetime_spec)
     specs.addSub(CashFlow.get_input_specs())
     return specs
 
@@ -60,7 +49,6 @@ class CashFlowGroup(Base):
     @ In, component, Component, object to which this group belongs
     @ Out, None
     """
-    Base.__init__(self, **kwargs)
     self.name = component.name
     self._component = component  # component this one
     self.lifetime: int | None = None  # lifetime of the component
@@ -81,7 +69,7 @@ class CashFlowGroup(Base):
           self.cashflows.append(new)
 
     if self.lifetime is None:
-      self.raiseAnError(IOError, f'Component "{self.name}" is missing its <lifetime> node!')
+      raise IOError(f'Component "{self.name}" is missing its <lifetime> node!')
 
 
   def evaluate_cfs(self, activity, meta, marginal=False):

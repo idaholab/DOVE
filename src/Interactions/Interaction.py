@@ -4,13 +4,12 @@
 from collections import defaultdict
 from typing import Any
 
-from ..Base import Base
 from ..TransferFuncs import TransferFunc
 
 from ravenframework.utils import InputData, InputTypes
 from ravenframework.utils.InputData import ParameterInput
 
-class Interaction(Base):
+class Interaction:
   """
   Base class for component interactions (e.g. Producer, Storage, Demand)
   """
@@ -117,7 +116,6 @@ class Interaction(Base):
     @ In, kwargs, dict, arbitrary pass-through arguments
     @ Out, None
     """
-    Base.__init__(self, **kwargs)
     self._capacity = None  # upper limit of this interaction
     self._capacity_factor = None  # ratio of actual output as fraction of _capacity
     self._signals = set()  # dependent signals for this interaction
@@ -170,14 +168,14 @@ class Interaction(Base):
       if len(resources) == 1:
         self.capacity_var = list(resources)[0]
       else:
-        self.raiseAnError(IOError, f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!')
+        raise IOError(f'Component "{comp_name}": If multiple resources are active, "capacity" requires a "resource" specified!')
 
     ## minimum: basically the same as capacity, functionally
     if self._minimum and self._minimum_var is None:
       if len(resources) == 1:
         self._minimum_var = list(resources)[0]
       else:
-        self.raiseAnError(IOError, f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!')
+        raise IOError(f'Component "{comp_name}": If multiple resources are active, "minimum" requires a "resource" specified!')
 
   @property
   def resources(self) -> set[str]:

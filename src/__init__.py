@@ -14,7 +14,6 @@ import DOVE.src._utils as dutils
 if find_spec("ravenframework") is None:
   sys.path.append(dutils.get_raven_loc())
 
-from .Base import Base
 from .Components import Component
 
-__all__ = ["Base", "Component"]
+__all__ = ["Component"]

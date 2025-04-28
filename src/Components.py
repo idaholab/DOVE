@@ -5,7 +5,6 @@ Component Module
 """
 import xml.etree.ElementTree as ET
 
-from . import Base
 from .Economics import CashFlowGroup
 from .Interactions import Demand, Producer, Storage
 
@@ -17,7 +16,7 @@ class ComponentError(Exception):
   """
   pass
 
-class Component(Base):
+class Component:
   """
   Represents a system component in the grid analysis. Each component has a
   single "interaction" that describes what it can do (produce, store, demand)
@@ -60,7 +59,6 @@ class Component(Base):
     @ In, kwargs, dict, optional, arguments to pass to other constructors
     @ Out, None
     """
-    Base.__init__(self, **kwargs)
     self.name = "placeholder" # Name is required, so just initialize with a temp name.
     self.levelized_meta = {}
     self._interaction = None
@@ -109,11 +107,11 @@ class Component(Base):
     for item in specs.subparts:
       item_name = item.getName()
       if item_name in interaction_map:
-        interaction_instance = interaction_map[item_name](messageHandler=self.messageHandler)
+        interaction_instance = interaction_map[item_name]()
         interaction_instance.read_input(item, self.name)
         self._interaction = interaction_instance
       elif item_name == 'economics':
-        cashflows = cfg_type(self, messageHander=self.messageHandler)
+        cashflows = cfg_type(self)
         cashflows.read_input(item)
         self._economics = cashflows
 
