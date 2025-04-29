@@ -1,8 +1,11 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+
 import __init__ # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
 
-from DOVE.src.TransferFuncs import TransferFunc
+from dove.physics import TransferFunc
 
 class TestTransferFunc(unittest.TestCase):
 

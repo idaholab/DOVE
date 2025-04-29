@@ -1,6 +1,6 @@
 [Tests]
-  [./test_transferfunc]
+  [./test_transfer]
     type = 'Unittest'
-    input = 'test_transferfunc.TestTransferFunc'
+    input = 'test_transfer.TestTransferFunc'
   [../]
 []
