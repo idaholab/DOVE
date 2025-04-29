@@ -1,25 +1,28 @@
-import __init__  # Running __init__ here enables importing from DOVE and RAVEN
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+# import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 
+from dove.economics import CashFlowGroup
 from ravenframework.utils import InputData, InputTypes
 
-from DOVE.src.Economics import CashFlowGroup
-from DOVE.src.Base import Base
+
+# from DOVE.src.Base import Base
 
 class TestCashFlowGroup(unittest.TestCase):
   # For convenience, patches and mocks that are needed for all tests are set up here
   def setUp(self):
     # Create patchers
     parameterInputFactoryPatcher = patch("ravenframework.utils.InputData.parameterInputFactory")
-    cashFlowPatcher = patch("DOVE.src.Economics.CashFlowGroup.CashFlow")
-    baseInitpatcher = patch.object(Base, '__init__')
+    cashFlowPatcher = patch("dove.economics.CashFlow")
+    #baseInitpatcher = patch.object(Base, '__init__')
 
     # Start patchers and store mocks
     self.mockParameterInputFactory = parameterInputFactoryPatcher.start()
     self.mockCashFlow = cashFlowPatcher.start()
-    self.mockBaseInit = baseInitpatcher.start()
+    #self.mockBaseInit = baseInitpatcher.start()
 
     # Add cleanup to stop manually started patchers
     self.addCleanup(patch.stopall)
@@ -88,9 +91,9 @@ class TestCashFlowGroup(unittest.TestCase):
     testCashFlowGroup.read_input(mockSpecs)
 
     # Checks for __init__
-    self.mockBaseInit.assert_called_once_with(testCashFlowGroup)
+    #self.mockBaseInit.assert_called_once_with(testCashFlowGroup)
     self.assertEqual(testCashFlowGroup.name, "test_component")
-    self.assertEqual(testCashFlowGroup.component, mockComponent)
+    self.assertEqual(testCashFlowGroup._component, mockComponent)
 
     # Checks for read_input
     self.assertEqual(testCashFlowGroup.lifetime, 50)
