@@ -104,7 +104,7 @@ class TestCashFlow(unittest.TestCase):
     self.assertIs(specs, self.mockCashFlow)
 
   def testReadInput(self):
-    # Note that this test also checks __init__ (mostly), _set_value, and 3 getter functions
+    # Note that this test also checks __init__ (mostly), _set_value, and get_driver
 
     # Set up mocks and patchers
     mockComponent = MagicMock(name="mockComponent")

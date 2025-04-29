@@ -1,11 +1,14 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+
 import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 
-from ravenframework.utils import InputData, InputTypes
+from ravenframework.utils import InputTypes
 
-from DOVE.src.Interactions import Interaction
+from dove.interactions import Interaction
 
 class TestInteraction(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
@@ -62,7 +65,7 @@ class TestInteraction(unittest.TestCase):
     # Check specs.addParam calls
     expectedAddParamCalls = [
       call("resource", param_type=InputTypes.StringListType, required=True, descr=ANY), # Check descr below
-      call("dispatch", param_type=mockMakeEnumType.return_value, descr=ANY)
+      call("dispatch", param_type=mockMakeEnumType.return_value, required=True, descr=ANY)
     ]
 
     self.mockSpecs.addParam.assert_has_calls(expectedAddParamCalls)
@@ -110,8 +113,8 @@ class TestInteraction(unittest.TestCase):
 
     # Reset mocks
     self.mockParameterInputFactory.side_effect = [self.mockSpecs, self.mockCapacity, self.mockCapFactor, self.mockMinimum]
-    self.mockParameterInputFactory.call_args_list.reset_mock()
-    self.mockSpecs.addParam.call_args_list.reset_mock()
+    self.mockParameterInputFactory.reset_mock()
+    self.mockSpecs.addParam.reset_mock()
 
     class testDemand(Interaction):
       tag = "demands"
@@ -128,22 +131,22 @@ class TestInteraction(unittest.TestCase):
     self.assertIn("consumed", self.mockSpecs.addParam.call_args_list[0][1]["descr"])
 
   def testReadInput(self):
-    # Note that this test also checks _set_value and 4 getter functions
+    # Note that this test also checks _set_value
 
     # Test-specific mock setup
-    self.mockSpecs.parameterValues = {"dispatch":"independent"}
+    self.mockSpecs.parameterValues = {"dispatch":"independent", "resource":["other_resource"]}
     self.mockSpecs.subparts = [self.mockCapacity, self.mockCapFactor, self.mockMinimum]
 
     self.mockCapacity.getName.return_value = "capacity"
     self.mockCapacity.value = 200
-    self.mockCapacity.parameterValues = {"resource":"electricity"}
+    self.mockCapacity.parameterValues = {"resource":"electricity"} # Should override resource in specs
 
     self.mockCapFactor.getName.return_value = "capacity_factor"
     self.mockCapFactor.value = 0.75
 
     self.mockMinimum.getName.return_value = "minimum"
     self.mockMinimum.value = 50
-    self.mockMinimum.parameterValues = {"resource": "electricity"}
+    self.mockMinimum.parameterValues = {"resource":"electricity"} # Should override resource in specs
 
     # Create Interaction instance and call method under test
     testInteraction = Interaction()
@@ -151,36 +154,29 @@ class TestInteraction(unittest.TestCase):
 
     # Assertions to verify behavior
 
-    self.assertEqual(testInteraction.is_dispatchable(), "independent")
-    self.assertEqual(testInteraction.get_capacity(), 150) # 200 * 0.75
-    self.assertEqual(testInteraction.get_capacity_var(), "electricity")
-    self.assertEqual(testInteraction.get_minimum(None), 50) # Don't care about the "meta" arg
-    self.assertEqual(testInteraction._minimum_var, "electricity") # No getter for _minimum_var
+    self.assertEqual(testInteraction.dispatch_flexibility, "independent")
+    self.assertEqual(testInteraction._capacity_factor, 0.75)
+    self.assertEqual(testInteraction.capacity_var, "electricity")
+    self.assertEqual(testInteraction._capacity, 200)
+    self.assertEqual(testInteraction._minimum, 50)
+    self.assertEqual(testInteraction._minimum_var, "electricity")
 
-    ### Test with no capacity var
-
-    # Update mock
-    self.mockCapacity.parameterValues = {}
-
-    # Create new Interaction instance and call method under test again
-    testInteractionNoCapVar = Interaction()
-    testInteractionNoCapVar.read_input(self.mockSpecs, "testComponentName")
-
-    # Check capacity var default
-    self.assertEqual(testInteractionNoCapVar.get_capacity_var(), "electricity")
-
-    ### Test with no minimum var
+    ### Test with no capacity or minimum var
 
     # Update mocks
-    self.mockCapacity.parameterValues = {"resource":"electricity"}
+    self.mockCapacity.parameterValues = {}
     self.mockMinimum.parameterValues = {}
 
     # Create new Interaction instance and call method under test again
-    testInteractionNoMinVar = Interaction()
-    testInteractionNoMinVar.read_input(self.mockSpecs, "testComponentName")
+    testInteractionMissingVars = Interaction()
+    testInteractionMissingVars.read_input(self.mockSpecs, "testComponentName")
 
-    # Check minimum var default
-    self.assertEqual(testInteractionNoMinVar._minimum_var, "electricity")
+    # Check vars
+    self.assertEqual(testInteractionMissingVars.capacity_var, "other_resource")
+    self.assertEqual(testInteractionMissingVars._minimum_var, "other_resource")
+
+    # NOTE: As of commit e555659, "self.capacity_var is None" (line 168 of interaction.py) will always be false
+    # NOTE: As of commit e555659, "self._minimum and self._minimum_var is None" (line 175 of interaction.py) will always be false
 
 
 if __name__ == "__main__":
