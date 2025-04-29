@@ -1,13 +1,11 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
-from typing import Any
 from collections import defaultdict
+from typing import Any
 
 from ravenframework.utils import InputData, InputTypes
 from ravenframework.utils.InputData import ParameterInput
-
-from ..physics import TransferFunc
 
 
 class Interaction:
@@ -180,6 +178,8 @@ class Interaction:
 
   @property
   def resources(self) -> set[str]:
+    """
+    """
     res: set[str] = set()
     res.update(self.inputs)
     res.update(self.outputs)
@@ -192,11 +192,3 @@ class Interaction:
     @ Out, is_governed, bool, whether this component is governed.
     """
     return False
-
-  def get_transfer(self) -> None | TransferFunc:
-    """
-    Returns the transfer function, if any
-    @ In, None
-    @ Out, transfer, transfer ValuedParam
-    """
-    return self._transfer

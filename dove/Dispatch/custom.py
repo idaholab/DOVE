@@ -9,8 +9,8 @@ import os
 import numpy as np
 from ravenframework.utils import InputData, InputTypes, utils
 
-from .Dispatcher import Dispatcher
-from .DispatchState import NumpyState
+from .dispatcher import Dispatcher
+from .dispatch_state import NumpyState
 
 
 class Custom(Dispatcher):

@@ -11,6 +11,7 @@ from pyomo.common.errors import ApplicationError
 
 from ..interactions import Storage
 
+
 def check_solver_availability(requested_solver: str) -> str:
   """
   Check if any of the requested solvers are available. If not, display available options.

@@ -1,10 +1,16 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 # import __init__  # Running __init__ here enables importing from DOVE and RAVEN
-
+"""
+Unit tests for ``dove.economics``
+"""
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 
+# Add dove to python path
+import resolve_module_path  # noqa: F401
+
+# import dove before ravenframework
 from dove.economics import CashFlowGroup
 from ravenframework.utils import InputData, InputTypes
 

@@ -277,7 +277,7 @@ def conservation_rule(res, m, t) -> bool:
       # activity information depends on if storage or component
       r = res_dict[res]
       intr = comp.interaction
-      if isinstance(intr, Storage): #.is_type("HeronStorage"):
+      if isinstance(intr, Storage):
         # Storages have 3 variables: level, charge, and discharge
         # -> so calculate activity
         charge = getattr(m, f"{comp.name}_charge")

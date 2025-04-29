@@ -4,16 +4,17 @@
 This module constructs the dispatch optimization model used by HERON.
 """
 from typing import Any, cast
+
 import numpy as np
 import numpy.typing as npt
 import pyomo.environ as pyo
 
-
-from . import PyomoRuleLibrary as prl
-from .DispatchState import PyomoState
 from .. import Component
+from ..interactions import Producer, Storage
 from ..physics import TransferFunc
-from ..interactions import Storage, Producer
+from . import pyomo_rule_library as prl
+from .dispatch_state import PyomoState
+
 
 class PyomoModelHandler:
   """
@@ -204,12 +205,13 @@ class PyomoModelHandler:
       self._create_ramp_limit(comp, prod_name)
     return prod_name
 
-  def _create_production_variable(self, comp: Component, tag=None, add_bounds=True, **kwargs) -> str:
+  def _create_production_variable(self, comp: Component, tag=None, add_bounds=True, bounds=None, **kwargs) -> str:
     """
     Creates production pyomo variable object for a component
     @ In, comp, HERON Component, component to make production variables for
     @ In, tag, str, optional, if not None then name will be component_[tag]; otherwise "production"
     @ In, add_bounds, bool, optional, if True then determine and set bounds for variable
+    @ In, bounds, Iterable[float], optional, custom bounds to set for the variable; ignored if add_bounds=True
     @ In, kwargs, dict, optional, passalong kwargs to pyomo variable
     @ Out, prod_name, str, name of production variable
     """
@@ -242,7 +244,7 @@ class PyomoModelHandler:
       )
       initial = lambda m, r, t: inits[t] if r == limit_r else 0
     else:
-      bounds = (None, None)
+      bounds = bounds or (None, None)
       initial = 0
     # production variable depends on resources, time
     # FIXME initials! Should be lambda with mins for tracking var!
@@ -433,8 +435,18 @@ class PyomoModelHandler:
     # -> set operational limits
     # self._create_capacity(m, comp, level_name, meta)
     # (2, 3) separate charge/discharge trackers, so we can implement round-trip efficiency and ramp rates
-    charge_name = self._create_production_variable(comp, tag="charge", add_bounds=False, within=pyo.NonPositiveReals)
-    discharge_name = self._create_production_variable(comp, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals)
+    # Storage charging and/or discharging rates might be limited to less than the component capacity
+    max_charge, max_discharge = comp.interaction.get_charge_rate_limits(self.meta)
+    charge_name = self._create_production_variable(comp,
+                                                   tag='charge',
+                                                   add_bounds=False,
+                                                   bounds=None if not max_charge else (-max_charge, 0),
+                                                   within=pyo.NonPositiveReals)
+    discharge_name = self._create_production_variable(comp,
+                                                      tag='discharge',
+                                                      add_bounds=False,
+                                                      bounds=None if not max_discharge else (0, max_discharge),
+                                                      within=pyo.NonNegativeReals)
     # balance level, charge/discharge
     level_rule_name = prefix + "_level_constr"
     # rule = lambda mod, t: prl.level_rule(comp, level_name, charge_name, discharge_name, self.initial_storage, r, mod, t)

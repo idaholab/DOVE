@@ -1,7 +1,7 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
-Storage Interaction Module
+Storage interaction module
 """
 import math
 import warnings
@@ -46,6 +46,22 @@ class Storage(Interaction):
       descr=r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
     )
 
+    specs.addParam(
+      'max_charge_rate',
+      param_type=InputTypes.FloatType, # type: ignore
+      required=False,
+      default="1.0",
+      descr=r"""maximum storage charge rate as a fraction of the storage capacity, from 0 to 1. \default{1.0}"""
+    )
+
+    specs.addParam(
+      'max_discharge_rate',
+      param_type=InputTypes.FloatType, # type: ignore
+      required=False,
+      default="1.0",
+      descr=r"""maximum storage discharge rate as a fraction of the storage capacity, from 0 to 1. \default{1.0}"""
+    )
+
     specs.addSub(InputData.parameterInputFactory(
       "initial_stored",
       contentType=InputTypes.FloatOrIntType,
@@ -75,6 +91,8 @@ class Storage(Interaction):
     self.tracking_vars = ["level", "charge", "discharge",]
     self.sqrt_rte = 1.0
     self.apply_periodic_level = True
+    self.max_charge_rate = 1.0
+    self.max_discharge_rate = 1.0
 
   def read_input(self, specs, comp_name: str) -> None:
     """
@@ -89,11 +107,24 @@ class Storage(Interaction):
     self.inputs = self.outputs = set(specs.parameterValues["resource"])
     self.apply_periodic_level = specs.parameterValues.get("periodic_level", self.apply_periodic_level)
     self.sqrt_rte = math.sqrt(specs.parameterValues.get("rte", self.sqrt_rte))
+    # Set this to None right now because of some stupid stuff in PyomoOptions test.
+    self.max_charge_rate = specs.parameterValues.get("max_charge_rate", None)
+    self.max_discharge_rate = specs.parameterValues.get("max_discharge_rate", None)
 
     for item in specs.subparts:
       match (name := item.getName()):
         case "initial_stored" | "strategy":
           self._set_value(f"_{name}", comp_name, item)
+
+    if self.max_charge_rate is not None:
+      if self.max_charge_rate <= 0 or self.max_charge_rate > 1:
+        raise ValueError("Value for max_charge_rate must be greater than 0 and less than or equal to 1. "
+                          f"Received {self.max_charge_rate}.")
+
+    if self.max_discharge_rate is not None:
+      if self.max_discharge_rate < 0 or self.max_discharge_rate > 1:
+        raise ValueError("Value for <max_discharge_rate> must be greater than 0 and less than or equal to 1. "
+                          f"Received {self.max_discharge_rate}.")
 
     if self._initial_stored is None:
       warnings.warn(f'Initial storage level for "{comp_name}" was not provided! Defaulting to 0%.')

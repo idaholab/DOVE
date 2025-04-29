@@ -15,9 +15,9 @@ from pyomo.opt import SolverStatus, TerminationCondition
 from ravenframework.utils import InputData, InputTypes
 
 from . import putils
-from .Dispatcher import Dispatcher, DispatchError
-from .DispatchState import NumpyState
-from .PyomoModelHandler import PyomoModelHandler
+from .dispatch_state import NumpyState
+from .dispatcher import Dispatcher, DispatchError
+from .pyomo_model_handler import PyomoModelHandler
 
 # allows pyomo to solve on threaded processes
 pyutilib.subprocess.GlobalData.DEFINE_SIGNAL_HANDLERS_DEFAULT = False

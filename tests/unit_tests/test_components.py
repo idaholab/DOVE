@@ -3,12 +3,16 @@
 # import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
-from unittest.mock import MagicMock, call, patch, ANY
 import xml.etree.ElementTree as ET
+from unittest.mock import ANY, MagicMock, call, patch
 
+# Add dove to python path
+import resolve_module_path  # noqa: F401
+
+# import dove before ravenframework
 from dove import Component
-
 from ravenframework.utils import InputData
+
 
 class TestComponent(unittest.TestCase):
   # For convenience, patches and mocks that are needed for all tests are set up here

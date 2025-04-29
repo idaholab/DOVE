@@ -1,11 +1,19 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
+"""
+Producer interaction module
+"""
+
 from ravenframework.utils import InputData, InputTypes
 
-from . import Interaction
+from ..physics import TransferFunc
 from ..physics import factory as tf_factory
+from . import Interaction
+
 
 class ProducerError(Exception):
+  """
+  """
   pass
 
 
@@ -13,7 +21,9 @@ class Producer(Interaction):
   """
   Explains a particular interaction, where resources are consumed to produce other resources
   """
+
   tag = "produces"  # node name in input file
+
   @classmethod
   def get_input_specs(cls) -> type[InputData.ParameterInput]:
     """
@@ -24,7 +34,7 @@ class Producer(Interaction):
     specs = super().get_input_specs()
     specs.addParam(
       "consumes",
-      param_type=InputTypes.StringListType, # type: ignore
+      param_type=InputTypes.StringListType,  # type: ignore
       required=False,
       descr=r"""The producer can either produce or consume a resource.
                   If the producer is a consumer it must be accompanied with a transfer
@@ -33,9 +43,9 @@ class Producer(Interaction):
 
     specs.addParam(
       "ramp_limit",
-      param_type=InputTypes.FloatType, # type: ignore
+      param_type=InputTypes.FloatType,  # type: ignore
       required=False,
-      default=0, # type: ignore
+      default=0,  # type: ignore
       descr=r"""Limits the rate at which production can change between consecutive
                 time steps, in either a positive or negative direction, as a
                 percentage of this component's capacity. For example, a generator
@@ -46,9 +56,9 @@ class Producer(Interaction):
 
     specs.addParam(
       "ramp_freq",
-      param_type=InputTypes.IntegerType, # type: ignore
+      param_type=InputTypes.IntegerType,  # type: ignore
       required=False,
-      default=0, # type: ignore
+      default=0,  # type: ignore
       descr=r"""Places a limit on the number of time steps between successive
                 production level ramping events. For example, if time steps are
                 an hour long and the ramp frequency is set to 4, then once this
@@ -98,9 +108,9 @@ class Producer(Interaction):
           self._set_transfer_func(comp_name, item)
 
     if self._transfer is None and self.inputs:
-        raise ProducerError(
-          "Any component that consumes a resource must have a transfer function describing the production process!"
-        )
+      raise ProducerError(
+        "Any component that consumes a resource must have a transfer function describing the production process!"
+      )
 
     ## transfer elements are all in IO list
     if self._transfer is not None:
@@ -127,6 +137,14 @@ class Producer(Interaction):
         transfer_function = tf_factory.returnInstance(sub.getName())
         transfer_function.read(comp_name, spec)
     self._transfer = transfer_function
+
+  def get_transfer(self) -> None | TransferFunc:
+    """
+    Returns the transfer function, if any
+    @ In, None
+    @ Out, transfer, transfer ValuedParam
+    """
+    return self._transfer
 
   def print_me(self, tabs: int = 0, tab: str = "  ") -> None:
     """
