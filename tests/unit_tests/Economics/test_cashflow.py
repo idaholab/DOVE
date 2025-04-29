@@ -1,3 +1,5 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
@@ -5,7 +7,7 @@ from unittest.mock import MagicMock, call, patch, ANY
 
 from ravenframework.utils import InputData, InputTypes
 
-from DOVE.src.Economics import CashFlow
+from dove.economics import CashFlow
 
 class TestCashFlow(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
@@ -29,7 +31,6 @@ class TestCashFlow(unittest.TestCase):
     self.mockLevelizedCost = MagicMock(name="mockLevelizedCost")
     self.mockReferenceDriver = MagicMock(name="mockReferenceDriver")
     self.mockScalingFactorX = MagicMock(name="mockScalingFactorX")
-    self.mockDepreciate = MagicMock(name="mockDepreciate")
 
   def testGetInputSpecs(self):
 
@@ -39,8 +40,7 @@ class TestCashFlow(unittest.TestCase):
       self.mockReferencePrice,
       self.mockLevelizedCost,
       self.mockReferenceDriver,
-      self.mockScalingFactorX,
-      self.mockDepreciate
+      self.mockScalingFactorX
     ]
 
     mockMakeEnumType = MagicMock(name='mockMakeEnumType')
@@ -61,8 +61,7 @@ class TestCashFlow(unittest.TestCase):
       call("reference_price", contentType=InputTypes.FloatOrIntType, descr=ANY),
       call("levelized_cost", strictMode=True, descr=ANY),
       call("reference_driver", contentType=InputTypes.FloatOrIntType, descr=ANY),
-      call("scaling_factor_x", contentType=InputTypes.FloatType, descr=ANY),
-      call("depreciate", contentType=InputTypes.IntegerType, descr=ANY)
+      call("scaling_factor_x", contentType=InputTypes.FloatType, descr=ANY)
     ]
 
     self.mockParameterInputFactory.assert_has_calls(expectedParameterInputFactoryCalls)
@@ -71,11 +70,11 @@ class TestCashFlow(unittest.TestCase):
     expectedAddParamCalls = [
       call("name", param_type=InputTypes.StringType, required=True, descr=ANY),
       call("type", param_type=mockMakeEnumType.return_value, required=True, descr=ANY),
-      call("taxable", param_type=InputTypes.BoolType, required=True, descr=ANY),
-      call("inflation", param_type=InputTypes.StringType, required=True, descr=ANY),
-      call("mult_target", param_type=InputTypes.BoolType, required=False, descr=ANY),
-      call("npv_exempt", param_type=InputTypes.BoolType, required=False, default=False, descr=ANY),
-      call("period", param_type=mockMakeEnumType.return_value, required=False, descr=ANY)
+      call("taxable", param_type=InputTypes.BoolType, required=False, default="True", descr=ANY),
+      call("inflation", param_type=InputTypes.StringType, required=False, default="none", descr=ANY),
+      call("npv_exempt", param_type=InputTypes.BoolType, required=False, default="False", descr=ANY),
+      call("period", param_type=mockMakeEnumType.return_value, required=False, default="hour", descr=ANY),
+      call("depreciate", param_type=InputTypes.IntegerType, required=False, default=None, descr=ANY)
     ]
 
     self.mockCashFlow.addParam.assert_has_calls(expectedAddParamCalls)
@@ -93,8 +92,7 @@ class TestCashFlow(unittest.TestCase):
       call(self.mockDriver),
       call(self.mockReferencePrice),
       call(self.mockReferenceDriver),
-      call(self.mockScalingFactorX),
-      call(self.mockDepreciate)
+      call(self.mockScalingFactorX)
     ]
 
     self.mockCashFlow.addSub.assert_has_calls(expectedAddSubCalls)
@@ -113,26 +111,25 @@ class TestCashFlow(unittest.TestCase):
 
     self.mockCashFlow.parameterValues = {
       "name": "testCashFlowName",
-      "taxable": True,
+      "taxable": False,
       "inflation": True,
       "type": "one-time",
       "period": "yearly",
-      "npv_exempt": True
+      "npv_exempt": True,
+      "depreciate": 100
     }
 
     self.mockCashFlow.subparts = [
       self.mockDriver,
       self.mockReferencePrice,
       self.mockReferenceDriver,
-      self.mockScalingFactorX,
-      self.mockDepreciate
+      self.mockScalingFactorX
     ]
 
     self.mockDriver.getName.return_value = "driver"
     self.mockReferencePrice.getName.return_value = "reference_price"
     self.mockReferenceDriver.getName.return_value = "reference_driver"
     self.mockScalingFactorX.getName.return_value = "scaling_factor_x"
-    self.mockDepreciate.getName.return_value = "depreciate"
 
     mockSetReferencePrice = MagicMock(name="mockSetReferencePrice")
     mockSetReferencePrice.return_value = False
@@ -147,38 +144,35 @@ class TestCashFlow(unittest.TestCase):
     # Assertions to verify behavior
 
     # Check component assignment in __init__
-    self.assertEqual(testCashFlow._component, mockComponent)
+    self.assertEqual(testCashFlow.component, mockComponent)
 
     # Check param values
     self.assertEqual(testCashFlow.name, "testCashFlowName")
-    self.assertEqual(testCashFlow.taxable, True)
-    self.assertEqual(testCashFlow.inflation, True)
+    self.assertEqual(testCashFlow.is_taxable, False)
+    self.assertEqual(testCashFlow.has_inflation, True)
     self.assertEqual(testCashFlow.type, "one-time")
     self.assertEqual(testCashFlow.period, "yearly")
-    self.assertEqual(testCashFlow.is_npv_exempt(), True)
+    self.assertEqual(testCashFlow.is_npv_exempt, True)
 
     self.assertEqual(testCashFlow.get_driver(), self.mockDriver.value)
     self.assertEqual(testCashFlow._reference_driver, self.mockReferenceDriver.value)
     self.assertEqual(testCashFlow._scaling_factor_x, self.mockScalingFactorX.value)
-    self.assertEqual(testCashFlow.depreciation, self.mockDepreciate.value)
+    self.assertEqual(testCashFlow.depreciation, 100)
 
     # Check correct call to set_reference_price
     mockSetReferencePrice.assert_called_once_with(self.mockReferencePrice)
-    self.assertEqual(testCashFlow.is_mult_target(), False) # default value
 
     # Test that default attribute values work properly
 
     # Remove attributes with defaults from mocks
     del self.mockCashFlow.parameterValues["taxable"]
     del self.mockCashFlow.parameterValues["inflation"]
-    del self.mockCashFlow.parameterValues["type"]
     del self.mockCashFlow.parameterValues["period"]
     del self.mockCashFlow.parameterValues["npv_exempt"]
 
     self.mockCashFlow.subparts = [
       self.mockDriver,
-      self.mockReferencePrice,
-      self.mockDepreciate
+      self.mockReferencePrice
     ]
 
     # Create another CashFlow instance and call method under test
@@ -186,14 +180,12 @@ class TestCashFlow(unittest.TestCase):
     testCashFlowDefaults.read_input(self.mockCashFlow)
 
     # Check defaults that should be set in __init__
-    self.assertEqual(testCashFlowDefaults.taxable, False)
-    self.assertEqual(testCashFlowDefaults.inflation, False)
-    self.assertEqual(testCashFlowDefaults.type, "repeating")
+    self.assertEqual(testCashFlowDefaults.is_taxable, True)
+    self.assertEqual(testCashFlowDefaults.has_inflation, False)
+    self.assertEqual(testCashFlowDefaults.period, "hour")
+    self.assertEqual(testCashFlowDefaults.is_npv_exempt, False)
 
     # Check defaults that should be set in read_input
-    self.assertEqual(testCashFlowDefaults.period, "hour")
-    self.assertEqual(testCashFlowDefaults.is_npv_exempt(), False)
-
     self.assertEqual(testCashFlowDefaults._reference_driver, 1)
     self.assertEqual(testCashFlowDefaults._scaling_factor_x, 1)
 
@@ -215,8 +207,7 @@ class TestCashFlow(unittest.TestCase):
     self.mockCashFlow.subparts = [
       self.mockReferencePrice,
       self.mockReferenceDriver,
-      self.mockScalingFactorX,
-      self.mockDepreciate
+      self.mockScalingFactorX
     ]
 
     # Create another CashFlow instance and call method under test again
