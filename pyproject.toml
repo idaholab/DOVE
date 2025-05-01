@@ -1,0 +1,4 @@
+[project]
+name = "dove"
+description = "Dispatch Optimization Variable Engine for energy systems"
+dynamic = ["version"]

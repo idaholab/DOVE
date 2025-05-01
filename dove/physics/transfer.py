@@ -5,25 +5,11 @@ Defines the TransferFunc entity.
 These define the transfer functions for generating Components.
 """
 
-#from ravenframework.BaseClasses import MessageUser
-from ravenframework.utils import InputData
-
-
 # class for potentially dynamically-evaluated quantities
 class TransferFunc:
   """
   These define the transfer functions for generating Components.
   """
-
-  @classmethod
-  def get_input_specs(cls, name):
-    """
-    Define inputs for this VP.
-    @ In, name, string, name for spec (tag)
-    @ Out, spec, InputData, value-based spec
-    """
-    spec = InputData.parameterInputFactory(name)
-    return spec
 
   def __init__(self):
     """

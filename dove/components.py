@@ -22,36 +22,6 @@ class Component:
   single "interaction" that describes what it can do (produce, store, demand)
   and a single CashFlowGroup which is a container for component associated cashflows.
   """
-  @classmethod
-  def get_input_specs(cls) -> type[InputData.ParameterInput]:
-    """
-    Collects input specifications for this class.
-    @ In, None
-    @ Out, input_specs, InputData, specs
-    """
-    input_specs = InputData.parameterInputFactory(
-      "Component",
-      ordered=False,
-      baseNode=None,
-      descr="""defines a component as an element of the grid system.
-               Components are defined by the action they perform such as
-              \\xmlNode{produces} or \\xmlNode{consumes}; see details below.""",
-    )
-
-    input_specs.addParam(
-      "name",
-      param_type=InputTypes.StringType,
-      required=True,
-      descr=r"""identifier for the component. This identifier will be used to
-                generate variables and relate signals to this component throughout
-                the DOVE analysis.""",
-    )
-
-    input_specs.addSub(Producer.get_input_specs())
-    input_specs.addSub(Storage.get_input_specs())
-    input_specs.addSub(Demand.get_input_specs())
-    input_specs.addSub(CashFlowGroup.get_input_specs())
-    return input_specs
 
   def __init__(self, **kwargs) -> None:
     """

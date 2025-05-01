@@ -24,60 +24,6 @@ class Producer(Interaction):
 
   tag = "produces"  # node name in input file
 
-  @classmethod
-  def get_input_specs(cls) -> type[InputData.ParameterInput]:
-    """
-    Collects input specifications for this class.
-    @ In, None
-    @ Out, input_specs, InputData, specs
-    """
-    specs = super().get_input_specs()
-    specs.addParam(
-      "consumes",
-      param_type=InputTypes.StringListType,  # type: ignore
-      required=False,
-      descr=r"""The producer can either produce or consume a resource.
-                  If the producer is a consumer it must be accompanied with a transfer
-                  function to convert one source of energy to another.""",
-    )
-
-    specs.addParam(
-      "ramp_limit",
-      param_type=InputTypes.FloatType,  # type: ignore
-      required=False,
-      default=0,  # type: ignore
-      descr=r"""Limits the rate at which production can change between consecutive
-                time steps, in either a positive or negative direction, as a
-                percentage of this component's capacity. For example, a generator
-                with a ramp limit of 0.10 cannot increase or decrease their
-                generation rate by more than 10 percent of capacity in a single
-                time interval. \default{1.0}""",
-    )
-
-    specs.addParam(
-      "ramp_freq",
-      param_type=InputTypes.IntegerType,  # type: ignore
-      required=False,
-      default=0,  # type: ignore
-      descr=r"""Places a limit on the number of time steps between successive
-                production level ramping events. For example, if time steps are
-                an hour long and the ramp frequency is set to 4, then once this
-                component has changed production levels, 4 hours must pass before
-                another production change can occur. Note this limit introduces
-                binary variables and may require selection of appropriate solvers.
-                \default{0}""",
-    )
-
-    specs.addSub(
-      tf_factory.make_input_specs(
-        "transfer",
-        descr=r"""describes the balance between consumed and produced resources
-                  for this component.""",
-      )
-    )
-
-    return specs
-
   def __init__(self, **kwargs) -> None:
     """
     Constructor

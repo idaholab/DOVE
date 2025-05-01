@@ -4,9 +4,13 @@
 Interaction Input Specification
 """
 
-from ravenframework.utils.InputData import InputTypes, parameterInputFactory, Quantity
+from ravenframework.utils.InputData import InputTypes
+
+from dove.interactions import Producer, Storage, Demand
 
 from .autospec import AutoSpec
+from .special import CapacitySpec, CapacityFactorSpec, MinimumSpec, InitialStoredSpec, StrategySpec
+from .transfer_spec import TransferSpec
 
 
 class InteractionSpec(AutoSpec):
@@ -15,7 +19,7 @@ class InteractionSpec(AutoSpec):
   @classmethod
   def getInputSpecification(cls) -> type[AutoSpec]:
     """ """
-    cls.createClass("interaction", ordered=True)
+    cls.createClass("interaction")
     cls.addParam(
       "resource",
       param_type=InputTypes.StringListType,  # type: ignore
@@ -43,60 +47,14 @@ class InteractionSpec(AutoSpec):
       """,
     )
 
-    cap = parameterInputFactory(
-      "capacity",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""
-      the maximum value at which this component can act, in units corresponding
-      to the indicated resource.
-      """,
-    )
-
-    cap.addParam(
-      "resource",
-      param_type=InputTypes.StringType,
-      descr=r"""
-      indicates the resource that defines the capacity of this component's
-      operation. For example, if a component consumes steam and electricity
-      to produce hydrogen, the capacity of the component can be defined by
-      the maximum steam consumable, maximum electricity consumable, or maximum
-      hydrogen producable. Any choice should be nominally equivalent, but
-      determines the units of the value of this node.
-      """,
-    )
-    cls.addSub(cap, quantity=Quantity.zero_to_one)
-
-    capfactor = parameterInputFactory(
-      "capacity_factor",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""
-      the actual value at which this component can act, as a unitless
-      fraction of total rated capacity. Note that these factors are applied
-      within the dispatch optimization; we assume that the capacity factor
-      is not a variable in the outer optimization.
-      """,
-    )
-    cls.addSub(capfactor)
-
-    minn = parameterInputFactory(
-      "minimum",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""
-      provides the minimum value at which this component can act, in units of
-      the indicated resource.
-      """,
-    )
-
-    minn.addParam(
-      "resource",
-      param_type=InputTypes.StringType,
-      descr=r"""
-      indicates the resource that defines the minimum activity level for this
-      component, as with the component's capacity.
-      """,
-    )
-    cls.addSub(minn)
+    cls.addSub(CapacitySpec.getInputSpecification())
+    cls.addSub(CapacityFactorSpec.getInputSpecification())
+    cls.addSub(MinimumSpec.getInputSpecification())
     return cls
+
+  def instantiate(self):
+    """"""
+    return None
 
 
 class ProducerSpec(AutoSpec):
@@ -146,14 +104,16 @@ class ProducerSpec(AutoSpec):
       """,
     )
 
-    # cls.addSub(
-    #   tf_factory.make_input_specs(
-    #     "transfer",
-    #     descr=r"""describes the balance between consumed and produced resources
-    #               for this component.""",
-    #   )
-    # )
+    cls.addSub(TransferSpec.getInputSpecification())
+    cls.associated_class = Producer
     return cls
+
+  def instantiate(self) -> Producer:
+    """ """
+    cap = self.findFirst("capacity").instantiate()
+    cap_var = cap["resource"]
+    capacity = cap["value"]
+    return Producer()
 
 
 class StorageSpec(AutoSpec):
@@ -208,31 +168,14 @@ class StorageSpec(AutoSpec):
       """,
     )
 
-    cls.addSub(
-      parameterInputFactory(
-        "initial_stored",
-        contentType=InputTypes.FloatOrIntType,
-        descr=r"""
-        indicates what percent of the storage unit is full at the start
-        of each optimization sequence, from 0 to 1. \default{0.0}.
-        """,
-      ),
-    )
-
-    # TODO: Need to revisit strategy param for DOVE since no functions are expected.
-    cls.addSub(
-      parameterInputFactory(
-        "strategy",
-        contentType=InputTypes.StringType,
-        descr=r"""
-        control strategy for operating the storage. If not specified,
-        uses a perfect foresight strategy.
-        """,
-      ),
-    )
-
+    cls.addSub(InitialStoredSpec.getInputSpecification())
+    cls.addSub(StrategySpec.getInputSpecification())
+    # TODO: Need to revisit strategy param for DOVE since no functions
     return cls
 
+  def instantiate(self) -> Storage:
+      """ """
+      return Storage()
 
 class DemandSpec(AutoSpec):
   """ """
@@ -243,3 +186,7 @@ class DemandSpec(AutoSpec):
     cls.createClass("demands", baseNode=InteractionSpec.getInputSpecification())
 
     return cls
+
+  def instantiate(self) -> Demand:
+    """ """
+    return Demand()

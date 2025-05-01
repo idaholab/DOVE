@@ -18,67 +18,6 @@ class Storage(Interaction):
 
   tag = "stores"  # node name in input file
 
-  @classmethod
-  def get_input_specs(cls) -> type[ParameterInput]:
-    """
-    Collects input specifications for this class.
-    @ In, None
-    @ Out, input_specs, InputData, specs
-    """
-    specs = super().get_input_specs()
-
-    specs.addParam(
-      "periodic_level",
-      param_type=InputTypes.BoolType, # type: ignore
-      required=False,
-      default="True",
-      descr=r"""indicates whether the level of the storage should be required to
-                return to its initial level within each modeling window. If True,
-                this reduces the flexibility of the storage, but if False, can
-                result in breaking conservation of resources. \default{True}."""
-    )
-
-    specs.addParam(
-      "rte",
-      param_type=InputTypes.FloatType, # type: ignore
-      required=False,
-      default="1.0",
-      descr=r"""round-trip efficiency for this component as a scalar multiplier. \default{1.0}"""
-    )
-
-    specs.addParam(
-      'max_charge_rate',
-      param_type=InputTypes.FloatType, # type: ignore
-      required=False,
-      default="1.0",
-      descr=r"""maximum storage charge rate as a fraction of the storage capacity, from 0 to 1. \default{1.0}"""
-    )
-
-    specs.addParam(
-      'max_discharge_rate',
-      param_type=InputTypes.FloatType, # type: ignore
-      required=False,
-      default="1.0",
-      descr=r"""maximum storage discharge rate as a fraction of the storage capacity, from 0 to 1. \default{1.0}"""
-    )
-
-    specs.addSub(InputData.parameterInputFactory(
-      "initial_stored",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""indicates what percent of the storage unit is full at the start
-                of each optimization sequence, from 0 to 1. \default{0.0}."""
-    ))
-
-    # TODO: Need to revisit strategy param for DOVE since no functions are expected.
-    specs.addSub(InputData.parameterInputFactory(
-      "strategy",
-      contentType=InputTypes.StringType,
-      descr=r"""control strategy for operating the storage. If not specified,
-                uses a perfect foresight strategy. """
-    ))
-
-    return specs
-
   def __init__(self, **kwargs) -> None:
     """
     Constructor

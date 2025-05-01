@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import MagicMock, call, patch, ANY
 
 # Add dove to python path
-import resolve_module_path  # noqa: F401
+from . import resolve_module_path  # noqa: F401
 
 # import dove before ravenframework
 from dove.economics import CashFlowGroup

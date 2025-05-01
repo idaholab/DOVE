@@ -5,7 +5,7 @@ Component Input Specification
 """
 import xml.etree.ElementTree as ET
 
-from ravenframework.utils.InputData import InputTypes
+from ravenframework.utils.InputData import InputTypes, parseFromList
 
 from dove import Component
 
@@ -51,26 +51,38 @@ class ComponentSpec(AutoSpec):
     cls.associated_class = Component
 
     return cls
+  
+  def instantiate(self) -> object:
+    pass
 
 if __name__ == "__main__":
   xml1 = """
 <Component name="npp">
 <produces resource="steam" dispatch="fixed" consumes="electricity">
-<capacity>10</capacity>
+  <capacity>10</capacity>
+  <capacity_factor>0.5</capacity_factor>
+  <transfer>
+      <ratio>
+        <rate resource="steam">10</rate>
+        <rate resource="electricity">11</rate>
+      </ratio>
+  </transfer>
 </produces>
-<economics lifetime="10">
-<CashFlow name="capex" type="one-time">
-<driver>10</driver>
-<reference_price>50</reference_price>
-</CashFlow>
-</economics>
+  <economics lifetime="10">
+    <CashFlow name="capex" type="one-time">
+        <driver>10</driver>
+        <reference_price levelized="True">50</reference_price>
+        <reference_driver>10</reference_driver>
+        <scaling_factor_x>1</scaling_factor_x>
+    </CashFlow>
+  </economics>
 </Component>
 """
-  # try:
-  spec = ComponentSpec.getInputSpecification()()
-  spec.parseNode(ET.fromstring(xml1))
+  # spec = ComponentSpec.getInputSpecification()()
+  # spec.parseNode(ET.fromstring(xml1))
+  spec = parseFromList(ET.fromstring(xml1), [ComponentSpec.getInputSpecification(),
+                                             ProducerSpec.getInputSpecification()])
   component = spec.instantiate()
   print(component)
   print(spec.generateLatex())
-  # except Exception:
-  #   print("Something went wrong")
+

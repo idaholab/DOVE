@@ -6,8 +6,6 @@ Primarily intended for transfer functions.
 """
 import warnings
 import numpy as np
-from ravenframework.utils import InputData, InputTypes
-
 from .transfer import TransferFunc
 
 
@@ -18,44 +16,14 @@ class Ratio(TransferFunc):
   This means the ratios of the resources must be maintained, NOT 3a + 7b = 2c!
   """
 
-  @classmethod
-  def get_input_specs(cls):
-    """
-    Input specification for this class.
-    @ In, None
-    @ Out, spec, InputData, value-based spec
-    """
-    spec = InputData.parameterInputFactory(
-      "ratio",
-      contentType=InputTypes.StringType,
-      descr=r"""indicates this transfer function is a constant linear combination of resources. For example,
-              a balance equation might be written as 3a + 7b -> 2c, implying that to make 2c, it always takes
-              3 parts a and 7 parts b, or the balance ratio (3a, 7b, 2c). This means that the ratio of (3, 7, 2) must be
-              maintained between (a, b, c) for all production levels. Note that the coefficient signs are automatically fixed
-              internally to be negative for consumed quantities and positive for produced resources, regardless of signs used
-              by the user. For an equation-based transfer function instead of balance ratio, see Polynomial.""",
-    )
-    rate = InputData.parameterInputFactory(
-      "rate",
-      contentType=InputTypes.FloatType,
-      descr=r"""linear coefficient for the indicated \xmlAttr{resource}.""",
-    )
-    rate.addParam(
-      "resource",
-      param_type=InputTypes.StringType,
-      descr=r"""indicates the resource for which the linear transfer ratio is being provided in this node.""",
-    )
-    spec.addSub(rate)
-    return spec
-
-  def __init__(self):
+  def __init__(self, coefficients: dict):
     """
     Constructor.
     @ In, None
     @ Out, None
     """
     super().__init__()
-    self._coefficients = None  # ratios, stored in a dict as key: value
+    self.coefficients = coefficients
 
   def read(self, comp_name, spec):
     """

@@ -11,15 +11,6 @@ class Demand(Interaction):
   Explains a particular interaction, where a resource is demanded
   """
   tag = "demands"  # node name in input file
-  @classmethod
-  def get_input_specs(cls) -> type[ParameterInput]:
-    """
-    Collects input specifications for this class.
-    @ In, None
-    @ Out, input_specs, InputData, specs
-    """
-    specs = super().get_input_specs()
-    return specs
 
   def __init__(self, **kwargs) -> None:
     """

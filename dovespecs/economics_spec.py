@@ -3,14 +3,16 @@
 """
 Economics Input Specification
 """
-from ravenframework.utils import InputData
+
 from ravenframework.utils.InputData import InputTypes, ParameterInput, Quantity, parameterInputFactory, parseFromList
-import xml.etree.ElementTree as ET
 
 from .autospec import AutoSpec
+from .special import DriverSpec, ReferencePriceSpec, ReferenceDriverSpec, ScalingFactorSpec
+
 
 class EconomicSpec(AutoSpec):
   """ """
+
   @classmethod
   def getInputSpecification(cls) -> type[AutoSpec]:
     """"""
@@ -25,7 +27,7 @@ class EconomicSpec(AutoSpec):
 
     cls.addParam(
       "lifetime",
-      param_type=InputTypes.IntegerType, # type: ignore
+      param_type=InputTypes.IntegerType,  # type: ignore
       required=False,
       default="100",
       descr=r"""
@@ -43,6 +45,7 @@ class EconomicSpec(AutoSpec):
 
 class CashFlowSpec(AutoSpec):
   """ """
+
   @classmethod
   def getInputSpecification(cls) -> type[AutoSpec]:
     """"""
@@ -55,7 +58,7 @@ class CashFlowSpec(AutoSpec):
       $C = \alpha \left(\frac{D}{D'}\right)^x$, aggregated depending on
       the \xmlAttr{type}. For more information, see the TEAL plugin for
       RAVEN.
-      """
+      """,
     )
 
     cls.addParam(
@@ -71,7 +74,7 @@ class CashFlowSpec(AutoSpec):
 
     cls.addParam(
       "type",
-      param_type=InputTypes.makeEnumType("CFType", "CFType", ["one-time", "repeating"]), #type: ignore
+      param_type=InputTypes.makeEnumType("CFType", "CFType", ["one-time", "repeating"]),  # type: ignore
       required=True,
       descr=r"""
       the type of CashFlow to calculate. \xmlString{one-time}
@@ -83,7 +86,7 @@ class CashFlowSpec(AutoSpec):
 
     cls.addParam(
       "taxable",
-      param_type=InputTypes.BoolType, #type: ignore
+      param_type=InputTypes.BoolType,  # type: ignore
       required=False,
       default="True",
       descr=r"""determines whether this CashFlow is taxed every cycle.""",
@@ -93,14 +96,14 @@ class CashFlowSpec(AutoSpec):
       "inflation",
       param_type=InputTypes.StringType,
       required=False,
-      default="none", # type: ignore
+      default="none",  # type: ignore
       descr=r"""determines how inflation affects this CashFlow every cycle.
                 See the CashFlow submodule of RAVEN.""",
     )
 
     cls.addParam(
       "npv_exempt",
-      param_type=InputTypes.BoolType, #type: ignore
+      param_type=InputTypes.BoolType,  # type: ignore
       required=False,
       default="False",
       descr=r"""indicates whether this CashFlow should be exempt from
@@ -115,7 +118,7 @@ class CashFlowSpec(AutoSpec):
 
     cls.addParam(
       "period",
-      param_type=InputTypes.makeEnumType("period_opts", "period_opts", ["hour", "year"]), #type: ignore
+      param_type=InputTypes.makeEnumType("period_opts", "period_opts", ["hour", "year"]),  # type: ignore
       required=False,
       default="hour",
       descr=r"""for a \xmlNode{CashFlow} with \xmlAttr{type} \xmlString{repeating},
@@ -127,60 +130,18 @@ class CashFlowSpec(AutoSpec):
 
     cls.addParam(
       "depreciate",
-      param_type=InputTypes.IntegerType, # type: ignore
+      param_type=InputTypes.IntegerType,  # type: ignore
       required=False,
-      default=None, # type: ignore
+      default=None,  # type: ignore
       descr=r"""indicates the number of cycles over which this CashFlow should be
                 depreciated. Depreciation schemes are assumed to be MACRS and available
                 cycles are listed in the CashFlow submodule of RAVEN.""",
     )
 
-    driver = InputData.parameterInputFactory(
-      "driver",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""
-      indicates the main driver for this CashFlow, such as the number of
-      units sold or the size of the constructed unit. Corresponds to $D$
-      in the CashFlow equation.
-      """,
-    )
-    cls.addSub(driver)
-
-    reference_price = InputData.parameterInputFactory(
-      "reference_price",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""indicates the cash value of the reference number of units sold.
-                corresponds to $\alpha$ in the CashFlow equation. If \xmlNode{reference_driver}
-                is 1, then this is the price-per-unit for the CashFlow.""",
-    )
-
-    levelized_cost = InputData.parameterInputFactory(
-      "levelized_cost",
-      strictMode=True,
-      descr=r"""indicates whether HERON and TEAL are meant to solve for the levelized
-                price related to this cashflow.""",
-    )
-
-    reference_price.addSub(levelized_cost)
-    cls.addSub(reference_price)
-
-    reference_driver = InputData.parameterInputFactory(
-      "reference_driver",
-      contentType=InputTypes.FloatOrIntType,
-      descr=r"""determines the number of units sold to which the \xmlNode{reference_price}
-                refers. Corresponds to $\prime D$ in the CashFlow equation.""",
-    )
-    cls.addSub(reference_driver)
-
-    x = InputData.parameterInputFactory(
-      "scaling_factor_x",
-      contentType=InputTypes.FloatType,
-      descr=r"""determines the scaling factor for this CashFlow. Corresponds to
-                $x$ in the CashFlow equation. If $x$ is less than one, the per-unit
-                price decreases as the units sold increases above the \xmlNode{reference_driver},
-                and vice versa.""",
-    )
-    cls.addSub(x)
+    # Adding Special Nodes that other softwares can change
+    cls.addSub(DriverSpec.getInputSpecification())
+    cls.addSub(ReferencePriceSpec.getInputSpecification())
+    cls.addSub(ReferenceDriverSpec.getInputSpecification())
+    cls.addSub(ScalingFactorSpec.getInputSpecification())
 
     return cls
-
