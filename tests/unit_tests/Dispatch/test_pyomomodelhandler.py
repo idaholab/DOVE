@@ -11,7 +11,7 @@ import pyomo.environ as pyo
 
 from dove.Dispatch import PyomoModelHandler as pmh
 from dove.components import Component
-from dove.interactions import Interaction, Producer, Storage
+from dove.interactions import Interaction, Producer, Demand, Storage
 
 class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
@@ -395,7 +395,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockParam = paramPatcher.start()
 
     # Set up other inputs for constructor and test method
-    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 1, "h2": 2}}
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
     self.mockComponent1.name = "comp1_name"
     values = np.array([0, -1, -2, 0])
 
@@ -423,6 +423,179 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     self.assertEqual(testPMH.model.comp1_name_production, mockParam.return_value)
 
+  def testCreateProduction(self):
+
+    # Set up test-specific patchers
+    createProductionVariablePatcher = patch.object(pmh.PyomoModelHandler, "_create_production_variable")
+    createTransferPatcher = patch.object(pmh.PyomoModelHandler, "_create_transfer")
+    createRampLimitPatcher = patch.object(pmh.PyomoModelHandler, "_create_ramp_limit")
+
+    # Start test-specific patchers and store mocks
+    mockCreateProductionVariable = createProductionVariablePatcher.start()
+    mockCreateTransfer = createTransferPatcher.start()
+    mockRampLimit = createRampLimitPatcher.start()
+
+    # Configure mocks
+    mockCreateProductionVariable.return_value = "comp1_prod"
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    returned = testPMH._create_production(self.mockComponent1)
+
+    # Check mock calls
+    mockCreateProductionVariable.assert_called_once_with(self.mockComponent1)
+    mockCreateTransfer.assert_called_once_with(self.mockComponent1, "comp1_prod")
+    mockRampLimit.assert_called_once_with(self.mockComponent1, "comp1_prod")
+
+    # Check return value
+    self.assertEqual(returned, "comp1_prod")
+
+  def testCreateProductionVariable(self):
+
+    # Set up test-specific patchers
+    findProductionLimitsPatcher = patch.object(pmh.PyomoModelHandler, "_find_production_limits")
+    pyoVarPatcher = patch.object(pmh.pyo, "Var") # To check args more easily
+
+    # Start test-specific patchers and store mocks
+    mockFindProductionLimits = findProductionLimitsPatcher.start()
+    mockPyoVar = pyoVarPatcher.start()
+
+    # Configure mocks and meta
+    self.mockComponent1.name = "comp1_name"
+    self.mockComponent1.interaction.capacity_var = "electricity"
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
+
+    ### Scenario 1: Demand, custom tag, add_bounds false, has kwargs, indexer not none, negative cap values
+
+    # Additional setup
+    self.mockComponent1.interaction.mock_add_spec(Demand)
+
+    caps = [0, -1, 0, 0]
+    mins = [0, -1, -2, -1]
+    mockFindProductionLimits.return_value = caps, mins
+
+    # Create PMH instance
+    testPMHScen1 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Set indexer
+    testPMHScen1.model.comp1_name_res_index_map = pyo.Set(initialize=[0, 1])
+
+    # Call method under test
+    testPMHScen1._create_production_variable(
+      self.mockComponent1,
+      tag="custom_prod_var",
+      add_bounds=False,
+      doc="stuff"
+    )
+
+    # Check call to _find_production_limits
+    mockFindProductionLimits.assert_called_with(self.mockComponent1)
+
+    # Check that production var was created and set correctly
+    mockPyoVar.assert_called_with(
+      set([0, 1]),
+      set([0, 1, 2, 3]),
+      initialize=0,
+      bounds=(None, None),
+      doc="stuff"
+    )
+    self.assertEqual(testPMHScen1.model.comp1_name_custom_prod_var, mockPyoVar.return_value)
+
+    ### Scenario 2: Producer, default tag and add_bounds, no kwargs, indexer none, positive cap values
+
+    # Additional setup
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+
+    caps = [0, 2, 3, 4]
+    mins = [0, 1, 0, 2]
+    mockFindProductionLimits.return_value = caps, mins
+
+    # Create PMH instance
+    testPMHScen2 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Remove indexer
+    del testPMHScen1.model.comp1_name_res_index_map
+
+    # Call method under test
+    testPMHScen2._create_production_variable(self.mockComponent1)
+
+    # Check that resource indexer was set correctly
+    resourceIndexer = testPMHScen2.model.comp1_name_res_index_map
+    self.assertSetEqual(resourceIndexer, set([0, 1]))
+
+    # Check call to _find_production_limits
+    mockFindProductionLimits.assert_called_with(self.mockComponent1)
+
+    # Check that production var was created and set correctly
+    mockPyoVar.assert_called_with(
+      testPMHScen2.model.comp1_name_res_index_map,
+      testPMHScen2.model.T,
+      initialize=ANY, # Have to check the lambdas for initialize and bounds explicitly, so ignore here
+      bounds=ANY
+    )
+
+    initializeFunc = mockPyoVar.call_args[1]["initialize"]
+    self.assertEqual(initializeFunc.__name__, "<lambda>") # Make sure it's a lambda function
+    # Check the function
+    self.assertEqual(initializeFunc(0, 2, 0), 0) # r != limit_r(==0)
+    self.assertEqual(initializeFunc(0, 0, 3), 2) # r == limit_r == 0
+
+    boundsFunc = mockPyoVar.call_args[1]["bounds"]
+    self.assertEqual(boundsFunc.__name__, "<lambda>") # Make sure it's a lambda function
+    # Check the function
+    self.assertEqual(boundsFunc(0, 2, 0), (None, None)) # r != limit_r(==0)
+    self.assertEqual(boundsFunc(0, 0, 3), (2, 4)) # r == limit_r == 0
+
+    self.assertEqual(testPMHScen2.model.comp1_name_production, mockPyoVar.return_value)
+
+    ### Scenario 3: bad cap values
+
+    # Mess up caps (mixed signs)
+    caps = [0, 2, -3, 4]
+    mins = [0, 1, 0, 2]
+    mockFindProductionLimits.return_value = caps, mins
+
+    # Create PMH instance
+    testPMHScen3 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test and ensure failure
+    with self.assertRaises(AssertionError):
+      testPMHScen3._create_production_variable(self.mockComponent1)
 
 if __name__ == "__main__":
   unittest.main()
