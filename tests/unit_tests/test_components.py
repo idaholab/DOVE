@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from unittest.mock import ANY, MagicMock, call, patch
 
 # Add dove to python path
-from . import resolve_module_path  # noqa: F401
+# from . import resolve_module_path  # noqa: F401
 
 # import dove before ravenframework
 from dove import Component

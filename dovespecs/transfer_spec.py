@@ -5,7 +5,7 @@
 
 import warnings
 
-from ravenframework.utils.InputData import InputTypes
+from ravenframework.utils.InputData import InputTypes, Quantity
 
 from dove.physics import Polynomial, Ratio
 
@@ -25,7 +25,7 @@ class RateSpec(SimpleNodeSpec):
       False,
       None,
       r"""
-      indicates the resource for which the linear transfer ratio is being 
+      indicates the resource for which the linear transfer ratio is being
       provided in this node.
       """,
     )
@@ -74,23 +74,15 @@ class TransferSpec(AutoSpec):
     """ """
     cls.createClass(
       "transfer",
+      ordered=True,
       descr=r"""
       describes the balance between consumed and produced resources
       for this component.
       """,
     )
-    cls.addSub(RatioSpec.getInputSpecification())
-    cls.addSub(PolySpec.getInputSpecification())
+    cls.addSub(RatioSpec.getInputSpecification(), quantity=Quantity.zero_to_one)
+    cls.addSub(PolySpec.getInputSpecification(), quantity=Quantity.zero_to_one)
     return cls
-  
-  def validate(self) -> None:
-    """ """
-    node = self.findFirst("ratio")
-    if node is None:
-      node = self.findFirst("linear")
-      if node is None:
-        raise IOError(f'Unrecognized transfer function for component "PLACEHOLDER": "{self.name}"')
-      warnings.warn("'linear' has been deprecated and will be removed in the future; see 'ratio' transfer function!")
 
   def instantiate(self):
     return self.subparts[0].instantiate()
@@ -120,8 +112,7 @@ class RatioSpec(AutoSpec):
     cls.associated_class = Ratio
     return cls
 
-
-  def instantiate(self) -> object:
+  def instantiate(self):
     """ """
     coefficient = {}
     for rate_node in self.findAll("rate"):

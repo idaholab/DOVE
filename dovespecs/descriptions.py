@@ -1,33 +1,28 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
-Interaction Input Specification
+Component Module
 """
 
-from ravenframework.utils.InputData import InputTypes
+from collections import defaultdict
 
-from .autospec import AutoSpec
-from .special import CapacitySpec, CapacityFactorSpec, MinimumSpec
+DESCRIPTIONS = defaultdict(dict)
 
+DESCRIPTIONS["Component"] = {
+  "descr": r"""defines a component as an element of the grid system.
+                Components are defined by the action they perform such as
+                \xmlNode{produces} or \xmlNode{consumes}; see details below.
+            """,
+  "name": r"""
+      identifier for the component. This identifier will be used to
+      generate variables and relate signals to this component throughout
+      the DOVE analysis.
+      """,
+}
 
-class InteractionSpec(AutoSpec):
-  """ """
-
-  @classmethod
-  def getInputSpecification(cls) -> type[AutoSpec]:
-    """ """
-    cls.createClass("interaction")
-    cls.addParam(
-      "resource",
-      param_type=InputTypes.StringListType,  # type: ignore
-      required=True,
-    )
-
-    cls.addParam(
-      "dispatch",
-      param_type=InputTypes.makeEnumType("dispatch_opts", "dispatch_opts", ["fixed", "independent", "dependent"]),  # type: ignore
-      required=True,
-      descr=r"""
+DESCRIPTIONS["Interaction"] = {
+  "resource": ddd,
+  "dispatch": r"""
       describes the way this component should be dispatched, or its flexibility.
       \texttt{fixed} indicates the component always fully dispatched at
       its maximum level. \texttt{independent} indicates the component is
@@ -42,9 +37,12 @@ class InteractionSpec(AutoSpec):
       \texttt{dependent} components may respond to balance the resource
       usage from the changing behavior of other components.
       """,
-    )
+}
 
-    cls.addSub(CapacitySpec.getInputSpecification())
-    cls.addSub(CapacityFactorSpec.getInputSpecification())
-    cls.addSub(MinimumSpec.getInputSpecification())
-    return cls
+DESCRIPTIONS["produces"] = {
+  "consumes": ...,
+  "ramp_limit": ...,
+  "ramp_freq": ...,
+}
+
+DESCRIPTIONS["transfer"] = {}

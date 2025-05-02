@@ -1,6 +1,8 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-""" """
+"""
+Capacity Factor Input Specification
+"""
 
 from ravenframework.utils.InputData import InputTypes
 
