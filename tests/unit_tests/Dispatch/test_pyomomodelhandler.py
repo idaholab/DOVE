@@ -11,7 +11,7 @@ import pyomo.environ as pyo
 
 from dove.Dispatch import PyomoModelHandler as pmh
 from dove.components import Component
-from dove.interactions import Interaction, Producer, Demand, Storage
+from dove.interactions import Interaction, Producer, Storage
 
 class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
@@ -387,6 +387,41 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Check that constraint was added to model correctly
     self.assertIs(testPMH.model.comp1_name_electricity_2_vld_limit_constr_1, "fake_constr")
+
+  def testCreateProductionParam(self):
+
+    # Set up and start test-specific patchers
+    paramPatcher = patch.object(pmh.pyo, "Param")
+    mockParam = paramPatcher.start()
+
+    # Set up other inputs for constructor and test method
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 1, "h2": 2}}
+    self.mockComponent1.name = "comp1_name"
+    values = np.array([0, -1, -2, 0])
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    testPMH._create_production_param(self.mockComponent1, values)
+
+    # Check that resource indexer was set correctly
+    resource_indexer = testPMH.model.comp1_name_res_index_map
+    self.assertSetEqual(resource_indexer, set([0, 1]))
+
+    # Check that production param was created and set correctly
+    init_dict = {(0, 0): 0, (0, 1): -1, (0, 2): -2, (0, 3): 0}
+    mockParam.assert_called_once_with(resource_indexer, set([0, 1, 2, 3]), initialize=init_dict)
+
+    self.assertEqual(testPMH.model.comp1_name_production, mockParam.return_value)
 
 
 if __name__ == "__main__":
