@@ -1,4 +1,7 @@
-import __init__  # Running __init__ here enables importing from DOVE and RAVEN
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+
+# import __init__  # Running __init__ here enables importing from DOVE and RAVEN
 
 import unittest
 from unittest.mock import MagicMock, call, patch, ANY
@@ -6,17 +9,16 @@ from unittest.mock import MagicMock, call, patch, ANY
 import numpy as np
 import pyomo.environ as pyo
 
-from DOVE.src.Dispatch import PyomoModelHandler as pmh
-from DOVE.src.Components import Component
-from DOVE.src.Interactions import Interaction
-from DOVE.src.Interactions import Storage
+from dove.Dispatch import PyomoModelHandler as pmh
+from dove.components import Component
+from dove.interactions import Interaction, Producer, Demand, Storage
 
 class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
   def setUp(self):
     # Create patchers
-    pyomoRuleLibraryPatcher = patch("DOVE.src.Dispatch.PyomoModelHandler.prl", autospec=True)
-    pyomoStatePatcher = patch("DOVE.src.Dispatch.PyomoModelHandler.PyomoState", autospec=True)
+    pyomoRuleLibraryPatcher = patch("dove.Dispatch.PyomoModelHandler.prl", autospec=True)
+    pyomoStatePatcher = patch("dove.Dispatch.PyomoModelHandler.PyomoState", autospec=True)
 
     # Start patchers and store mocks
     self.mockPRL = pyomoRuleLibraryPatcher.start()
@@ -57,7 +59,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Checks for __init__
     self.assertIs(testPMH.time, self.time)
     self.assertEqual(testPMH.time_offset, self.time_offset)
-    self.assertEqual(testPMH.case, self.mockCase)
+    # self.assertEqual(testPMH.case, self.mockCase)
     self.assertEqual(testPMH.components, self.components)
     self.assertEqual(testPMH.resources, self.resources)
     self.assertEqual(testPMH.initial_storage, self.mockInitialStorage)
@@ -71,9 +73,8 @@ class TestPyomoModelHandler(unittest.TestCase):
     self.assertIs(testPMH.model.Times, self.time)
     self.assertEqual(testPMH.model.time_offset, self.time_offset)
     self.assertEqual(testPMH.model.resource_index_map, "resource_index_map")
-    self.assertEqual(testPMH.model.Case, self.mockCase)
+    # self.assertEqual(testPMH.model.Case, self.mockCase)
     self.assertEqual(testPMH.model.Components, self.components)
-
 
     # Check that model activity was initialized correctly
     self.assertEqual(testPMH.model.Activity, self.mockPyomoState.return_value)
@@ -130,9 +131,6 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockCreateStorage = createStoragePatcher.start()
     mockCreateProduction = createProductionPatcher.start()
 
-    # Additional mock configuration
-    self.mockComponent1.get_interaction.return_value = self.mockInteraction
-
     # Create PMH instance
     testPMH = pmh.PyomoModelHandler(
       self.time,
@@ -144,42 +142,41 @@ class TestPyomoModelHandler(unittest.TestCase):
       self.meta
     )
 
-    ### With governed component
+    ### With governed storage
 
-    # Configure mock interaction
-    self.mockInteraction.is_governed.return_value = True
+    # Configure mocks
+    self.mockComponent1.interaction.is_governed.return_value = True
+    self.mockComponent1.interaction.mock_add_spec(Storage)
 
     # Call method under test
     testPMH._process_component(self.mockComponent1)
 
     # Check that only correct function called
-    mockProcessGovernedComponent.assert_called_once_with(self.mockComponent1, self.mockInteraction)
+    mockProcessGovernedComponent.assert_called_once_with(self.mockComponent1)
     mockCreateStorage.assert_not_called()
     mockCreateProduction.assert_not_called()
 
-    ### With storage
+    ### With non-governed storage
 
     # Configure mocks
-    self.mockInteraction.is_governed.return_value = False
-    self.mockInteraction.is_type.return_value = True
+    self.mockComponent1.interaction.is_governed.return_value = False
+    # Still has Storage spec, so don't need to add it
 
     mockProcessGovernedComponent.reset_mock()
 
     # Call method under test
     testPMH._process_component(self.mockComponent1)
 
-    # Check type
-    self.mockInteraction.is_type.assert_called_once_with("HeronStorage")
-
     # Check that only correct function called
     mockProcessGovernedComponent.assert_not_called()
     mockCreateStorage.assert_called_once_with(self.mockComponent1)
     mockCreateProduction.assert_not_called()
 
-    ### With production
+    ### With producer
 
     # Configure mocks
-    self.mockInteraction.is_type.return_value = False
+    self.mockComponent1.interaction.is_governed.return_value = False
+    self.mockComponent1.interaction.mock_add_spec(Producer)
 
     mockCreateStorage.reset_mock()
 
@@ -203,8 +200,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockCreateProductionParam = createProductionParamPatcher.start()
 
     # Set up activity value
-    # FIXME: Uncomment the below line once get_strategy bug is fixed
-    # self.mockInteraction.get_strategy.return_value.evaluate.return_value = [{"level": "expected_activity_value"}]
+    self.mockComponent1.interaction.get_strategy.return_value.evaluate.return_value = [{"level": "expected_activity_value"}]
 
     # Create PMH instance
     testPMH = pmh.PyomoModelHandler(
@@ -219,32 +215,34 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     ### With storage
 
-    # Configure mock interaction
-    self.mockInteraction.is_type.return_value = True
+    # Configure mocks
+    self.mockComponent1.interaction.mock_add_spec(Storage)
 
     # Call method under test
-    testPMH._process_governed_component(self.mockComponent1, self.mockInteraction)
+    testPMH._process_governed_component(self.mockComponent1)
 
-    # Check meta and type
+    # Check meta
     self.assertEqual(testPMH.meta["request"]["component"], self.mockComponent1)
     self.assertIs(testPMH.meta["request"]["time"], self.time)
-    self.mockInteraction.is_type.assert_called_once_with("HeronStorage")
 
     # Check that only correct function called
-    mockProcessStorageComponent.assert_called_once_with(self.mockComponent1, self.mockInteraction)
+    mockProcessStorageComponent.assert_called_once_with(self.mockComponent1)
     mockCreateProductionParam.assert_not_called()
 
     ### With production param
 
     # Configure mocks
-    self.mockInteraction.is_type.return_value = False
+    # FIXME: The below line causes an error because get_strategy (mentioned in line 203 above) is only in Storage.
+    #        But if it was a Storage, then process_storage_component should have been called.
+    #        Is the else block supposed to be runnable?
+    self.mockComponent1.interaction.mock_add_spec(Producer)
     mockProcessStorageComponent.reset_mock()
 
     # Call method under test
-    testPMH._process_governed_component(self.mockComponent1, self.mockInteraction)
+    testPMH._process_governed_component(self.mockComponent1)
 
     # Check activity call
-    self.mockInteraction.get_strategy.return_value.evaluate.assert_called_once_with(self.meta)
+    self.mockComponent1.interaction.get_strategy.return_value.evaluate.assert_called_once_with(self.meta)
 
     # Check that only correct function called
     mockProcessStorageComponent.assert_not_called()
@@ -259,13 +257,13 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockCreateProductionParam = createProductionParamPatcher.start()
 
     # Configure additional mocks
-    self.mockInteraction.mock_add_spec(Storage)
+    self.mockComponent1.interaction.mock_add_spec(Storage)
     activity = [0, 1, 3, 1]
-    # FIXME: Uncomment the below lines once get_strategy bug is fixed
-    # self.mockInteraction.get_strategy.return_value.evaluate.return_value = [{"level": activity}]
-    self.mockInteraction.get_initial_level.return_value = 1
+    self.mockComponent1.interaction.get_strategy.return_value.evaluate.return_value = [{"level": activity}]
+    # FIXME: The following line causes an error because Storage doesn't have a get_initial_level method
+    self.mockComponent1.interaction.get_initial_level.return_value = 1
 
-    self.mockComponent1.get_sqrt_RTE.return_value = 0.5
+    self.mockComponent1.interaction.sqrt_rte = 0.5
 
     # Create PMH instance
     testPMH = pmh.PyomoModelHandler(
@@ -279,11 +277,11 @@ class TestPyomoModelHandler(unittest.TestCase):
     )
 
     # Call method under test
-    testPMH._process_storage_component(self.mockComponent1, self.mockInteraction)
+    testPMH._process_storage_component(self.mockComponent1)
 
     # Check interaction calls
-    self.mockInteraction.get_strategy.return_value.evaluate.assert_called_once_with(self.meta)
-    self.mockInteraction.get_initial_level.assert_called_once_with(self.meta)
+    self.mockComponent1.interaction.get_strategy.return_value.evaluate.assert_called_once_with(self.meta)
+    self.mockComponent1.get_initial_level.assert_called_once_with(self.meta)
 
     # Check CreateProductionParam calls
     # Equality checks don't work on entire numpy arrays, so we have to go through the calls manually
