@@ -339,17 +339,17 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockFakeProdLimitRule = MagicMock(name="mockFakeProdLimitRule", wraps=fake_prod_limit_rule) # To track calls
     self.mockPRL.prod_limit_rule = mockFakeProdLimitRule
 
-    mockConstraint = MagicMock(name="mockConstraint")
-    mockConstraint.Feasible = pyo.Constraint.Feasible # For fake rule
-    mockConstraint.return_value = "fake_constr"
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For fake rule
+    mockPyoConstraint.return_value = "fake_constr"
 
     # Add patcher to track calls to pyo.Constraint and control return value
-    constraintPatcher = patch.object(pmh.pyo, "Constraint", mockConstraint)
-    constraintPatcher.start()
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+    pyoConstraintPatcher.start()
 
     # Modify arguments for constructor
     self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 1}}
-    self.mockComponent1.name = "comp1_name"
+    self.mockComponent1.name = "comp1"
 
     # Create PMH instance
     testPMH = pmh.PyomoModelHandler(
@@ -375,18 +375,18 @@ class TestPyomoModelHandler(unittest.TestCase):
     testPMH._create_production_limit(validation)
 
     # Check that constraint was created from rule
-    rule = mockConstraint.call_args[1]["rule"]
+    rule = mockPyoConstraint.call_args[1]["rule"]
     # Checks that the rule added is a lambda function
     self.assertEqual(rule.__name__, "<lambda>")
 
     # Check that rule was set up correctly
     rule("fake_mod") # Call the lambda function so we can read the other call args off the mock
-    mockFakeProdLimitRule.assert_called_once_with("comp1_name_production", 1, ANY, "upper", 2, "fake_mod")
+    mockFakeProdLimitRule.assert_called_once_with("comp1_production", 1, ANY, "upper", 2, "fake_mod")
     # Have to check limits arg explicitly since it's a numpy array
     self.assertTrue((mockFakeProdLimitRule.call_args[0][2] == np.array([0, 0, 3, 0])).all()) # All elements are the same
 
     # Check that constraint was added to model correctly
-    self.assertIs(testPMH.model.comp1_name_electricity_2_vld_limit_constr_1, "fake_constr")
+    self.assertIs(testPMH.model.comp1_electricity_2_vld_limit_constr_1, "fake_constr")
 
   def testCreateProductionParam(self):
 
@@ -396,7 +396,7 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Set up other inputs for constructor and test method
     self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
-    self.mockComponent1.name = "comp1_name"
+    self.mockComponent1.name = "comp1"
     values = np.array([0, -1, -2, 0])
 
     # Create PMH instance
@@ -414,14 +414,14 @@ class TestPyomoModelHandler(unittest.TestCase):
     testPMH._create_production_param(self.mockComponent1, values)
 
     # Check that resource indexer was set correctly
-    resource_indexer = testPMH.model.comp1_name_res_index_map
+    resource_indexer = testPMH.model.comp1_res_index_map
     self.assertSetEqual(resource_indexer, set([0, 1]))
 
     # Check that production param was created and set correctly
     init_dict = {(0, 0): 0, (0, 1): -1, (0, 2): -2, (0, 3): 0}
     mockParam.assert_called_once_with(resource_indexer, set([0, 1, 2, 3]), initialize=init_dict)
 
-    self.assertEqual(testPMH.model.comp1_name_production, mockParam.return_value)
+    self.assertEqual(testPMH.model.comp1_production, mockParam.return_value)
 
   def testCreateProduction(self):
 
@@ -472,7 +472,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockPyoVar = pyoVarPatcher.start()
 
     # Configure mocks and meta
-    self.mockComponent1.name = "comp1_name"
+    self.mockComponent1.name = "comp1"
     self.mockComponent1.interaction.capacity_var = "electricity"
     self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
 
@@ -497,7 +497,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     )
 
     # Set indexer
-    testPMHScen1.model.comp1_name_res_index_map = pyo.Set(initialize=[0, 1])
+    testPMHScen1.model.comp1_res_index_map = pyo.Set(initialize=[0, 1])
 
     # Call method under test
     testPMHScen1._create_production_variable(
@@ -518,7 +518,7 @@ class TestPyomoModelHandler(unittest.TestCase):
       bounds=(None, None),
       doc="stuff"
     )
-    self.assertEqual(testPMHScen1.model.comp1_name_custom_prod_var, mockPyoVar.return_value)
+    self.assertEqual(testPMHScen1.model.comp1_custom_prod_var, mockPyoVar.return_value)
 
     ### Scenario 2: Producer, default tag and add_bounds, no kwargs, indexer none, positive cap values
 
@@ -541,13 +541,13 @@ class TestPyomoModelHandler(unittest.TestCase):
     )
 
     # Remove indexer
-    del testPMHScen1.model.comp1_name_res_index_map
+    del testPMHScen1.model.comp1_res_index_map
 
     # Call method under test
     testPMHScen2._create_production_variable(self.mockComponent1)
 
     # Check that resource indexer was set correctly
-    resourceIndexer = testPMHScen2.model.comp1_name_res_index_map
+    resourceIndexer = testPMHScen2.model.comp1_res_index_map
     self.assertSetEqual(resourceIndexer, set([0, 1]))
 
     # Check call to _find_production_limits
@@ -555,7 +555,7 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Check that production var was created and set correctly
     mockPyoVar.assert_called_with(
-      testPMHScen2.model.comp1_name_res_index_map,
+      testPMHScen2.model.comp1_res_index_map,
       testPMHScen2.model.T,
       initialize=ANY, # Have to check the lambdas for initialize and bounds explicitly, so ignore here
       bounds=ANY
@@ -573,7 +573,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     self.assertEqual(boundsFunc(0, 2, 0), (None, None)) # r != limit_r(==0)
     self.assertEqual(boundsFunc(0, 0, 3), (2, 4)) # r == limit_r == 0
 
-    self.assertEqual(testPMHScen2.model.comp1_name_production, mockPyoVar.return_value)
+    self.assertEqual(testPMHScen2.model.comp1_production, mockPyoVar.return_value)
 
     ### Scenario 3: bad cap values
 
@@ -596,6 +596,196 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Call method under test and ensure failure
     with self.assertRaises(AssertionError):
       testPMHScen3._create_production_variable(self.mockComponent1)
+
+  def testCreateRampLimit(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule functions
+    # This is necessary becuase the lambda functions need real functions to interact with so we can test them
+    def fake_ramp_rule_down(prod_name, r, limit, neg_cap, t, m, bins=None):
+      return pyo.Constraint.Feasible
+    def fake_ramp_rule_up(prod_name, r, limit, neg_cap, t, m, bins=None):
+      return pyo.Constraint.Feasible
+    def fake_ramp_freq_bins_rule(Bd, Bu, Bn, t, m):
+      return pyo.Constraint.Feasible
+    def fake_ramp_freq_rule(Bd, Bu, tao, t, m):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule functions so we can record the calls to them
+    mockFakeRRD = MagicMock(name="mockFakeRampRuleDown", wraps=fake_ramp_rule_down)
+    mockFakeRRU = MagicMock(name="mockFakeRampRuleUp", wraps=fake_ramp_rule_up)
+    mockFakeRFBR = MagicMock(name="mockFakeRampFreqBinsRule", wraps=fake_ramp_freq_bins_rule)
+    mockFakeRFR = MagicMock(name="mockFakeRampFreqRule", wraps=fake_ramp_freq_rule)
+
+    # Update the patched rule library with the wrapped rules
+    self.mockPRL.ramp_rule_down = mockFakeRRD
+    self.mockPRL.ramp_rule_up = mockFakeRRU
+    self.mockPRL.ramp_freq_bins_rule = mockFakeRFBR
+    self.mockPRL.ramp_freq_rule = mockFakeRFR
+
+    # Configure mock constraint before starting patcher so .Feasible will refer to original
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rules
+    mockPyoConstraint.side_effect = ["fake_rrd_constr", "fake_rru_constr", "fake_rfbr_constr", "fake_rfr_constr"]
+
+    # Add patchers to track calls to pyo.Constraint and pyo.Var
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+    pyoVarPatcher = patch.object(pmh.pyo, "Var")
+
+    # Start patchers
+    pyoConstraintPatcher.start()
+    mockPyoVar = pyoVarPatcher.start()
+
+    # Additional mock configuration
+    mockPyoVar.side_effect = ["upVar", "downVar", "steadyVar"]
+
+    self.mockComponent1.name = "comp1"
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+    self.mockComponent1.interaction.capacity_var = "electricity"
+    self.mockComponent1.interaction.ramp_limit = 0.5
+
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
+
+    ### Scenario 1: cap < 0, ramp_freq > 0
+
+    # Scenario-specific setup
+    # FIXME: The below line causes an error because Producer doesn't have a get_capacity method
+    self.mockComponent1.interaction.get_capacity.return_value = [{"electricity": -4}]
+    self.mockComponent1.interaction.ramp_freq = 3
+
+    # Create PMH instance
+    testPMHScen1 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    testPMHScen1._create_ramp_limit(self.mockComponent1, "comp1_production")
+
+    # Check get_capacity call
+    self.mockComponent1.interaction.get_capacity.assert_called_with(self.meta)
+
+    # Check that ramp tracker binaries were created and set correctly
+    expectedPyoVarCalls = [
+      call(set([0, 1, 2, 3]), initialize=0, domain=pyo.Binary),
+      call(set([0, 1, 2, 3]), initialize=0, domain=pyo.Binary),
+      call(set([0, 1, 2, 3]), initialize=1, domain=pyo.Binary)
+    ]
+    mockPyoVar.assert_has_calls(expectedPyoVarCalls)
+
+    self.assertEqual(testPMHScen1.model.comp1_up_ramp_tracker, "upVar")
+    self.assertEqual(testPMHScen1.model.comp1_down_ramp_tracker, "downVar")
+    self.assertEqual(testPMHScen1.model.comp1_steady_ramp_tracker, "steadyVar")
+
+    # Ensure that rules were created and set correctly
+
+    # Check that constraints were created correctly (have to check lambdas separately)
+    expectedPyoConstraintCalls = [
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY)
+    ]
+    mockPyoConstraint.assert_has_calls(expectedPyoConstraintCalls)
+    self.assertEqual(mockPyoConstraint.call_count, 4)
+
+    # Extract lambdas from constraint calls and check that they're lambdas
+    rrdLambda = mockPyoConstraint.call_args_list[0][1]["rule"]
+    self.assertEqual(rrdLambda.__name__, "<lambda>")
+    rruLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
+    self.assertEqual(rruLambda.__name__, "<lambda>")
+    rfbrLambda = mockPyoConstraint.call_args_list[2][1]["rule"]
+    self.assertEqual(rfbrLambda.__name__, "<lambda>")
+    rfrLambda = mockPyoConstraint.call_args_list[3][1]["rule"]
+    self.assertEqual(rfrLambda.__name__, "<lambda>")
+
+    # Call each lambda and check the call args on the mock rule
+    rrdLambda("model", 0)
+    mockFakeRRD.assert_called_once_with("comp1_production", 0, -2.0, True, 0, "model", bins=("downVar", "upVar", "steadyVar"))
+    rruLambda("model", 1)
+    mockFakeRRU.assert_called_once_with("comp1_production", 0, -2.0, True, 1, "model", bins=("downVar", "upVar", "steadyVar"))
+    rfbrLambda("model", 2)
+    mockFakeRFBR.assert_called_once_with("downVar", "upVar", "steadyVar", 2, "model")
+    rfrLambda("model", 3)
+    mockFakeRFR.assert_called_once_with("downVar", "upVar", 3, 3, "model")
+
+    # Check that constraints were set
+    self.assertEqual(testPMHScen1.model.comp1_ramp_down_constr, "fake_rrd_constr")
+    self.assertEqual(testPMHScen1.model.comp1_ramp_up_constr, "fake_rru_constr")
+    self.assertEqual(testPMHScen1.model.comp1_ramp_freq_binaries, "fake_rfbr_constr")
+    self.assertEqual(testPMHScen1.model.comp1_ramp_freq_constr, "fake_rfr_constr")
+
+    ### Scenario 2: cap > 0, ramp_freq = 0
+
+    # Reset mocks
+    mockPyoVar.reset_mock()
+    mockPyoConstraint.reset_mock()
+    mockFakeRRD.reset_mock()
+    mockFakeRRU.reset_mock()
+    mockFakeRFBR.reset_mock()
+    mockFakeRFR.reset_mock()
+
+    mockPyoConstraint.side_effect = ["fake_rrd_constr", "fake_rru_constr"]
+
+    # Scenario-specific setup
+    self.mockComponent1.interaction.get_capacity.return_value = [{"electricity": 4}]
+    self.mockComponent1.interaction.ramp_freq = 0
+
+    # Create PMH instance
+    testPMHScen2 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    testPMHScen2._create_ramp_limit(self.mockComponent1, "comp1_production")
+
+    # Check get_capacity call
+    self.mockComponent1.interaction.get_capacity.assert_called_with(self.meta)
+
+    # Check that ramp tracker binaries were not created
+    mockPyoVar.assert_not_called()
+
+    # Ensure that appropriate rules were created and set correctly
+
+    # Check that constraints were created correctly (have to check lambdas separately)
+    expectedPyoConstraintCalls = [
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY)
+    ]
+    mockPyoConstraint.assert_has_calls(expectedPyoConstraintCalls)
+    self.assertEqual(mockPyoConstraint.call_count, 2)
+
+    # Extract lambdas from constraint calls and check that they're lambdas
+    rrdLambda = mockPyoConstraint.call_args_list[0][1]["rule"]
+    self.assertEqual(rrdLambda.__name__, "<lambda>")
+    rruLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
+    self.assertEqual(rruLambda.__name__, "<lambda>")
+
+    # Call each lambda and check the call args on the mock rule
+    rrdLambda("model", 0)
+    mockFakeRRD.assert_called_once_with("comp1_production", 0, 2.0, False, 0, "model", bins=None)
+    rruLambda("model", 1)
+    mockFakeRRU.assert_called_once_with("comp1_production", 0, 2.0, False, 1, "model", bins=None)
+
+    # Check that constraints were set
+    self.assertEqual(testPMHScen1.model.comp1_ramp_down_constr, "fake_rrd_constr")
+    self.assertEqual(testPMHScen1.model.comp1_ramp_up_constr, "fake_rru_constr")
+
+    # BUG: What if ramp_limit = 0? Doesn't the `if limit_delta < 0` set neg_cap to True no matter what?
+    #      Why aren't we just checking `if cap < 0`?
+
 
 if __name__ == "__main__":
   unittest.main()
