@@ -30,6 +30,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Additional mocks
     self.mockCase = MagicMock(name="mockCase")
     self.mockComponent1 = MagicMock(name="mockComponent1", spec=Component)
+    self.mockComponent1.name = "comp1"
     self.mockComponent2 = MagicMock(name="mockComponent2", spec=Component)
     self.mockInitialStorage = MagicMock(name="mockInitialStorage")
     self.mockInteraction = MagicMock(name="mockInteraction", spec=Interaction)
@@ -187,7 +188,6 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockProcessGovernedComponent.assert_not_called()
     mockCreateStorage.assert_not_called()
     mockCreateProduction.assert_called_once_with(self.mockComponent1)
-
 
   def testProcessGovernedComponent(self):
 
@@ -347,9 +347,8 @@ class TestPyomoModelHandler(unittest.TestCase):
     pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
     pyoConstraintPatcher.start()
 
-    # Modify arguments for constructor
+    # Modify meta
     self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 1}}
-    self.mockComponent1.name = "comp1"
 
     # Create PMH instance
     testPMH = pmh.PyomoModelHandler(
@@ -396,7 +395,6 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Set up other inputs for constructor and test method
     self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
-    self.mockComponent1.name = "comp1"
     values = np.array([0, -1, -2, 0])
 
     # Create PMH instance
@@ -471,8 +469,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockFindProductionLimits = findProductionLimitsPatcher.start()
     mockPyoVar = pyoVarPatcher.start()
 
-    # Configure mocks and meta
-    self.mockComponent1.name = "comp1"
+    # Configure mock component and meta
     self.mockComponent1.interaction.capacity_var = "electricity"
     self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
 
@@ -500,7 +497,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     testPMHScen1.model.comp1_res_index_map = pyo.Set(initialize=[0, 1])
 
     # Call method under test
-    testPMHScen1._create_production_variable(
+    result_prod_name = testPMHScen1._create_production_variable(
       self.mockComponent1,
       tag="custom_prod_var",
       add_bounds=False,
@@ -519,6 +516,9 @@ class TestPyomoModelHandler(unittest.TestCase):
       doc="stuff"
     )
     self.assertEqual(testPMHScen1.model.comp1_custom_prod_var, mockPyoVar.return_value)
+
+    # Check return value
+    self.assertEqual(result_prod_name, "comp1_custom_prod_var")
 
     ### Scenario 2: Producer, default tag and add_bounds, no kwargs, indexer none, positive cap values
 
@@ -544,7 +544,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     del testPMHScen1.model.comp1_res_index_map
 
     # Call method under test
-    testPMHScen2._create_production_variable(self.mockComponent1)
+    result_prod_name = testPMHScen2._create_production_variable(self.mockComponent1)
 
     # Check that resource indexer was set correctly
     resourceIndexer = testPMHScen2.model.comp1_res_index_map
@@ -574,6 +574,9 @@ class TestPyomoModelHandler(unittest.TestCase):
     self.assertEqual(boundsFunc(0, 0, 3), (2, 4)) # r == limit_r == 0
 
     self.assertEqual(testPMHScen2.model.comp1_production, mockPyoVar.return_value)
+
+    # Check return value
+    self.assertEqual(result_prod_name, "comp1_production")
 
     ### Scenario 3: bad cap values
 
@@ -640,7 +643,6 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Additional mock configuration
     mockPyoVar.side_effect = ["upVar", "downVar", "steadyVar"]
 
-    self.mockComponent1.name = "comp1"
     self.mockComponent1.interaction.mock_add_spec(Producer)
     self.mockComponent1.interaction.capacity_var = "electricity"
     self.mockComponent1.interaction.ramp_limit = 0.5
@@ -785,6 +787,100 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # BUG: What if ramp_limit = 0? Doesn't the `if limit_delta < 0` set neg_cap to True no matter what?
     #      Why aren't we just checking `if cap < 0`?
+
+  def testCreateCapacityConstraints(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule functions
+    # This is necessary becuase the lambda functions need real functions to interact with so we can test them
+    def fake_capacity_rule(prod_name, r, caps, m, t):
+      return pyo.Constraint.Feasible
+    def fake_min_prod_rule(prod_name, r, caps, minimums, m, t):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule functions so we can record the calls to them
+    mockFakeCapRule = MagicMock(name="mockFakeRampRuleDown", wraps=fake_capacity_rule)
+    mockFakeMinRule = MagicMock(name="mockFakeRampRuleUp", wraps=fake_min_prod_rule)
+
+    # Update the patched rule library with the wrapped rules
+    self.mockPRL.capacity_rule = mockFakeCapRule
+    self.mockPRL.min_prod_rule = mockFakeMinRule
+
+    # Configure mock constraint before starting patcher so .Feasible will refer to original
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rules
+    mockPyoConstraint.side_effect = ["fake_capacity_constr", "fake_min_prod_constr"]
+
+    # Add patchers
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+    findProdLimitsPatcher = patch.object(pmh.PyomoModelHandler, "_find_production_limits")
+
+    # Start patchers
+    pyoConstraintPatcher.start()
+    mockFindProdLimits = findProdLimitsPatcher.start()
+
+    # Additional setup
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+    self.mockComponent1.interaction.capacity_var = "electricity"
+
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
+
+    caps = [1, 1, 2, 1]
+    mins = [0, 1, 0, 0]
+    mockFindProdLimits.return_value = caps, mins
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Set up the production variable
+    mockProdVar = MagicMock(name="mockProdVar")
+    mockProdVar.get_values.return_value = {(0, 0): 0, (0, 1): 0, (0, 2): 0, (0, 3): 0,
+                                           (1, 0): 0, (1, 1): 0, (1, 2): 0, (1, 3): 0 }
+    testPMH.model.comp1_production = mockProdVar
+
+    # Call the method under test
+    testPMH._create_capacity_constraints(self.mockComponent1, "comp1_production")
+
+    # Check call to _find_production_limits
+    mockFindProdLimits.assert_called_once_with(self.mockComponent1)
+
+    # Check that constraints were created correctly (have to check lambdas separately)
+    expectedPyoConstraintCalls = [
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY)
+    ]
+    mockPyoConstraint.assert_has_calls(expectedPyoConstraintCalls)
+    self.assertEqual(mockPyoConstraint.call_count, 2)
+
+    # Extract lambdas from constraint calls and check that they're lambdas
+    capacityRuleLambda = mockPyoConstraint.call_args_list[0][1]["rule"]
+    self.assertEqual(capacityRuleLambda.__name__, "<lambda>")
+    minProdLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
+    self.assertEqual(minProdLambda.__name__, "<lambda>")
+
+    # Check that constraints were set
+    self.assertEqual(testPMH.model.comp1_electricity_capacity_constr, "fake_capacity_constr")
+    self.assertEqual(testPMH.model.comp1_electricity_minprod_constr, "fake_min_prod_constr")
+
+    # Check prod var calls
+    mockProdVar.get_values.assert_called_once_with() # Called with no args
+    # BUG: right now, if the capacity and minimum values are equal for the given resource at any single timestep,
+    # then every element of the var, for every resource and every timestep, is set to the capacity value
+    # of the resource in question at the last timestep where the capacity equals the minimum
+    # mockProdVar.set_values.assert_called_once_with({(0, 0): 1, (0, 1): 1, (0, 2): 1, (0, 3): 1,
+    #                                                 (1, 0): 1, (1, 1): 1, (1, 2): 1, (1, 3): 1 })
+    # Best guess of intended functionality:
+    mockProdVar.set_values.assert_called_once_with({(0, 0): 0, (0, 1): 1, (0, 2): 0, (0, 3): 0,
+                                                    (1, 0): 0, (1, 1): 0, (1, 2): 0, (1, 3): 0 })
 
 
 if __name__ == "__main__":
