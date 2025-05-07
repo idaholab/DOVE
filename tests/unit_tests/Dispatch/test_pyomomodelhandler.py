@@ -868,6 +868,13 @@ class TestPyomoModelHandler(unittest.TestCase):
     minProdLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
     self.assertEqual(minProdLambda.__name__, "<lambda>")
 
+    # Call the lamdas and check call args
+    capacityRuleLambda("model", 1)
+    mockFakeCapRule.assert_called_once_with("comp1_production", 0, caps, "model", 1)
+
+    minProdLambda("model", 2)
+    mockFakeMinRule.assert_called_once_with("comp1_production", 0, caps, mins, "model", 2)
+
     # Check that constraints were set
     self.assertEqual(testPMH.model.comp1_electricity_capacity_constr, "fake_capacity_constr")
     self.assertEqual(testPMH.model.comp1_electricity_minprod_constr, "fake_min_prod_constr")
@@ -1030,6 +1037,81 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     with self.assertRaises(NotImplementedError):
       testPMH4._create_transfer(self.mockComponent1, "comp1_production")
+
+  def testCreateTransferRatio(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule function
+    # This is necessary becuase the lambda function needs a real function to interact with so we can test it
+    def fake_ratio_transfer_rule(ratio, r, ref_r, prod_name, m, t):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule function so we can record the calls to it
+    mockFakeRatioTransferRule = MagicMock(name="mockFakeRatioTransferRule", wraps=fake_ratio_transfer_rule)
+
+    # Update the patched rule library with the wrapped rules
+    self.mockPRL.ratio_transfer_rule = mockFakeRatioTransferRule
+
+    # Configure mock constraint before starting patcher so .Feasible will refer to original
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rule
+    mockPyoConstraint.side_effect = ["fake_electricity_rtr_constr", "fake_h2_rtr_constr"]
+
+    # Add and start patcher
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+    pyoConstraintPatcher.start()
+
+    # Additional setup
+    mockTransfer = MagicMock(name="mockTransfer", spec=Ratio)
+    mockTransfer.get_coefficients.return_value = {"electricity": 0.8, "h2": 0.4}
+
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
+
+    # Create PMH instance and call method under test
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    testPMH._create_transfer_ratio(mockTransfer, self.mockComponent1, "comp1_production")
+
+    # Check get_coefficents call
+    mockTransfer.get_coefficients.assert_called_once_with() # With no args
+
+    # Check that constraints were created correctly (have to check lambdas separately)
+    expectedPyoConstraintCalls = [
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY)
+    ]
+    mockPyoConstraint.assert_has_calls(expectedPyoConstraintCalls)
+    self.assertEqual(mockPyoConstraint.call_count, 2)
+
+    # Extract lambdas from constraint calls and check that they're lambdas
+    elecRTRLambda = mockPyoConstraint.call_args_list[0][1]["rule"]
+    self.assertEqual(elecRTRLambda.__name__, "<lambda>")
+    h2RTRLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
+    self.assertEqual(h2RTRLambda.__name__, "<lambda>")
+
+    # Call the lambdas and check the call args
+    elecRTRLambda("model", 1)
+    h2RTRLambda("model", 2)
+
+    expectedFakeRTRCalls = [
+      call(1, 0, 0, "comp1_production", "model", 1),
+      call(2, 1, 0, "comp1_production", "model", 2)
+    ]
+
+    mockFakeRatioTransferRule.assert_has_calls(expectedFakeRTRCalls)
+
+    # Check that constraints were added correctly
+    self.assertEqual(testPMH.model.comp1_electricity_electricity_transfer, "fake_electricity_rtr_constr")
+    self.assertEqual(testPMH.model.comp1_electricity_h2_transfer, "fake_h2_rtr_constr")
 
 
 if __name__ == "__main__":
