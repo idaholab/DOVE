@@ -882,6 +882,51 @@ class TestPyomoModelHandler(unittest.TestCase):
     mockProdVar.set_values.assert_called_once_with({(0, 0): 0, (0, 1): 1, (0, 2): 0, (0, 3): 0,
                                                     (1, 0): 0, (1, 1): 0, (1, 2): 0, (1, 3): 0 })
 
+  def testFindProductionLimits(self):
+
+    # Configure mocks
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+    self.mockComponent1.interaction.capacity_var = "electricity"
+    # FIXME: The below line causes an error because Producer doesn't have a get_capacity method
+    self.mockComponent1.interaction.get_capacity.side_effect = [[{"electricity": 4}],
+                                                                [{"electricity": 2}],
+                                                                [{"electricity": 3}],
+                                                                [{"electricity": 1}]]
+    self.mockComponent1.interaction.dispatch_flexibility = "independent"
+    # FIXME: The below line causes an error because Producer doesn't have a get_minimum method
+    self.mockComponent1.interaction.get_minimum.side_effect = [[{"electricity": 1}],
+                                                               [{"electricity": 2}],
+                                                               [{"electricity": 0}],
+                                                               [{"electricity": 1}]]
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    resultCaps, resultMins = testPMH._find_production_limits(self.mockComponent1)
+
+    # Check get_capacity calls
+    self.assertEqual(self.mockComponent1.interaction.get_capacity.call_count, 4)
+    # Check last time_index value
+    self.assertEqual(self.mockComponent1.interaction.get_capacity.call_args[0][0]["HERON"]["time_index"], 6)
+
+    # Check get_minimum calls
+    self.assertEqual(self.mockComponent1.interaction.get_minimum.call_count, 4)
+    # Check last time_index value
+    self.assertEqual(self.mockComponent1.interaction.get_minimum.call_args[0][0]["HERON"]["time_index"], 6)
+
+    # Check return values
+    self.assertEqual(resultCaps, [4, 2, 3, 1])
+    self.assertEqual(resultMins, [1, 2, 0, 1])
+
 
 if __name__ == "__main__":
   unittest.main()
