@@ -1048,10 +1048,10 @@ class TestPyomoModelHandler(unittest.TestCase):
       return pyo.Constraint.Feasible
 
     # Wrap the fake rule function so we can record the calls to it
-    mockFakeRatioTransferRule = MagicMock(name="mockFakeRatioTransferRule", wraps=fake_ratio_transfer_rule)
+    mockFakeRTR = MagicMock(name="mockFakeRatioTransferRule", wraps=fake_ratio_transfer_rule)
 
     # Update the patched rule library with the wrapped rules
-    self.mockPRL.ratio_transfer_rule = mockFakeRatioTransferRule
+    self.mockPRL.ratio_transfer_rule = mockFakeRTR
 
     # Configure mock constraint before starting patcher so .Feasible will refer to original
     mockPyoConstraint = MagicMock(name="mockPyoConstraint")
@@ -1107,11 +1107,73 @@ class TestPyomoModelHandler(unittest.TestCase):
       call(2, 1, 0, "comp1_production", "model", 2)
     ]
 
-    mockFakeRatioTransferRule.assert_has_calls(expectedFakeRTRCalls)
+    mockFakeRTR.assert_has_calls(expectedFakeRTRCalls)
 
     # Check that constraints were added correctly
     self.assertEqual(testPMH.model.comp1_electricity_electricity_transfer, "fake_electricity_rtr_constr")
     self.assertEqual(testPMH.model.comp1_electricity_h2_transfer, "fake_h2_rtr_constr")
+
+  def testCreateTransferPoly(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule function
+    # This is necessary becuase the lambda function needs a real function to interact with so we can test it
+    def fake_poly_transfer_rule(coeffs, r_map, prod_name, m, t):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule function so we can record the calls to it
+    mockFakePTR = MagicMock(name="mockFakePolyTransferRule", wraps=fake_poly_transfer_rule)
+
+    # Update the patched rule library with the wrapped rules
+    self.mockPRL.poly_transfer_rule = mockFakePTR
+
+    # Configure mock constraint before starting patcher so .Feasible will refer to original
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rule
+    mockPyoConstraint.return_value = "fake_poly_transfer_constr"
+
+    # Add and start patcher
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+    pyoConstraintPatcher.start()
+
+    # Additional setup
+    mockTransfer = MagicMock(name="mockTransfer", spec=Polynomial)
+    coeffs = {("electricity", "h2"): {(1, 2): 0.8}}
+    mockTransfer.get_coefficients.return_value = coeffs
+
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0, "h2": 1}}
+
+    # Create PMH instance and call method under test
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    testPMH._create_transfer_poly(mockTransfer, self.mockComponent1, "comp1_production")
+
+    # Check get_coefficents call
+    mockTransfer.get_coefficients.assert_called_once_with() # With no args
+
+    # Check that constraint was created correctly (have to check lambda separately)
+    mockPyoConstraint.assert_called_once_with(set([0, 1, 2, 3]), rule=ANY)
+
+    # Extract lambda from constraint call and check that it's a lambda
+    PTRLambda = mockPyoConstraint.call_args[1]["rule"]
+    self.assertEqual(PTRLambda.__name__, "<lambda>")
+
+    # Call the lambda and check the call args
+    PTRLambda("model", 1)
+
+    mockFakePTR.assert_called_once_with(coeffs, {"electricity": 0, "h2": 1}, "comp1_production", "model", 1)
+
+    # Check that constraint was added correctly
+    self.assertEqual(testPMH.model.comp1_transfer_func, "fake_poly_transfer_constr")
 
 
 if __name__ == "__main__":
