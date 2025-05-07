@@ -12,6 +12,7 @@ import pyomo.environ as pyo
 from dove.Dispatch import PyomoModelHandler as pmh
 from dove.components import Component
 from dove.interactions import Interaction, Producer, Demand, Storage
+from dove.physics import Ratio, Polynomial
 
 class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
@@ -926,6 +927,109 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Check return values
     self.assertEqual(resultCaps, [4, 2, 3, 1])
     self.assertEqual(resultMins, [1, 2, 0, 1])
+
+  def testCreateTransfer(self):
+
+    # Configure patchers and mocks
+
+    createTransferRatioPatcher = patch.object(pmh.PyomoModelHandler, "_create_transfer_ratio")
+    createTransferPolyPatcher = patch.object(pmh.PyomoModelHandler, "_create_transfer_poly")
+
+    # Start patchers and store mocks
+    mockCreateTransferRatio = createTransferRatioPatcher.start()
+    mockCreateTransferPoly = createTransferPolyPatcher.start()
+
+    self.mockComponent1.interaction.mock_add_spec(Interaction)
+    mockTransfer = MagicMock(name="mockTransfer")
+
+    # Test with no transfer
+
+    self.mockComponent1.interaction.get_transfer.return_value = None
+
+    # Create PMH instance and call method under test
+    testPMH1 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    testPMH1._create_transfer(self.mockComponent1, "comp1_production")
+
+    # Check that nothing was called
+    mockCreateTransferRatio.assert_not_called()
+    mockCreateTransferPoly.assert_not_called()
+
+    # Test with ratio transfer
+
+    self.mockComponent1.interaction.get_transfer.return_value = mockTransfer
+
+    mockTransfer.mock_add_spec(Ratio)
+    # FIXME: The following line causes an error because Ratio doesn't have a type attribute
+    mockTransfer.type = "Ratio"
+
+    # Create PMH instance and call method under test
+    testPMH2 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    testPMH2._create_transfer(self.mockComponent1, "comp1_production")
+
+    # Check that correct calls were made
+    mockCreateTransferRatio.assert_called_once_with(mockTransfer, self.mockComponent1, "comp1_production")
+    mockCreateTransferPoly.assert_not_called()
+
+    # Test with poly transfer
+
+    mockCreateTransferRatio.reset_mock()
+
+    mockTransfer.mock_add_spec(Polynomial)
+    # FIXME: The following line causes an error because Polynomial doesn't have a type attribute
+    mockTransfer.type = "Polynomial"
+
+    # Create PMH instance and call method under test
+    testPMH3 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    testPMH3._create_transfer(self.mockComponent1, "comp1_production")
+
+    # Check that correct calls were made
+    mockCreateTransferRatio.assert_not_called()
+    mockCreateTransferPoly.assert_called_once_with(mockTransfer, self.mockComponent1, "comp1_production")
+
+    # Test with bad transfer
+
+    mockTransfer.type = "Bad"
+
+    # Create PMH instance and call method under test
+    testPMH4 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    with self.assertRaises(NotImplementedError):
+      testPMH4._create_transfer(self.mockComponent1, "comp1_production")
 
 
 if __name__ == "__main__":
