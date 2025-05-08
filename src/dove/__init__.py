@@ -9,9 +9,3 @@ energy system components and compute an optimized dispatch strategy for resource
 throughout the system.
 """
 
-from .components import Component
-
-
-__all__ = [
-  "Component",
-]
