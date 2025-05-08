@@ -1,4 +1,49 @@
 [project]
 name = "dove"
-description = "Dispatch Optimization Variable Engine for energy systems"
-dynamic = ["version"]
+version = "0.1.0"
+description = "An extensible Python library for modeling multi-commodity energy systmes."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{name="Dylan McDowell", email="dylan.mcdowell@inl.gov"}]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Intended Audience :: Science/Research"
+ ]
+dependencies = [
+    "numpy>=2.2.5",
+    "pandas>=2.2.3",
+    "pyomo>=6.9.2",
+]
+
+[dependency-groups]
+dev = [
+    "build>=1.2.2.post1",
+    "pytest>=8.3.5",
+    "ruff>=0.11.8",
+    "twine>=6.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+managed = true
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
+
+[tool.ruff]
+indent-width = 4
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "D1"]
+ignore = ["E402", "E501", "W505"]
+
+[format]
+indent-style = "space"
