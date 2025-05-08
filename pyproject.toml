@@ -16,7 +16,6 @@ classifiers = [
 
 
 dependencies = [
-    "matplotlib>=3.10.1",
     "numpy>=2.2.5",
     "pandas>=2.2.3",
     "pyomo>=6.9.2",

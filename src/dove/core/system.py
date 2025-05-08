@@ -7,7 +7,7 @@ from typing import Self, Union
 import numpy as np
 
 from ..models import BUILDER_REGISTRY
-from .components import Component, Resource, Storage
+from . import Component, Resource, Storage
 
 ArrayLike = Union[float, list[float], np.ndarray]
 
@@ -25,13 +25,13 @@ def _broadcast(x: ArrayLike, T: int) -> list[float]:
 class System:
     """ """
 
-    def __init__(self, components, resources, time_index) -> None:
+    def __init__(self, components=None, resources=None, time_index=None) -> None:
         """ """
-        self.components: list[Component] = components
-        self.resources: list[Resource] = resources
-        self.time_index = time_index
-        self.comp_map = {comp.name: comp for comp in components}
-        self.res_map = {res.name: res for res in resources}
+        self.components: list[Component] = [] if components is None else components
+        self.resources: list[Resource] = [] if resources is None else resources
+        self.time_index = [0] if time_index is None else time_index
+        self.comp_map = {comp.name: comp for comp in self.components}
+        self.res_map = {res.name: res for res in self.resources}
         self._normalize_time_series()
 
     @property
@@ -47,11 +47,13 @@ class System:
     def add_component(self, comp) -> Self:
         """ """
         self.components.append(comp)
+        self.comp_map[comp.name] = comp
         return self
 
     def add_resource(self, res) -> Self:
         """ """
         self.resources.append(res)
+        self.res_map[res.name] = res
         return self
 
     def build(self):
@@ -75,12 +77,12 @@ class System:
     def _normalize_time_series(self) -> None:
         """ """
 
-        # I guess these are technically all the variables we might expect
-        # to be varying over time?
+        # I guess these are all the variables we might expect to be varying over time?
         for comp in self.components:
             comp.capacity = _broadcast(comp.capacity, len(self.time_index))
 
             if comp.capacity_factor is not None:
+                # TODO: update capacity if capacity_factor exists
                 comp.capacity_factor = _broadcast(comp.capacity_factor, len(self.time_index))
 
             if comp.flexibility == "fixed":

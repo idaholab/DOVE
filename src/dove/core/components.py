@@ -1,19 +1,19 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """
-Component Module
+``dove.core.components``
 """
 
 from dataclasses import dataclass, field
 from abc import ABC
+from collections.abc import Sequence
 from typing import Literal, Optional
-
-DispatchFlexibility = Literal["independent"] | Literal["fixed"]
 
 
 @dataclass(frozen=True)
 class Resource:
     """ """
+
     name: str
     unit: Optional[str] = None
 
@@ -21,6 +21,7 @@ class Resource:
 @dataclass
 class TransferTerm:
     """ """
+
     coeff: float
     exponent: dict[Resource, int]
 
@@ -28,34 +29,40 @@ class TransferTerm:
 @dataclass
 class CashFlow(ABC):
     """ """
+
     name: str
-    alpha: float | list[float]
-    dprime: float | list[float] = 1.0
-    scalex: float | list[float] = 1.0
+    alpha: float | Sequence[float]
+    dprime: float | Sequence[float] = 1.0
+    scalex: float | Sequence[float] = 1.0
     price_is_levelized: bool = False
+
 
 @dataclass
 class Cost(CashFlow):
     """ """
+
     sign: int = -1
+
 
 @dataclass
 class Revenue(CashFlow):
     """ """
+
     sign: int = +1
 
 
 @dataclass(kw_only=True)
 class Component(ABC):
     """ """
+
     name: str
-    capacity: float | list[float]
-    capacity_factor: Optional[float | list[float]] = None
-    minimum: Optional[float | list[float]] = None
+    capacity: float | Sequence[float]
+    capacity_factor: Optional[float | Sequence[float]] = None
+    minimum: Optional[float | Sequence[float]] = None
     capacity_resource: Optional[Resource] = None
     flexibility: Literal["independent", "fixed"] = "independent"
-    cashflows: list[CashFlow] = field(default_factory=list)
-    transfer_terms: list[TransferTerm] = field(default_factory=list)
+    cashflows: Sequence[CashFlow] = field(default_factory=list)
+    transfer_terms: Sequence[TransferTerm] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """ """
@@ -65,6 +72,7 @@ class Component(ABC):
 @dataclass
 class Source(Component):
     """ """
+
     produces: Resource
 
     def __post_init__(self) -> None:
@@ -78,6 +86,7 @@ class Source(Component):
 @dataclass
 class Sink(Component):
     """ """
+
     consumes: Resource
 
     def __post_init__(self) -> None:
@@ -91,7 +100,8 @@ class Sink(Component):
 @dataclass
 class Converter(Component):
     """ """
-    consumes: list[Resource]
+
+    consumes: Sequence[Resource]
     produces: Resource
     ramp_limit: float = 1.0
     ramp_freq: int = 0
@@ -108,8 +118,11 @@ class Converter(Component):
         if not extras and self.capacity_resource is None:
             self.capacity_resource = self.produces
         if extras and not self.transfer_terms:
-            raise ValueError(f"Converter '{self.name}' consumes {self.consumes} but no transfer terms defined!")
+            raise ValueError(
+                f"Converter '{self.name}' consumes {self.consumes} but no transfer terms defined!"
+            )
 
+        assert self.capacity_resource is not None
         # Auto‐adjust the sign of any transfer term that involves capacity_var:
         for term in self.transfer_terms:
             # Does this term actually involve our capacity resource?
@@ -125,6 +138,7 @@ class Converter(Component):
 @dataclass
 class Storage(Component):
     """ """
+
     resource: Resource
     rte: float = 1.0
     max_charge_rate: float = 1.0

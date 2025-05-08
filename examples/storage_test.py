@@ -1,11 +1,10 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
 """
 """
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import pyomo.environ as pyo
 
-from dove.core.components import Converter, Resource, Revenue, Sink, Source, Storage, TransferTerm
+from dove.core import Converter, Resource, Revenue, Sink, Source, Storage, TransferTerm
 from dove.core.system import System
 
 if __name__ == '__main__':
@@ -65,16 +64,6 @@ if __name__ == '__main__':
     results = sys.solve()
 
     print(results)
-
-    # ### Visualize Results
-    # plt.figure()
-    # for comp in system.comp_names:
-    #     plt.plot(time_index, results[comp], label=comp)
-    # plt.xlabel("Time")
-    # plt.ylabel("Dispatch")
-    # plt.title("Component Dispatch over Time")
-    # plt.legend()
-    # plt.show()
 
 
 
