@@ -1200,7 +1200,7 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Configure mock constraint before starting patcher so .Feasible will refer to original
     mockPyoConstraint = MagicMock(name="mockPyoConstraint")
-    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rule
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rules
     mockPyoConstraint.side_effect = ["fake_level_constr", "fake_charge_constr", "fake_discharge_constr"]
 
     # Add patchers
@@ -1276,6 +1276,71 @@ class TestPyomoModelHandler(unittest.TestCase):
     self.assertEqual(testPMH.model.comp1_level_constr, "fake_level_constr")
     # self.assertEqual(testPMH.model.comp1_charge_constr, "fake_charge_constr")
     # self.assertEqual(testPMH.model.comp1_discharge_constr, "fake_discharge_constr")
+
+  def testCreateConservation(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule function
+    # This is necessary becuase the lambda function needs a real function to interact with so we can test it
+    def fake_conservation_rule(res, m, t):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule function so we can record the calls to it
+    mockFakeConservationRule = MagicMock(name="mockFakeConservationRule", wraps=fake_conservation_rule)
+
+    # Update the patched rule library with the wrapped rule
+    self.mockPRL.conservation_rule = mockFakeConservationRule
+
+    # Configure mock constraint before starting patcher so .Feasible will refer to original
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return value of fake rule
+    mockPyoConstraint.side_effect = ["fake_electricity_conservation_constr", "fake_steam_conservation_constr"]
+
+    # Add patchers
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+
+    # Start patchers
+    pyoConstraintPatcher.start()
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    testPMH._create_conservation()
+
+    # Check that constraints were created correctly (have to check lambdas separately)
+    expectedPyoConstraintCalls = [
+      call(set([0, 1, 2, 3]), rule=ANY),
+      call(set([0, 1, 2, 3]), rule=ANY)
+    ]
+    mockPyoConstraint.assert_has_calls(expectedPyoConstraintCalls)
+    self.assertEqual(mockPyoConstraint.call_count, 2)
+
+    # Extract lambdas from constraint calls and check that they're lambdas
+    electricityConservationLambda = mockPyoConstraint.call_args_list[0][1]["rule"]
+    self.assertEqual(electricityConservationLambda.__name__, "<lambda>")
+    steamConservationLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
+    self.assertEqual(steamConservationLambda.__name__, "<lambda>")
+
+    # Call the lamdas and check call args
+    electricityConservationLambda("model", 1)
+    mockFakeConservationRule.assert_called_with("electricity", "model", 1)
+
+    steamConservationLambda("model", 2)
+    mockFakeConservationRule.assert_called_with("steam", "model", 2)
+
+    # Check that constraints were set
+    self.assertEqual(testPMH.model.electricity_conservation, "fake_electricity_conservation_constr")
+    self.assertEqual(testPMH.model.steam_conservation, "fake_steam_conservation_constr")
 
 
 if __name__ == "__main__":
