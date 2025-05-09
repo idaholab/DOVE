@@ -1175,6 +1175,108 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Check that constraint was added correctly
     self.assertEqual(testPMH.model.comp1_transfer_func, "fake_poly_transfer_constr")
 
+  def testCreateStorage(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule functions
+    # This is necessary becuase the lambda functions need real functions to interact with so we can test them
+    def fake_level_rule(comp, level_name, charge_name, discharge_name, initial_storage, r, m, t):
+      return pyo.Constraint.Feasible
+    def fake_charge_rule(charge_name, bin_name, large_eps, r, m, t):
+      return pyo.Constraint.Feasible
+    def fake_discharge_rule(discharge_name, bin_name, large_eps, r, m, t):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule functions so we can record the calls to them
+    mockFakeLevelRule = MagicMock(name="mockFakeLevelRule", wraps=fake_level_rule)
+    mockFakeChargeRule = MagicMock(name="mockFakeChargeRule", wraps=fake_charge_rule)
+    mockFakeDischargeRule = MagicMock(name="mockFakeDischargeRule", wraps=fake_discharge_rule)
+
+    # Update the patched rule library with the wrapped rules
+    self.mockPRL.level_rule = mockFakeLevelRule
+    self.mockPRL.charge_rule = mockFakeChargeRule # Unused (disabled) in _create_storage
+    self.mockPRL.discharge_rule = mockFakeDischargeRule # Unused (disabled) in _create_storage
+
+    # Configure mock constraint before starting patcher so .Feasible will refer to original
+    mockPyoConstraint = MagicMock(name="mockPyoConstraint")
+    mockPyoConstraint.Feasible = pyo.Constraint.Feasible # For return values of fake rule
+    mockPyoConstraint.side_effect = ["fake_level_constr", "fake_charge_constr", "fake_discharge_constr"]
+
+    # Add patchers
+    pyoConstraintPatcher = patch.object(pmh.pyo, "Constraint", mockPyoConstraint)
+    createProdVarPatcher = patch.object(pmh.PyomoModelHandler, "_create_production_variable")
+
+    # Start patchers
+    pyoConstraintPatcher.start()
+    mockCreateProdVar = createProdVarPatcher.start()
+
+    # Additional setup
+    mockCreateProdVar.side_effect = ["comp1_level", "comp1_charge", "comp1_discharge"]
+
+    self.mockComponent1.interaction.apply_periodic_level = True
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Set up fake level_var
+    testPMH.model.comp1_level = {(0, 3): 2}
+
+    # Call method under test
+    testPMH._create_storage(self.mockComponent1)
+
+    # Last two (charge and discharge) constraints are disabled, so checks for them are commented out
+
+    # Check calls to _create_production_variable
+    expectedCreateProdVarCalls = [
+      call(self.mockComponent1, tag="level"),
+      call(self.mockComponent1, tag="charge", add_bounds=False, within=pyo.NonPositiveReals),
+      call(self.mockComponent1, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals)#,
+      # call(self.mockComponent1, tag="dcforcer", add_bounds=False, within=pyo.Binary)
+    ]
+    mockCreateProdVar.assert_has_calls(expectedCreateProdVarCalls)
+
+    # Check that constraints were created correctly (have to check lambdas separately)
+    expectedPyoConstraintCalls = [
+      call(set([0, 1, 2, 3]), rule=ANY)#,
+      # call(set([0, 1, 2, 3]), rule=ANY),
+      # call(set([0, 1, 2, 3]), rule=ANY)
+    ]
+    mockPyoConstraint.assert_has_calls(expectedPyoConstraintCalls)
+    self.assertEqual(mockPyoConstraint.call_count, 1)#3)
+
+    # Extract lambdas from constraint calls and check that they're lambdas
+    levelRuleLambda = mockPyoConstraint.call_args_list[0][1]["rule"]
+    self.assertEqual(levelRuleLambda.__name__, "<lambda>")
+    # chargeRuleLambda = mockPyoConstraint.call_args_list[1][1]["rule"]
+    # self.assertEqual(chargeRuleLambda.__name__, "<lambda>")
+    # dischargeRuleLambda = mockPyoConstraint.call_args_list[2][1]["rule"]
+    # self.assertEqual(dischargeRuleLambda.__name__, "<lambda>")
+
+    # Call the lamdas and check call args
+    levelRuleLambda("model", 1)
+    mockFakeLevelRule.assert_called_once_with(
+      self.mockComponent1, "comp1_level", "comp1_charge", "comp1_discharge", 2, 0, "model", 1)
+
+    # chargeRuleLambda("model", 2)
+    # mockFakeChargeRule.assert_called_once_with("comp1_charge", "comp1_dcforcer", 1e8, 0, "model", 2)
+
+    # dischargeRuleLambda("model", 3)
+    # mockFakeDischargeRule.assert_called_once_with("comp1_discharge", "comp1_dcforcer", 1e8, 0, "model", 3)
+
+    # Check that constraints were set
+    self.assertEqual(testPMH.model.comp1_level_constr, "fake_level_constr")
+    # self.assertEqual(testPMH.model.comp1_charge_constr, "fake_charge_constr")
+    # self.assertEqual(testPMH.model.comp1_discharge_constr, "fake_discharge_constr")
+
 
 if __name__ == "__main__":
   unittest.main()
