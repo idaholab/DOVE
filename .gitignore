@@ -7,9 +7,23 @@
 ### Python
 ###
 __pycache__/
-
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
 
 ###
 ### Misc
 ###
 .DS_Store
+
+###
+### Sphinx
+###
+docs/build/
+
+###
+### VS Code
+###
+.vscode/
+

@@ -12,7 +12,13 @@ from typing import Literal, Optional
 
 @dataclass(frozen=True)
 class Resource:
-    """ """
+    """
+    Represents a unique resource type exchanged by different components.
+
+    Attributes:
+    name (str): Unique identifier for the resource.
+    unit (Optional[str]): Unit of measurement for the resource. Defaults to None.
+    """
 
     name: str
     unit: Optional[str] = None
@@ -20,16 +26,25 @@ class Resource:
 
 @dataclass
 class TransferTerm:
-    """ """
+    """
+    A single term in a transfer function, defined by a scaling coefficient and
+    a set of resource-specific exponents.
 
+    Attributes:
+    coeff (float):
+        Scaling factor for the transfer term.
+    exponent (dict[Resource, int]):
+        Mapping of each Resource to its integer exponent in this term.
+    """
     coeff: float
     exponent: dict[Resource, int]
 
 
 @dataclass
 class CashFlow(ABC):
-    """ """
-
+    """
+    Base abstract class representing a recurring cash flow.
+    """
     name: str
     alpha: float | Sequence[float]
     dprime: float | Sequence[float] = 1.0
@@ -39,14 +54,45 @@ class CashFlow(ABC):
 
 @dataclass
 class Cost(CashFlow):
-    """ """
+    """
+    Cost cash flow class.
+
+    This class represents a cost cash flow, inheriting from CashFlow. The `sign`
+    attribute indicates the direction of the cash flow, with a default value of
+    -1 to represent an outflow.
+
+    Parameters
+    ----------
+    sign : int, optional
+        The direction of the cash flow. Defaults to -1 for cost (outflow).
+
+    Attributes
+    ----------
+    sign : int
+        The direction of the cash flow.
+
+    Examples
+    --------
+    >>> cost = Cost(name='elec_cost')
+    >>> cost.sign
+    -1
+    """
 
     sign: int = -1
 
 
 @dataclass
 class Revenue(CashFlow):
-    """ """
+    """
+    Revenue cash flow.
+
+    Inherits from CashFlow and represents revenue as a positive cash inflow.
+
+    Parameters
+    ----------
+    sign : int, optional
+        Sign of the cash flow. +1 indicates an inflow (revenue). Default is +1.
+    """
 
     sign: int = +1
 

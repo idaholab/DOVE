@@ -42,3 +42,11 @@ line-ending = "auto"
 select = ["E", "F", "W", "D1"]
 ignore = ["E402", "E501", "W505"]
 
+[dependency-groups]
+dev = [
+    "myst-parser>=4.0.1",
+    "pytest>=8.3.5",
+    "sphinx>=8.2.3",
+    "sphinx-book-theme>=1.1.4",
+]
+
