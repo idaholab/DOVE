@@ -37,10 +37,14 @@ indent-style = "space"
 quote-style = "double"
 line-ending = "auto"
 
-
 [tool.ruff.lint]
 select = ["E", "F", "W", "D1"]
 ignore = ["E402", "E501", "W505"]
+
+[tool.pytest.ini_options]
+minversion = "8.3.5"
+addopts = "-ra -q"
+testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
