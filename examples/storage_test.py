@@ -20,15 +20,15 @@ if __name__ == '__main__':
 
 
     ### Component Definitions
-    steamer = Source(name="steamer", produces=steam, capacity=100, flexibility="fixed")
-    steam_storage = Storage(name="steam_storage", resource=steam, capacity=100, rte=0.9)
+    steamer = Source(name="steamer", produces=steam, max_capacity=100, flexibility="fixed")
+    steam_storage = Storage(name="steam_storage", resource=steam, max_capacity=100, rte=0.9)
 
     gen = Converter(
         name="generator",
         capacity_resource=steam,
-        capacity=90,
+        max_capacity=90,
         consumes=[steam],
-        produces=elec,
+        produces=[elec],
         transfer_terms=[
             TransferTerm(1, {steam: 1}),
             TransferTerm(0.5, {elec: 1})
@@ -38,22 +38,22 @@ if __name__ == '__main__':
     market_linear = Sink(
         name="market_linear",
         consumes=elec,
-        capacity=2,
-        cashflows=[Revenue("esales", linear_price)]
+        max_capacity=2,
+        cashflows=[Revenue("esales", price_profile=linear_price)]
     )
 
     market_spike = Sink(
         name="market_spike",
         consumes=elec,
-        capacity=40,
-        cashflows=[Revenue("esales", spike_price.tolist())],
+        max_capacity=40,
+        cashflows=[Revenue("esales", price_profile=spike_price.tolist())],
     )
 
     steam_offload = Sink(
         name="steam_offload",
         consumes=steam,
-        capacity=100,
-        cashflows=[Revenue("steam_offload", 0.01)],
+        max_capacity=100,
+        cashflows=[Revenue("steam_offload", alpha=0.01)],
     )
 
     ### System Definition

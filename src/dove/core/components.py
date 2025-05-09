@@ -4,10 +4,14 @@
 ``dove.core.components``
 """
 
-from dataclasses import dataclass, field
 from abc import ABC
-from collections.abc import Sequence
-from typing import Literal, Optional
+from dataclasses import dataclass, field
+from typing import Literal, Optional, TypeAlias
+
+import numpy as np
+from numpy.typing import NDArray
+
+TimeDependent: TypeAlias = list[float] | NDArray
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,7 @@ class TransferTerm:
     exponent (dict[Resource, int]):
         Mapping of each Resource to its integer exponent in this term.
     """
+
     coeff: float
     exponent: dict[Resource, int]
 
@@ -45,39 +50,21 @@ class CashFlow(ABC):
     """
     Base abstract class representing a recurring cash flow.
     """
+
     name: str
-    alpha: float | Sequence[float]
-    dprime: float | Sequence[float] = 1.0
-    scalex: float | Sequence[float] = 1.0
+    price_profile: list[float] = field(default_factory=list)
+    alpha: float = 1.0
+    dprime: float = 1.0
+    scalex: float = 1.0
     price_is_levelized: bool = False
+    sign: int = 0
 
 
 @dataclass
 class Cost(CashFlow):
     """
     Cost cash flow class.
-
-    This class represents a cost cash flow, inheriting from CashFlow. The `sign`
-    attribute indicates the direction of the cash flow, with a default value of
-    -1 to represent an outflow.
-
-    Parameters
-    ----------
-    sign : int, optional
-        The direction of the cash flow. Defaults to -1 for cost (outflow).
-
-    Attributes
-    ----------
-    sign : int
-        The direction of the cash flow.
-
-    Examples
-    --------
-    >>> cost = Cost(name='elec_cost')
-    >>> cost.sign
-    -1
     """
-
     sign: int = -1
 
 
@@ -93,24 +80,23 @@ class Revenue(CashFlow):
     sign : int, optional
         Sign of the cash flow. +1 indicates an inflow (revenue). Default is +1.
     """
-
     sign: int = +1
 
 
 @dataclass(kw_only=True)
 class Component(ABC):
     """ """
-
     name: str
-    capacity: float | Sequence[float]
-    capacity_factor: Optional[float | Sequence[float]] = None
-    minimum: Optional[float | Sequence[float]] = None
+    profile: list[float] = field(default_factory=list)
+    max_capacity: float = 1.0
+    min_capacity: float = 0.0
+    capacity_factor: bool = False
     capacity_resource: Optional[Resource] = None
-    flexibility: Literal["independent", "fixed"] = "independent"
-    cashflows: Sequence[CashFlow] = field(default_factory=list)
-    transfer_terms: Sequence[TransferTerm] = field(default_factory=list)
+    flexibility: Literal["flex", "fixed"] = "flex"
+    cashflows: list[CashFlow] = field(default_factory=list)
+    transfer_terms: list[TransferTerm] = field(default_factory=list)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
         """ """
         pass
 
@@ -118,7 +104,6 @@ class Component(ABC):
 @dataclass
 class Source(Component):
     """ """
-
     produces: Resource
 
     def __post_init__(self) -> None:
@@ -147,8 +132,8 @@ class Sink(Component):
 class Converter(Component):
     """ """
 
-    consumes: Sequence[Resource]
-    produces: Resource
+    consumes: list[Resource]
+    produces: list[Resource]
     ramp_limit: float = 1.0
     ramp_freq: int = 0
 
@@ -162,7 +147,7 @@ class Converter(Component):
                 f"produces: {self.produces} with no 'capacity_resource' defined!"
             )
         if not extras and self.capacity_resource is None:
-            self.capacity_resource = self.produces
+            self.capacity_resource = self.produces[0]
         if extras and not self.transfer_terms:
             raise ValueError(
                 f"Converter '{self.name}' consumes {self.consumes} but no transfer terms defined!"
@@ -189,7 +174,7 @@ class Storage(Component):
     rte: float = 1.0
     max_charge_rate: float = 1.0
     max_discharge_rate: float = 1.0
-    initial_stored: float = 0
+    initial_stored: float = 0.0
     periodic_level: bool = True
 
     def __post_init__(self) -> None:

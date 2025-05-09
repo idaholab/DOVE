@@ -9,18 +9,6 @@ import numpy as np
 from ..models import BUILDER_REGISTRY
 from . import Component, Resource, Storage
 
-ArrayLike = Union[float, list[float], np.ndarray]
-
-
-def _broadcast(x: ArrayLike, T: int) -> list[float]:
-    """Turn a scalar or length-T list/array into an np.ndarray of length T."""
-    if isinstance(x, (int, float)):
-        return list(np.full(T, float(x)))
-    arr = np.asarray(x, float)
-    if arr.shape == (T,):
-        return list(arr)
-    raise ValueError(f"Expected scalar or length-{T} array, got shape {arr.shape}")
-
 
 class System:
     """ """
@@ -79,20 +67,14 @@ class System:
 
         # I guess these are all the variables we might expect to be varying over time?
         for comp in self.components:
-            comp.capacity = _broadcast(comp.capacity, len(self.time_index))
-
-            if comp.capacity_factor is not None:
-                # TODO: update capacity if capacity_factor exists
-                comp.capacity_factor = _broadcast(comp.capacity_factor, len(self.time_index))
+            if comp.capacity_factor:
+                comp.profile *= comp.max_capacity
 
             if comp.flexibility == "fixed":
-                comp.minimum = comp.capacity
-            elif comp.minimum is not None:
-                comp.minimum = _broadcast(comp.minimum, len(self.time_index))
-            else:
-                comp.minimum = np.zeros(len(self.time_index), dtype=float).tolist()
+                comp.min_capacity = comp.max_capacity
+                comp.profile = np.full(len(self.time_index), comp.max_capacity)
 
             for cf in comp.cashflows:
-                cf.alpha = _broadcast(cf.alpha, len(self.time_index))
-                cf.dprime = _broadcast(cf.dprime, len(self.time_index))
-                cf.scalex = _broadcast(cf.scalex, len(self.time_index))
+                if not cf.price_profile:
+                    cf.price_profile = np.full(len(self.time_index), cf.alpha)
+

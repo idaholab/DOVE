@@ -42,7 +42,8 @@ class PriceTakerBuilder(BaseModelBuilder):
                     col = f"{comp_name}_{res.name}_{direction}"
                     vals = []
                     for t in self.system.time_index:
-                        d = pyo.value(self.model.dispatch[comp_name, t])
+                        d = pyo.value(self.model.dispatch[comp_name, t], exception=True)
+                        assert d is not None
                         vals.append(term.coeff * (d ** exp))
                     data[col] = vals
         df = pd.DataFrame(data, index=self.system.time_index)
@@ -61,7 +62,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         """ """
         def _cap_init(m, comp_name, t):
             comp = self.system.comp_map[comp_name]
-            return comp.capacity[t]
+            return comp.max_capacity
 
         self.model.capacity = pyo.Param(
             self.model.COMPS, self.model.TIMES, initialize=_cap_init, mutable=False
@@ -69,7 +70,7 @@ class PriceTakerBuilder(BaseModelBuilder):
 
         def _min_init(m, comp_name, t):
             comp = self.system.comp_map[comp_name]
-            return comp.minimum[t]
+            return comp.min_capacity
 
         self.model.minimum = pyo.Param(
             self.model.COMPS, self.model.TIMES, initialize=_min_init, mutable=False
@@ -118,7 +119,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         for comp in self.system.components:
             for cf in comp.cashflows:
                 for t in self.model.TIMES:
-                    expr += cf.sign * cf.alpha[t] * (self.model.dispatch[comp.name, t] / cf.dprime[t]) ** cf.scalex[t]
+                    expr += cf.sign * cf.price_profile[t] * (self.model.dispatch[comp.name, t] / cf.dprime) ** cf.scalex
 
         self.model.Objective = pyo.Objective(expr=expr, sense=pyo.maximize)
 
