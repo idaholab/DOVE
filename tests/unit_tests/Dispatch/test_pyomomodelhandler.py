@@ -1497,6 +1497,80 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Check return value
     self.assertEqual(returnedTotal2, 8)
 
+  def testComputeLevelizedCashflows(self):
+
+    # Configure mocks and inputs
+
+    mockActivity = MagicMock(name="mockActivity", spec=DispatchState)
+    mockActivity.get_activity.side_effect = ["fake_comp1_activity", "fake_comp2_activity"]
+
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+    self.mockComponent1.interaction.tracking_vars = ["production"]
+    self.mockComponent1.economics.mock_add_spec(CashFlowGroup)
+    self.mockComponent1.economics.evaluate_cfs.return_value = {"fake_cfs": 3 - 1e-9}
+
+    self.mockComponent2.interaction.mock_add_spec(Demand)
+    self.mockComponent2.interaction.tracking_vars = ["production"]
+    self.mockComponent2.economics.mock_add_spec(CashFlowGroup)
+    self.mockComponent2.economics.evaluate_cfs.return_value = {"fake_cfs": 4}
+
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0},
+                                              self.mockComponent2: {"h2": 1}
+                                             }
+    mockMetaCase = MagicMock(name="mockMetaCase")
+    self.meta["HERON"]["Case"] = mockMetaCase
+    mockMetaCase.npv_target = 10
+
+    self.mockComponent1.levelized_meta = {"fake_cfs": 6}
+    self.mockComponent2.levelized_meta = None
+
+    # Create PMH instance and call method under test
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    returnedTotal = testPMH._compute_levelized_cashflows(
+      [self.mockComponent1, self.mockComponent2], mockActivity, np.array([2]), self.meta, {"Idaho": 43}, 3
+    )
+
+    # Check calls to get_activity
+    expectedGetActivityCalls = [
+      call(self.mockComponent1, "production", "electricity", 2, Idaho=43),
+      call(self.mockComponent2, "production", "h2", 2, Idaho=43)
+    ]
+    mockActivity.get_activity.assert_has_calls(expectedGetActivityCalls)
+
+    # Check calls to evaluate_cfs
+    specificMetaComp1 = {"HERON": {"resource_indexer": {self.mockComponent1: {"electricity": 0},
+                                                        self.mockComponent2: {"h2": 1}
+                                                       },
+                                   "Case": mockMetaCase,
+                                   "component": self.mockComponent1,
+                                   "time_index": 3,
+                                   "time_value": 2
+                                  }
+                        }
+    specificMetaComp2 = specificMetaComp1
+    specificMetaComp2["HERON"]["component"] = self.mockComponent2
+
+    self.mockComponent1.economics.evaluate_cfs.assert_called_once_with(
+      {"production": {"electricity": "fake_comp1_activity"}}, specificMetaComp1, marginal=True
+    )
+    self.mockComponent2.economics.evaluate_cfs.assert_called_once_with(
+      {"production": {"h2": "fake_comp2_activity"}}, specificMetaComp2, marginal=True
+    )
+
+    # Check return value
+    # multiplied == 6
+    # non_multiplied == 4
+    self.assertEqual(returnedTotal, -2)
+
 
 if __name__ == "__main__":
   unittest.main()
