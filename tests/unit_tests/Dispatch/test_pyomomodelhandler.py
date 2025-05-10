@@ -10,6 +10,8 @@ import numpy as np
 import pyomo.environ as pyo
 
 from dove.Dispatch import PyomoModelHandler as pmh
+from dove.Dispatch.DispatchState import DispatchState
+from dove.economics import CashFlowGroup
 from dove.components import Component
 from dove.interactions import Interaction, Producer, Demand, Storage
 from dove.physics import Ratio, Polynomial
@@ -1341,6 +1343,159 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Check that constraints were set
     self.assertEqual(testPMH.model.electricity_conservation, "fake_electricity_conservation_constr")
     self.assertEqual(testPMH.model.steam_conservation, "fake_steam_conservation_constr")
+
+  def testCreateObjective(self):
+
+    # Configure patchers and mocks
+
+    # Set up fake rule function
+    # This is necessary becuase the lambda function needs a real function to interact with so we can test it
+    def fake_cashflow_rule(compute_cashflows, meta, m):
+      return pyo.Constraint.Feasible
+
+    # Wrap the fake rule function so we can record the calls to it
+    mockFakeCashflowRule = MagicMock(name="mockFakeCashflowRule", wraps=fake_cashflow_rule)
+
+    # Update the patched rule library with the wrapped rule
+    self.mockPRL.cashflow_rule = mockFakeCashflowRule
+
+    # Add patchers
+    pyoObjectivePatcher = patch.object(pmh.pyo, "Objective")
+    computeCashflowsPatcher = patch.object(pmh.PyomoModelHandler, "_compute_cashflows")
+
+    # Start patchers
+    mockPyoObjective = pyoObjectivePatcher.start()
+    mockComputeCashflows = computeCashflowsPatcher.start()
+
+    # Configure mocks
+    mockPyoObjective.return_value = "fake_objective"
+
+    # Create PMH instance
+    testPMH = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    # Call method under test
+    testPMH._create_objective()
+
+    # Check that objective was created correctly (have to check lambdas separately)
+    mockPyoObjective.assert_called_once_with(rule=ANY, sense=pyo.maximize)
+
+    # Extract lambda from objective call and check that it's a lambda
+    cashflowLambda = mockPyoObjective.call_args[1]["rule"]
+    self.assertEqual(cashflowLambda.__name__, "<lambda>")
+
+    # Call the lamdas and check call args
+    cashflowLambda("model")
+    mockFakeCashflowRule.assert_called_once_with(mockComputeCashflows, self.meta, "model")
+
+    # Check that objective was set
+    self.assertEqual(testPMH.model.obj, "fake_objective")
+
+  def testComputeCashflows(self):
+
+    # Create and start patcher
+    computeLevelizedCashflowsPatcher = patch.object(pmh.PyomoModelHandler, "_compute_levelized_cashflows")
+    mockComputeLCFs = computeLevelizedCashflowsPatcher.start()
+
+    # Configure mocks and inputs
+    mockComputeLCFs.return_value = 4
+
+    mockActivity = MagicMock(name="mockActivity", spec=DispatchState)
+    mockActivity.get_activity.side_effect = ["fake_activity_t2", "fake_activity_t4"]
+
+    self.mockComponent1.interaction.mock_add_spec(Producer)
+    self.mockComponent1.interaction.tracking_vars = ["production"]
+    self.mockComponent1.economics.mock_add_spec(CashFlowGroup)
+    self.mockComponent1.economics.evaluate_cfs.side_effect = [{"fake_cfs_t2": 3}, {"fake_cfs_t4": 5}]
+
+    self.meta["HERON"]["resource_indexer"] = {self.mockComponent1: {"electricity": 0}}
+    mockMetaCase = MagicMock(name="mockMetaCase")
+    self.meta["HERON"]["Case"] = mockMetaCase
+
+    ### Scenario 1: test with true value for use_levelized_inner; defaults for state_args, time_offset
+
+    # Additional setup
+    self.meta["HERON"]["Case"].use_levelized_inner = True
+
+    # Create PMH instance and call method under test
+    testPMHScen1 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    returnedTotal1 = testPMHScen1._compute_cashflows([self.mockComponent1], mockActivity, np.array([2, 4]), self.meta)
+
+    # Check call to _compute_levelized_cashflows (have to check numpy array explicitly)
+    mockComputeLCFs.assert_called_once_with([self.mockComponent1], mockActivity, ANY, self.meta, {}, 0)
+    self.assertTrue((mockComputeLCFs.call_args[0][2] == np.array([2, 4])).all())
+
+    # Check return value
+    self.assertEqual(returnedTotal1, 4)
+
+    ### Scenario 2: test with false value for use_levelized_inner; custom values for state_args, time_offset
+
+    # Additional setup
+    mockComputeLCFs.reset_mock()
+
+    self.meta["HERON"]["Case"].use_levelized_inner = False
+
+    # Create PMH instance and call method under test
+    testPMHScen2 = pmh.PyomoModelHandler(
+      self.time,
+      self.time_offset,
+      self.mockCase,
+      self.components,
+      self.resources,
+      self.mockInitialStorage,
+      self.meta
+    )
+
+    returnedTotal2 = testPMHScen2._compute_cashflows(
+      [self.mockComponent1], mockActivity, np.array([2, 4]), self.meta, {"Idaho": 43}, 3
+    )
+
+    # Check that _compute_levelized_cashflows was not called
+    mockComputeLCFs.assert_not_called()
+
+    # Check calls to get_activity
+    expectedGetActivityCalls = [
+      call(self.mockComponent1, "production", "electricity", 2, Idaho=43),
+      call(self.mockComponent1, "production", "electricity", 4, Idaho=43)
+    ]
+    mockActivity.get_activity.assert_has_calls(expectedGetActivityCalls)
+
+    # Check calls to evaluate_cfs
+    specificMetaT2 = {"HERON": {"resource_indexer": {self.mockComponent1: {"electricity": 0}},
+                                "Case": mockMetaCase,
+                                "component": self.mockComponent1,
+                                "time_index": 3,
+                                "time_value": 2
+                               }
+                     }
+    specificMetaT4 = specificMetaT2
+    specificMetaT4["HERON"]["time_index"] = 4
+    specificMetaT4["HERON"]["time_value"] = 4
+
+    expectedEvaluateCfsCalls = [
+      call({"production": {"electricity": "fake_activity_t2"}}, specificMetaT2, marginal=True),
+      call({"production": {"electricity": "fake_activity_t4"}}, specificMetaT4, marginal=True)
+    ]
+    self.mockComponent1.economics.evaluate_cfs.assert_has_calls(expectedEvaluateCfsCalls)
+
+    # Check return value
+    self.assertEqual(returnedTotal2, 8)
 
 
 if __name__ == "__main__":
