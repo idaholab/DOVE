@@ -1,6 +1,6 @@
 [Tests]
-  [./test_pyomomodelhandler]
+  [./test_pyomo_model_handler]
     type = 'Unittest'
-    input = 'test_pyomomodelhandler.TestPyomoModelHandler'
+    input = 'test_pyomo_model_handler.TestPyomoModelHandler'
   [../]
 []

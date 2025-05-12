@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, call, patch, ANY
 import numpy as np
 import pyomo.environ as pyo
 
-from dove.Dispatch import PyomoModelHandler as pmh
-from dove.Dispatch.DispatchState import DispatchState
+from dove.dispatch import pyomo_model_handler as pmh
+from dove.dispatch.dispatch_state import DispatchState
 from dove.economics import CashFlowGroup
 from dove.components import Component
 from dove.interactions import Interaction, Producer, Demand, Storage
@@ -20,8 +20,8 @@ class TestPyomoModelHandler(unittest.TestCase):
   # For convenience, patches and mocks that are needed for multiple tests are set up here
   def setUp(self):
     # Create patchers
-    pyomoRuleLibraryPatcher = patch("dove.Dispatch.PyomoModelHandler.prl", autospec=True)
-    pyomoStatePatcher = patch("dove.Dispatch.PyomoModelHandler.PyomoState", autospec=True)
+    pyomoRuleLibraryPatcher = patch("dove.dispatch.pyomo_model_handler.prl", autospec=True)
+    pyomoStatePatcher = patch("dove.dispatch.pyomo_model_handler.PyomoState", autospec=True)
 
     # Start patchers and store mocks
     self.mockPRL = pyomoRuleLibraryPatcher.start()
