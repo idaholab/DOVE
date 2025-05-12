@@ -18,7 +18,7 @@ if __name__ == '__main__':
     ### Time-Series Profiles
     ############################
     linear_price = np.arange(0.1, 2.2, 0.1)
-    spike_price = np.zeros(len(linear_price))
+    spike_price = np.zeros(len(linear_price), dtype=np.float64)
     spike_price.put((0, 11, 20), 10)
 
     ##########################
@@ -70,21 +70,21 @@ if __name__ == '__main__':
         name="market_linear",
         consumes=elec,
         max_capacity=2,
-        cashflows=[Revenue("esales", price_profile=linear_price)]
+        cashflows=[Revenue("esales", price_profile=linear_price)] # Time Varying Revenue
     )
 
     market_spike = Sink(
         name="market_spike",
         consumes=elec,
         max_capacity=40,
-        cashflows=[Revenue("esales", price_profile=spike_price)],
+        cashflows=[Revenue("esales", price_profile=spike_price)], # Time Varying Revenue
     )
 
     steam_offload = Sink(
         name="steam_offload",
         consumes=steam,
         max_capacity=100,
-        cashflows=[Revenue("steam_offload", alpha=0.01)],
+        cashflows=[Revenue("steam_offload", alpha=0.01)], # Constant Revenue
     )
 
     ############################
