@@ -52,7 +52,7 @@ class CashFlow(ABC):
     """
 
     name: str
-    price_profile: list[float] = field(default_factory=list)
+    price_profile: TimeDependent = field(default_factory=list)
     alpha: float = 1.0
     dprime: float = 1.0
     scalex: float = 1.0
@@ -87,7 +87,7 @@ class Revenue(CashFlow):
 class Component(ABC):
     """ """
     name: str
-    profile: list[float] = field(default_factory=list)
+    profile: TimeDependent = field(default_factory=list)
     max_capacity: float = 1.0
     min_capacity: float = 0.0
     capacity_factor: bool = False
@@ -117,7 +117,6 @@ class Source(Component):
 @dataclass
 class Sink(Component):
     """ """
-
     consumes: Resource
 
     def __post_init__(self) -> None:
@@ -169,7 +168,6 @@ class Converter(Component):
 @dataclass
 class Storage(Component):
     """ """
-
     resource: Resource
     rte: float = 1.0
     max_charge_rate: float = 1.0

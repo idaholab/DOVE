@@ -2,7 +2,7 @@
 # ALL RIGHTS RESERVED
 """ """
 
-from typing import Self, Union
+from typing import Self
 
 import numpy as np
 
@@ -46,7 +46,7 @@ class System:
 
     def build(self):
         """ """
-        raise NotImplementedError("System method 'build()' is not yet implemented!")
+        raise NotImplementedError("System method 'build' is not yet implemented!")
 
     def solve(self, model_type: str = "price_taker", **kw):
         """ """
@@ -75,6 +75,6 @@ class System:
                 comp.profile = np.full(len(self.time_index), comp.max_capacity)
 
             for cf in comp.cashflows:
-                if not cf.price_profile:
+                if len(cf.price_profile) < 1:
                     cf.price_profile = np.full(len(self.time_index), cf.alpha)
 
