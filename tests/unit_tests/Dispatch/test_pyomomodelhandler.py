@@ -1216,6 +1216,7 @@ class TestPyomoModelHandler(unittest.TestCase):
     # Additional setup
     mockCreateProdVar.side_effect = ["comp1_level", "comp1_charge", "comp1_discharge"]
 
+    self.mockComponent1.interaction.get_charge_rate_limits.return_value = (3, 4)
     self.mockComponent1.interaction.apply_periodic_level = True
 
     # Create PMH instance
@@ -1237,11 +1238,14 @@ class TestPyomoModelHandler(unittest.TestCase):
 
     # Last two (charge and discharge) constraints are disabled, so checks for them are commented out
 
+    # Check call to get_charge_rate_limits
+    self.mockComponent1.interaction.get_charge_rate_limits.assert_called_once_with(self.meta)
+
     # Check calls to _create_production_variable
     expectedCreateProdVarCalls = [
       call(self.mockComponent1, tag="level"),
-      call(self.mockComponent1, tag="charge", add_bounds=False, within=pyo.NonPositiveReals),
-      call(self.mockComponent1, tag="discharge", add_bounds=False, within=pyo.NonNegativeReals)#,
+      call(self.mockComponent1, tag="charge", add_bounds=False, bounds=(-3, 0), within=pyo.NonPositiveReals),
+      call(self.mockComponent1, tag="discharge", add_bounds=False, bounds=(0, 4), within=pyo.NonNegativeReals)#,
       # call(self.mockComponent1, tag="dcforcer", add_bounds=False, within=pyo.Binary)
     ]
     mockCreateProdVar.assert_has_calls(expectedCreateProdVarCalls)
