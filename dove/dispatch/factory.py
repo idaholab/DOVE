@@ -1,13 +1,14 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-from .CustomDispatcher import Custom
+"""
+"""
+from .custom import Custom
 from .pyomo_dispatch import Pyomo
 
 known = {
   "pyomo": Pyomo,
   "custom": Custom,
 }
-
 
 def get_class(typ):
   """

@@ -1,5 +1,8 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
+"""
+Demands interaction module
+"""
 from ravenframework.utils.InputData import ParameterInput
 from . import Interaction
 
