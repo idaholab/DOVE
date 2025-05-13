@@ -4,7 +4,7 @@
 
 from math import sqrt
 
-from pyomo.environ import Constraint
+from pyomo.environ import Constraint, Expression
 
 
 def cap_rule(m, cname, t):
@@ -44,26 +44,28 @@ def soc_balance(m, cname, t):
     )
 
 
-def flow_rule(m, rname, t):
-    """ """
-    resource = m.system.res_map[rname]
-    expr = None
-    for cname in m.NON_STORAGE:
-        comp = m.system.comp_map[cname]
-        for term in comp.transfer_terms:
-            exp = term.exponent.get(resource, 0)
-            if exp != 0:
-                term_expr = term.coeff * (m.dispatch[cname, t] ** exp)
-                if expr is None:
-                    expr = term_expr
-                else:
-                    expr += term_expr
-    for stor_cname in m.STORAGE:
-        # TODO: Hardcoding storage transfer terms is not great...
-        expr += -1.0 * (m.charge[stor_cname, t] ** 1)
-        expr += +1.0 * (m.discharge[stor_cname, t] ** 1)
+def flow_rule(m, res_name, t):
+    net = 0
+    system = m.system
 
-    if expr is None:
-        expr = Constraint.Skip
+    for cname in system.non_storage_comp_names:
+        comp = system.comp_map[cname]
+        dispatch = m.dispatch[cname, t]
 
-    return expr == 0.0
+        # Transfer function explicitly ONLY uses the single dispatch variable
+        inputs = {comp.capacity_resource.name: dispatch}
+
+        # Evaluate transfer_fn using ONLY the dispatch var
+        out_map = comp.transfer_fn(**inputs)
+
+        for rsrc, expr in out_map.items():
+            if rsrc in comp.produces:
+                net += expr
+            if rsrc in comp.consumes:
+                net -= expr
+
+    # Storage components (if any)
+    for stor_name in system.storage_comp_names:
+        net += m.discharge[stor_name, t] - m.charge[stor_name, t]
+
+    return net == 0

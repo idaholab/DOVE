@@ -4,15 +4,15 @@
 """
 import numpy as np
 
-from dove import Converter, Resource, Revenue, Sink, Source, System, Storage, TransferTerm
+import dove.core as dc
 
 if __name__ == '__main__':
 
     ############################
     ### System Resources
     ############################
-    elec = Resource("electricity")
-    steam = Resource("steam")
+    elec = dc.Resource("electricity")
+    steam = dc.Resource("steam")
 
     ############################
     ### Time-Series Profiles
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # indicates that the component will produce `steam` at max_capacity for each time step.
     # This is also the reason why `profile` is not set for this component.
     # There are also no cashflows associated with producing steam from the "steamer."
-    steamer = Source(
+    steamer = dc.Source(
         name="steamer",
         produces=steam,
         max_capacity=100,
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     # A Storage component doesn't specify a `consumes` and `produces` but defines
     # a `resource` that its capacity is defined in terms of. A Storage can only store
     # a singluar resource and dispatch it at a later point in time when advantageous.
-    steam_storage = Storage(
+    steam_storage = dc.Storage(
         name="steam_storage",
         resource=steam,
         max_capacity=100,
@@ -50,41 +50,38 @@ if __name__ == '__main__':
     # A Converter can consume and produce multiple resources. If a Converter produces
     # resources that are different from what it consumes, `transfer_terms` must be defined
     # so the resource knows how to convert resources to contribute to the system.
-    gen = Converter(
+    gen = dc.Converter(
         name="generator",
         consumes=[steam],
         produces=[elec],
         max_capacity=90,
         capacity_resource=steam,
-        transfer_terms=[
-            TransferTerm(1, {steam: 1}),
-            TransferTerm(0.5, {elec: 1})
-        ]
+        transfer_fn=dc.RatioTransfer("steam", "electricity", 0.5),
     )
 
     # A Sink can only consume one resource. These components typically represent
     # some kind of "grid" or "market" that resources in the system are distributed to.
     # Revenue cash flows are defined to motivate the optimizer to dispatch resources
     # to its respective market.
-    market_linear = Sink(
+    market_linear = dc.Sink(
         name="market_linear",
         consumes=elec,
         max_capacity=2,
-        cashflows=[Revenue("esales", price_profile=linear_price)] # Time Varying Revenue
+        cashflows=[dc.Revenue("esales", price_profile=linear_price)] # Time Varying Revenue
     )
 
-    market_spike = Sink(
+    market_spike = dc.Sink(
         name="market_spike",
         consumes=elec,
         max_capacity=40,
-        cashflows=[Revenue("esales", price_profile=spike_price)], # Time Varying Revenue
+        cashflows=[dc.Revenue("esales", price_profile=spike_price)], # Time Varying Revenue
     )
 
-    steam_offload = Sink(
+    steam_offload = dc.Sink(
         name="steam_offload",
         consumes=steam,
         max_capacity=100,
-        cashflows=[Revenue("steam_offload", alpha=0.01)], # Constant Revenue
+        cashflows=[dc.Revenue("steam_offload", alpha=0.01)], # Constant Revenue
     )
 
     ############################
@@ -93,7 +90,7 @@ if __name__ == '__main__':
     components = [steamer, steam_storage, gen, market_linear, market_spike, steam_offload]
     resources = [elec, steam]
     time_index = np.arange(0, len(linear_price))
-    sys = System(components, resources, time_index)
+    sys = dc.System(components, resources, time_index)
     results = sys.solve()
 
     print(results)

@@ -8,8 +8,8 @@ The Dispatch Optimization Variable Engine (DOVE) is a library used to configure
 energy system components and compute an optimized dispatch strategy for resources
 throughout the system.
 """
-
-from .core.components import Converter, Cost, Resource, Revenue, Sink, Source, Storage, TransferTerm
+from .core.transfers import RatioTransfer, PolynomialTransfer
+from .core.components import Converter, Cost, Resource, Revenue, Sink, Source, Storage
 from .core.system import System
 
 
@@ -22,5 +22,6 @@ __all__ = [
     "Source",
     "System",
     "Storage",
-    "TransferTerm"
+    "RatioTransfer",
+    "PolynomialTransfer",
 ]

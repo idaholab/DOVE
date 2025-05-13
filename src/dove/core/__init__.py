@@ -3,6 +3,7 @@
 """
 ``dove.core``
 """
+from .transfers import RatioTransfer, PolynomialTransfer
 
 from .components import (
     CashFlow,
@@ -14,7 +15,6 @@ from .components import (
     Sink,
     Source,
     Storage,
-    TransferTerm,
 )
 from .system import System
 
@@ -29,5 +29,6 @@ __all__ = [
     "Cost",
     "Resource",
     "Revenue",
-    "TransferTerm",
+    "RatioTransfer",
+    "PolynomialTransfer",
 ]
