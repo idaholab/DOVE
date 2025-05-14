@@ -32,9 +32,47 @@ class System:
         """ """
         return [cn for cn in self.comp_map.keys() if isinstance(self.comp_map[cn], Storage)]
 
+    def summary(self) -> None:
+        """ """
+        info = {
+            "num_components": len(self.components),
+            "component_names": [c.name for c in self.components],
+            "non_storage_components": self.non_storage_comp_names,
+            "storage_components": self.storage_comp_names,
+            "num_resources": len(self.resources),
+            "resource_names": [r.name for r in self.resources],
+            "time_horizon": len(self.time_index),
+        }
+        print(info)
+
+    def verify(self) -> None:
+        """Verify the integrity of the system."""
+        # Check for unique component names
+        component_names = [comp.name for comp in self.components]
+        if len(component_names) != len(set(component_names)):
+            raise ValueError("Component names must be unique!")
+
+        # Check for unique resource names
+        resource_names = [res.name for res in self.resources]
+        if len(resource_names) != len(set(resource_names)):
+            raise ValueError("Resource names must be unique!")
+
+        # Check that time index length matches profiles and price profiles
+        for comp in self.components:
+            if comp.profile and len(comp.profile) != len(self.time_index):
+                raise ValueError(
+                    f"Component '{comp.name}' has a profile length that does not match the time index length!"
+                )
+            for cf in comp.cashflows:
+                if cf.price_profile is not None and len(cf.price_profile) != len(self.time_index):
+                    raise ValueError(
+                        f"Component '{comp.name}' has a cashflow price profile length that does not match the time index length!"
+                    )
+
     def add_component(self, comp) -> Self:
         """ """
         self.components.append(comp)
+        self.verify()
         self.comp_map[comp.name] = comp
         return self
 
@@ -59,7 +97,7 @@ class System:
 
         builder = builder_cls(self)
         builder.build()
-        builder.solve()
+        builder.solve(**kw)
         return builder.extract_results()
 
     def _normalize_time_series(self) -> None:
@@ -79,4 +117,5 @@ class System:
             for cf in comp.cashflows:
                 if len(cf.price_profile) < 1:
                     cf.price_profile = np.full(len(self.time_index), cf.alpha)
+
 

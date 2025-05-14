@@ -29,7 +29,7 @@ if __name__ == '__main__':
     produces=[work],
     capacity_resource=funding,
     max_capacity=100,
-    transfer_fn=dc.RatioTransfer("funding", "work", 0.25)
+    transfer_fn=dc.RatioTransfer(funding, work, 0.25)
   )
 
   quadratic = dc.Converter(
@@ -39,9 +39,9 @@ if __name__ == '__main__':
     capacity_resource=funding,
     max_capacity=100,
     transfer_fn=dc.PolynomialTransfer([
-      (0.9, {"funding": 1}),
-      (1, {"labor": 1}),
-      (1e-6, {"funding": 1, "labor": 2}),
+      (0.9, {funding: 1}),
+      (1, {labor: 1}),
+      (1e-6, {funding: 1, labor: 2}),
     ])
   )
 
@@ -78,6 +78,6 @@ if __name__ == '__main__':
     ],
     resources=[funding, labor, work],
   )
-  results = sys.solve()
+  results = sys.solve(solver="ipopt")
   print(results)
   results.to_csv("example_transfers.csv")

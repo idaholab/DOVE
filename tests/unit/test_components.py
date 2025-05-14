@@ -1,149 +1,121 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-"""
-"""
-import math
-
+""" """
 import pytest
+import numpy as np
 
-from dove import Converter, Cost, Resource, Revenue, Sink, Source, Storage, TransferTerm
-from dataclasses import FrozenInstanceError
+from dove.core import (
+    Component,
+    Source,
+    Sink,
+    Converter,
+    Storage,
+    Resource,
+    RatioTransfer,
+)
 
-@pytest.fixture
-def steam():
-    return Resource("steam")
 
-@pytest.fixture
-def elec():
-    return Resource("electricity")
+def test_component_basic_properties_and_profile_conversion():
+    comp = Component(name="comp", max_capacity=5.0, min_capacity=1.0, profile=[0.1, 0.2, 0.3])
+    # capacities and profile
+    assert comp.max_capacity == 5.0
+    assert comp.min_capacity == 1.0
+    assert isinstance(comp.profile, np.ndarray)
+    assert comp.profile.tolist() == [0.1, 0.2, 0.3]
+    # empty consumes/produces
+    assert comp.consumes_by_name == []
+    assert comp.produces_by_name == []
 
-def test_source_defaults_and_signs(steam):
-    src = Source(
-        name="injector",
-        produces=steam,
-        max_capacity=100.0,
-    )
-    assert src.capacity_resource is steam
-    assert src.transfer_terms[0].coeff == +1.0
 
-    src = Source(
-        name="injector",
-        produces=steam,
-        max_capacity=100.0,
-        transfer_terms=[TransferTerm(-1.0, {steam: 1})]
-    )
-    assert src.transfer_terms[0].coeff == +1.0
+@pytest.mark.parametrize(
+    "kwargs, exc_type, msg_substr",
+    [
+        ({"max_capacity": -1.0}, ValueError, "max_capacity < 0"),
+        ({"max_capacity": 1.0, "min_capacity": 2.0}, ValueError, "min_capacity (2.0) must be in"),
+        ({"profile": [-0.5]}, ValueError, "profile contains negative"),
+        ({"capacity_factor": True, "profile": [-0.1, 0.5]}, ValueError, "capacity_factor profile must"),
+        ({"capacity_factor": True, "profile": [0.5, 1.2]}, ValueError, "capacity_factor profile must"),
+        ({"flexibility": "invalid"}, ValueError, "flexibility must be"),
+        ({"cashflows": [object()]}, TypeError, "all cashflows must be CashFlow"),
+    ],
+)
+def test_component_invalid_initialization(kwargs, exc_type, msg_substr):
+    init_kwargs = {"name": "bad", "max_capacity": 1.0}
+    init_kwargs.update(kwargs)
+    with pytest.raises(exc_type) as exc:
+        Component(**init_kwargs)
+    assert msg_substr in str(exc.value)
 
-def test_resource_equality_and_immutability():
-    r1 = Resource("water", unit="kg")
-    r2 = Resource("water", unit="kg")
-    assert r1 == r2
-    with pytest.raises(FrozenInstanceError):
-        r1.name = "steam"
 
-def test_transfer_term_attributes(steam, elec):
-    term = TransferTerm( coeff=2.5, exponent={steam: 2, elec: 1} )
-    assert term.coeff == 2.5
-    assert term.exponent == {steam: 2, elec: 1}
+def test_component_capacity_resource_not_in_consumes_or_produces():
+    r = Resource(name="res")
+    with pytest.raises(ValueError) as exc:
+        Component(name="bad", max_capacity=1.0, capacity_resource=r)
+    assert "capacity_resource" in str(exc.value)
 
-def test_cost_and_revenue_defaults_and_custom():
-    c = Cost(
-        name="capex",
-        price_profile=[100, 200],
-        alpha=0.5,
-        dprime=0.8,
-        scalex=1.2,
-        price_is_levelized=True
-    )
-    assert c.name == "capex"
-    assert c.price_profile == [100, 200]
-    assert c.alpha == 0.5
-    assert c.dprime == 0.8
-    assert c.scalex == 1.2
-    assert c.price_is_levelized is True
-    assert c.sign == -1
 
-    rev = Revenue(name="sales")
-    assert rev.sign == +1
-    # defaults
-    assert rev.price_profile == []
-    assert rev.alpha == 1.0
-    assert rev.dprime == 1.0
-    assert rev.scalex == 1.0
-    assert rev.price_is_levelized is False
-    assert rev.sign == +1
+def test_source_defaults_transfer_function():
+    r = Resource(name="water")
+    src = Source(name="src", max_capacity=10.0, produces=r)
+    assert src.produces == [r]
+    assert src.consumes == []
+    assert src.capacity_resource is r
+    tf = src.transfer_fn
+    assert isinstance(tf, RatioTransfer)
+    assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
 
-def test_sink_default_behavior(steam):
-    s = Sink(name="cooler", consumes=steam)
-    assert s.capacity_resource is steam
-    assert len(s.transfer_terms) == 1
-    term = s.transfer_terms[0]
-    assert term.coeff == -1.0
-    assert term.exponent == {steam: 1}
 
-def test_converter_no_extras_same_resource(steam):
-    # consumes == produces => no extras, capacity_resource auto-set
-    conv = Converter(
-        name="loop",
-        consumes=[steam],
-        produces=[steam]
-    )
-    assert conv.capacity_resource == steam
-    # no transfer_terms so list is empty
-    assert conv.transfer_terms == []
+def test_sink_defaults_transfer_function():
+    r = Resource(name="fuel")
+    sink = Sink(name="sink", max_capacity=8.0, consumes=r)
+    assert sink.consumes == [r]
+    assert sink.produces == []
+    assert sink.capacity_resource is r
+    tf = sink.transfer_fn
+    assert isinstance(tf, RatioTransfer)
+    assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
 
-def test_converter_extras_without_capacity_fails(steam, elec):
-    with pytest.raises(ValueError):
-        Converter(
-            name="bad1",
-            consumes=[steam],
-            produces=[elec]
-        )
 
-def test_converter_extras_with_capacity_but_no_terms_fails(steam, elec):
-    with pytest.raises(ValueError):
-        Converter(
-            name="bad2",
-            consumes=[steam],
-            produces=[elec],
-            capacity_resource=steam
-        )
+def test_converter_same_resource_sets_capacity_and_warns():
+    r = Resource(name="electricity")
+    with pytest.warns(UserWarning):
+        conv = Converter(name="conv", max_capacity=15.0, consumes=[r], produces=[r])
+    assert conv.capacity_resource is r
 
-def test_converter_term_sign_adjustment(steam, elec):
-    # capacity_resource in consumes => coeff becomes negative
-    terms = [
-        TransferTerm( coeff=4.0, exponent={steam:1} ),
-        TransferTerm( coeff=-5.0, exponent={elec:1} )
-    ]
-    conv = Converter(
-        name="conv",
-        consumes=[steam],
-        produces=[elec],
-        capacity_resource=steam,
-        transfer_terms=terms
-    )
-    # first term had steam exponent and steam in consumes => -abs(4.0)
-    assert conv.transfer_terms[0].coeff == -4.0
-    # second term has elec exponent (capacity_resource not in exponent) => unchanged
-    assert conv.transfer_terms[1].coeff == +5.0
 
-    # capacity_resource in produces => coeff becomes positive
-    terms2 = [ TransferTerm(coeff=-7.0, exponent={elec:1}) ]
-    conv2 = Converter(
-        name="conv2",
-        consumes=[steam],
-        produces=[elec],
-        capacity_resource=elec,
-        transfer_terms=terms2
-    )
-    assert conv2.transfer_terms[0].coeff == +7.0
+def test_converter_ambiguous_capacity_resource_requires_explicit():
+    r1 = Resource(name="in_res")
+    r2 = Resource(name="out_res")
+    # missing transfer_fn and ambiguous resources
+    with pytest.raises(ValueError) as exc:
+        Converter(name="amb", max_capacity=5.0, consumes=[r1], produces=[r2])
+    assert "ambiguous capacity_resource" in str(exc.value)
 
-def test_storage_default_behavior(elec):
-    st = Storage(name="tank", resource=elec)
-    assert st.capacity_resource is elec
-    # defaults
-    assert st.rte == 1.0
-    assert st.max_charge_rate == 1.0
-    assert st.max_discharge_rate == 1.0
-    assert st.initial_stored == 0.0
-    assert st.periodic_level is True
+
+def test_storage_default_capacity_and_valid_ranges():
+    r = Resource(name="stor_res")
+    st = Storage(name="stor", max_capacity=20.0, resource=r)
+    assert st.resource is r
+    assert st.capacity_resource is r
+    # default attributes are in [0,1]
+    for attr in ("rte", "max_charge_rate", "max_discharge_rate", "initial_stored"):
+        val = getattr(st, attr)
+        assert 0.0 <= val <= 1.0
+
+
+@pytest.mark.parametrize(
+    "bad_kwargs, msg_substr",
+    [
+        ({"rte": 1.5}, "rte"),
+        ({"max_charge_rate": -0.1}, "max_charge_rate"),
+        ({"max_discharge_rate": 2.0}, "max_discharge_rate"),
+        ({"initial_stored": -0.5}, "initial_stored"),
+    ],
+)
+def test_storage_invalid_parameters_raise(bad_kwargs, msg_substr):
+    r = Resource(name="stor_bad")
+    init_kwargs = {"name": "stor_bad", "max_capacity": 5.0, "resource": r}
+    init_kwargs.update(bad_kwargs)
+    with pytest.raises(ValueError) as exc:
+        Storage(**init_kwargs)
+    assert msg_substr in str(exc.value)

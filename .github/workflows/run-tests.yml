@@ -8,60 +8,25 @@ jobs:
       - run: echo " The job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo " This job is now running on a ${{ runner.os }} server"
       - run: echo " The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
         with:
-          miniconda-version: "latest"
-          channels: conda-forge, defaults
-          activate-environment: raven_libraries
-          auto-update-conda: true
-          auto-activate-base: true
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - run: pwd
-      - run: cd .. && rm -Rf raven && git clone https://github.com/idaholab/raven.git
-      - run: python3 ../raven/scripts/install_plugins.py -s ${{ github.workspace }}
-      - run: >
-          WD=`(cd ../../.. && pwd)` && export RAVEN_LIBS_NAME="raven_libs_dove_linux_runner" &&
-          ../raven/scripts/establish_conda_env.sh --install
-      - run: cd ../raven && ./build_raven
-      - run: ../raven/run_tests --library-report
-      - run: source ../raven/scripts/establish_conda_env.sh --load && bash coverage_scripts/check_py_coverage.sh -j4
-      # report_py_coverage is being called twice, once within check_py_coverage to print to the terminal and once here to get data for the annotation
-      - run: >
-          source ../raven/scripts/establish_conda_env.sh --load &&
-          DATA_FILE=`pwd`/.coverage && COV_RCFILE=`pwd`/coverage_scripts/.coveragerc &&
-          COV_RPT=`bash coverage_scripts/report_py_coverage.sh --data-file=$DATA_FILE --coverage-rc-file=$COV_RCFILE` &&
-          echo "::notice title=Coverage Summary::$COV_RPT For details, download 'coverage_results' from Artifacts, extract all files, and open 'index.html'."
-      - name: Archive coverage results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage_results
-          path: tests/coverage_html_report
-      - run: source ../raven/scripts/establish_conda_env.sh --load && ruff check --config ruff.toml
-  Test-DOVE-Windows:
-    runs-on: [windows-latest]
-    steps:
-      - run: echo " The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo " This job is now running on a ${{ runner.os }} server"
-      - run: echo " The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniconda-version: "latest"
-          channels: conda-forge, defaults
-          activate-environment: raven_libraries
-          auto-update-conda: true
-          auto-activate-base: true
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - run: pwd
-      - run: cd ..; if (Test-Path raven) {Remove-Item -Recurse -Force raven}; git clone https://github.com/idaholab/raven.git
-      - run: python ../raven/scripts/install_plugins.py -s ${{ github.workspace }}
-      - run: >
-          $Env:RAVEN_LIBS_NAME =  "raven_libs_dove_windows_runner";
-          bash ../raven/scripts/establish_conda_env.sh --install --conda-defs $HOME/Miniconda3/etc/profile.d/conda.sh
-      - run: cd ../raven; bash ./build_raven
-      - run: bash ../raven/run_tests --library-report
-      - run: bash ../raven/run_tests -j4 --re=DOVE/tests
+          python-version-file: ".python-version"
+      
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Lint with Ruff
+        run: |
+          # Run Ruff for linting
+          uvx ruff check .  
+
+      - name: Run tests
+        # For example, using `pytest`
+        run: uv run pytest --cov src/dove
+

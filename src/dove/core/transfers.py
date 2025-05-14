@@ -5,9 +5,12 @@
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import TypeAlias, TYPE_CHECKING
 
 from pyomo.environ import Constraint
+
+if TYPE_CHECKING:
+    from . import Resource
 
 TransferFunc : TypeAlias = "RatioTransfer | PolynomialTransfer"
 
@@ -15,8 +18,8 @@ TransferFunc : TypeAlias = "RatioTransfer | PolynomialTransfer"
 @dataclass
 class RatioTransfer:
     """ """
-    input_res: str
-    output_res: str
+    input_res: "Resource"
+    output_res: "Resource"
     ratio: float = 1.0
 
     def __call__(self, inputs: dict[str, float], outputs: dict[str, float]):
@@ -25,11 +28,11 @@ class RatioTransfer:
         If both input and output are present, enforce: output == ratio * input.
         If only one is present, assume the dispatch is done externally (Source/Sink case).
         """
-        has_input = self.input_res in inputs
-        has_output = self.output_res in outputs
+        has_input = self.input_res.name in inputs
+        has_output = self.output_res.name in outputs
 
         if has_input and has_output:
-            return outputs[self.output_res] == self.ratio * inputs[self.input_res]
+            return outputs[self.output_res.name] == self.ratio * inputs[self.input_res.name]
 
         elif has_output and not has_input:
             # Source: output = output (tautology)
@@ -48,7 +51,7 @@ class RatioTransfer:
 @dataclass
 class PolynomialTransfer:
     """ """
-    terms: list[tuple[float, dict[str, int]]]  # [(coefficient, {resource: exponent, ...}), ...]
+    terms: list[tuple[float, dict["Resource", int]]]  # [(coefficient, {resource: exponent, ...}), ...]
 
     def __call__(self, inputs, outputs):
         """ """
@@ -57,6 +60,6 @@ class PolynomialTransfer:
         for coef, input_exponents in self.terms:
             term = coef
             for res, exp in input_exponents.items():
-                term *= inputs[res] ** exp
+                term *= inputs[res.name] ** exp
             expr += term
         return total_output == expr

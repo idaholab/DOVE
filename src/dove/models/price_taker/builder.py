@@ -21,8 +21,8 @@ class PriceTakerBuilder(BaseModelBuilder):
 
         return self
 
-    def solve(self):
-        solver = pyo.SolverFactory("cbc")
+    def solve(self, **kw):
+        solver = pyo.SolverFactory(kw.get("solver", "cbc"))
         solver.solve(self.model)
         return self.model
 
