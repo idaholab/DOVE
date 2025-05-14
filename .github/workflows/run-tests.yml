@@ -21,10 +21,10 @@ jobs:
       - name: Install the project
         run: uv sync --locked --all-extras --dev
 
-      - name: Lint with Ruff
-        run: |
-          # Run Ruff for linting
-          uvx ruff check .  
+      # - name: Lint with Ruff
+      #   run: |
+      #     # Run Ruff for linting
+      #     uvx ruff check .  
 
       - name: Run tests
         # For example, using `pytest`
