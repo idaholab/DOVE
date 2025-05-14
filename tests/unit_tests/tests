@@ -3,8 +3,4 @@
     type = 'Unittest'
     input = 'test_components.TestComponent'
   [../]
-  [./test_cashflowgroup]
-    type = 'Unittest'
-    input = 'test_cashflowgroup.TestCashFlowGroup'
-  [../]
 []
