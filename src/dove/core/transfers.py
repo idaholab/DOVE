@@ -4,19 +4,17 @@
 
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Sequence, TypeAlias, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TypeAlias
 
 from pyomo.environ import Constraint
 
-if TYPE_CHECKING:
-  from . import Resource
-
-TransferFunc : TypeAlias = "Monomial | Polynomial | Ratio"
+TransferFunc : TypeAlias = "RatioTransfer | PolynomialTransfer"
 
 
 @dataclass
 class RatioTransfer:
+    """ """
     input_res: str
     output_res: str
     ratio: float = 1.0
@@ -49,9 +47,11 @@ class RatioTransfer:
 
 @dataclass
 class PolynomialTransfer:
+    """ """
     terms: list[tuple[float, dict[str, int]]]  # [(coefficient, {resource: exponent, ...}), ...]
 
     def __call__(self, inputs, outputs):
+        """ """
         total_output = sum(outputs.values())
         expr = 0
         for coef, input_exponents in self.terms:

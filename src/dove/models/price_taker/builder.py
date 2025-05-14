@@ -88,6 +88,13 @@ class PriceTakerBuilder(BaseModelBuilder):
             return m.flow[cname, comp.capacity_resource.name, t] >= comp.min_capacity
         m.min_capacity = Constraint(m.NON_STORAGE, m.T, rule=min_rule)
 
+        def fixed_profile_rule(m, cname, t):
+            comp = m.system.comp_map[cname]
+            if len(comp.profile) == 0:
+                return Constraint.Skip
+            return m.flow[cname, comp.capacity_resource.name, t] == comp.profile[t]
+        m.fixed_profile = Constraint(m.NON_STORAGE, m.T, rule=fixed_profile_rule)
+
         # Resource Balance Constraints
         def balance_rule(m, rname, t):
             prod = sum(m.flow[c.name, rname, t]

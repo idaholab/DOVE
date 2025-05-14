@@ -11,7 +11,7 @@ from typing import Literal, Optional, TypeAlias
 
 from numpy.typing import NDArray
 
-from .transfers import RatioTransfer, PolynomialTransfer
+from .transfers import RatioTransfer
 
 TimeDependent: TypeAlias = list[float] | NDArray
 
@@ -19,7 +19,6 @@ TimeDependent: TypeAlias = list[float] | NDArray
 @dataclass(frozen=True)
 class Resource:
     """ """
-
     name: str
     unit: Optional[str] = None
 
@@ -27,7 +26,6 @@ class Resource:
 @dataclass
 class CashFlow(ABC):
     """ """
-
     name: str
     price_profile: TimeDependent = field(default_factory=list)
     alpha: float = 1.0

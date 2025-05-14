@@ -68,7 +68,9 @@ class System:
         # I guess these are all the variables we might expect to be varying over time?
         for comp in self.components:
             if comp.capacity_factor:
-                comp.profile *= comp.max_capacity
+                # Means user has supplied a time-series profile to the component
+                # that represents the capacity factor
+                comp.profile = comp.profile * comp.max_capacity
 
             if comp.flexibility == "fixed":
                 comp.min_capacity = comp.max_capacity
