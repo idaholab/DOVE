@@ -1,21 +1,46 @@
-name: Deploy Sphinx documentation to Pages
+name: deploy documentation
 
-on:
-  push:
-    branches: [main] # branch to trigger deployment
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: write
 
 jobs:
-  pages:
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  docs:
     permissions:
-      pages: write
       id-token: write
+      pages: write
+    runs-on: ubuntu-latest
     steps:
-    - id: deployment
-      uses: sphinx-notes/pages@v3
-      with:
-        cache: true
-        python_version: 3.11
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+      
+      - name: install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: enable github problem matcher
+        uses: sphinx-doc/github-problem-matcher@master
+
+      - name: create tmp directory
+        run: mkdir -p /tmp/dovedocs
+
+      - name: sphinx build
+        run: uv run sphinx-build -b html "docs/source" "/tmp/dovedocs"
+      
+      - name: setup pages
+        uses: actions/configure-pages@v5
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      
+      - name: upload artifact
+        uses: actions/upload-pages-artifact@v3
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        with:
+          path: "/tmp/dovedocs"
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        
