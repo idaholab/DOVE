@@ -1,5 +1,5 @@
 # Dispatch Optimization Variable Engine (DOVE)
-[![GitHub DOVE test](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml/badge.svg?branch=dove-from-scratch)](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml)
+[![tests](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml)
 
 
 # Install
