@@ -1,16 +1,23 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
+from typing import Self
+
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.environ import ConcreteModel, Set, Var, Constraint, Objective, value, NonNegativeReals, Binary
+from pyomo.environ import ConcreteModel, Constraint, Objective, Set, Var, value
+
 from .. import register_builder
 from ..base import BaseModelBuilder
+from . import rulelib as prl
+
 
 @register_builder("price_taker")
 class PriceTakerBuilder(BaseModelBuilder):
+    """ """
 
-    def build(self):
+    def build(self) -> Self:
+        """ """
         self.model = ConcreteModel()
         self.model.system = self.system
 
@@ -22,11 +29,13 @@ class PriceTakerBuilder(BaseModelBuilder):
         return self
 
     def solve(self, **kw):
+        """ """
         solver = pyo.SolverFactory(kw.get("solver", "cbc"))
         solver.solve(self.model)
         return self.model
 
     def extract_results(self) -> pd.DataFrame:
+        """ """
         m = self.model
         data = {}
         T = self.system.time_index
@@ -45,20 +54,23 @@ class PriceTakerBuilder(BaseModelBuilder):
         return pd.DataFrame(data, index=T)
 
     def _add_sets(self):
-        m = self.model
-        m.NON_STORAGE = Set(initialize=[cname for cname in m.system.non_storage_comp_names])
-        m.STORAGE = Set(initialize=[cname for cname in m.system.storage_comp_names])
-        m.R = Set(initialize=[r.name for r in self.system.resources])
-        m.T = Set(initialize=self.system.time_index, ordered=True)
+        """ """
+        non_storage_comp_names = self.model.system.non_storage_comp_names
+        storage_comp_names = self.model.system.storage_comp_names
+
+        self.model.NON_STORAGE = Set(initialize=non_storage_comp_names)
+        self.model.STORAGE = Set(initialize=storage_comp_names)
+        self.model.R = Set(initialize=[r.name for r in self.system.resources])
+        self.model.T = Set(initialize=self.system.time_index, ordered=True)
 
     def _add_variables(self):
         m = self.model
-        m.flow = Var(m.NON_STORAGE, m.R, m.T, within=NonNegativeReals)
+        m.flow = Var(m.NON_STORAGE, m.R, m.T, within=pyo.NonNegativeReals)
 
         # Storage Variables
-        m.SOC = Var(m.STORAGE, m.T, within=NonNegativeReals)
-        m.charge = Var(m.STORAGE, m.T, within=NonNegativeReals)
-        m.discharge = Var(m.STORAGE, m.T, within=NonNegativeReals)
+        m.SOC = Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.charge = Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.discharge = Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
 
         # # Ramp tracking variables
         # m.ramp_up = Var(m.C, m.T, within=NonNegativeReals)
@@ -69,60 +81,15 @@ class PriceTakerBuilder(BaseModelBuilder):
     def _add_constraints(self):
         m, system = self.model, self.system
 
-        # Transfer Constraints (Converters)
-        def transfer_rule(m, cname, t):
-            comp = m.system.comp_map[cname]
-            inputs = {r.name: m.flow[cname, r.name, t] for r in comp.consumes}
-            outputs = {r.name: m.flow[cname, r.name, t] for r in comp.produces}
-            return comp.transfer_fn(inputs, outputs)
-        m.transfer = Constraint(m.NON_STORAGE, m.T, rule=transfer_rule)
+        m.transfer = Constraint(m.NON_STORAGE, m.T, rule=prl.transfer_rule)
+        m.capacity = Constraint(m.NON_STORAGE, m.T, rule=prl.capacity_rule)
+        m.min_capacity = Constraint(m.NON_STORAGE, m.T, rule=prl.min_rule)
+        m.fixed_profile = Constraint(m.NON_STORAGE, m.T, rule=prl.fixed_profile_rule)
 
-        # Capacity Constraints
-        def capacity_rule(m, cname, t):
-            comp = system.comp_map[cname]
-            return m.flow[cname, comp.capacity_resource.name, t] <= comp.max_capacity
-        m.capacity = Constraint(m.NON_STORAGE, m.T, rule=capacity_rule)
-
-        def min_rule(m, cname, t):
-            comp = m.system.comp_map[cname]
-            return m.flow[cname, comp.capacity_resource.name, t] >= comp.min_capacity
-        m.min_capacity = Constraint(m.NON_STORAGE, m.T, rule=min_rule)
-
-        def fixed_profile_rule(m, cname, t):
-            comp = m.system.comp_map[cname]
-            if len(comp.profile) == 0:
-                return Constraint.Skip
-            return m.flow[cname, comp.capacity_resource.name, t] == comp.profile[t]
-        m.fixed_profile = Constraint(m.NON_STORAGE, m.T, rule=fixed_profile_rule)
-
-        # Resource Balance Constraints
-        def balance_rule(m, rname, t):
-            prod = sum(m.flow[c.name, rname, t]
-                       for c in system.components
-                       if rname in c.produces_by_name)
-
-            cons = sum(m.flow[c.name, rname, t]
-                       for c in system.components
-                       if rname in c.consumes_by_name)
-
-            storage_change = sum(
-                m.discharge[s, t] - m.charge[s, t]
-                for s in m.STORAGE
-                if system.comp_map[s].resource.name == rname
-            )
-            return prod - cons + storage_change == 0
-        m.resource_balance = Constraint(m.R, m.T, rule=balance_rule)
+        m.resource_balance = Constraint(m.R, m.T, rule=prl.balance_rule)
 
         # Storage Constraints
-        def storage_balance_rule(m, sname, t):
-            comp = system.comp_map[sname]
-            if t == m.T.first():
-                soc_prev = comp.initial_stored * comp.max_capacity
-            else:
-                soc_prev = m.SOC[sname, m.T.prev(t)]
-            return m.SOC[sname, t] == soc_prev + \
-                (m.charge[sname, t] * comp.rte**0.5 - m.discharge[sname, t] / comp.rte**0.5)
-        m.storage_balance = Constraint(m.STORAGE, m.T, rule=storage_balance_rule)
+        m.storage_balance = Constraint(m.STORAGE, m.T, rule=prl.storage_balance_rule)
 
         m.charge_limit = Constraint(
             m.STORAGE, m.T,
@@ -168,6 +135,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         def objective_rule(m):
             total = 0
             for comp in system.components:
+                # TODO: cashflow defaults to capacity_resource we should find a way to do different tracking vars
                 rname = comp.capacity_resource.name
                 for cf in comp.cashflows:
                     for t in m.T:

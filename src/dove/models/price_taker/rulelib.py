@@ -2,70 +2,68 @@
 # ALL RIGHTS RESERVED
 """ """
 
-from math import sqrt
-
-from pyomo.environ import Constraint, Expression
+from pyomo.environ import Constraint
 
 
-def cap_rule(m, cname, t):
+# Transfer Constraints (Converters)
+def transfer_rule(m, cname, t):
     """ """
-    return m.dispatch[cname, t] <= m.capacity[cname, t]
+    comp = m.system.comp_map[cname]
+    inputs = {r.name: m.flow[cname, r.name, t] for r in comp.consumes}
+    outputs = {r.name: m.flow[cname, r.name, t] for r in comp.produces}
+    return comp.transfer_fn(inputs, outputs)
+
+
+def capacity_rule(m, cname, t):
+    """ """
+    comp = m.system.comp_map[cname]
+    return m.flow[cname, comp.capacity_resource.name, t] <= comp.max_capacity
 
 
 def min_rule(m, cname, t):
     """ """
-    return m.dispatch[cname, t] >= m.minimum[cname, t]
+    comp = m.system.comp_map[cname]
+    return m.flow[cname, comp.capacity_resource.name, t] >= comp.min_capacity
 
 
-def charge_limit(m, comp_name, t):
-    """ """
-    max_charge = m.system.comp_map[comp_name].max_charge_rate
-    return m.charge[comp_name, t] <= max_charge
-
-
-def discharge_limit(m, cname, t):
-    """ """
-    max_discharge = m.system.comp_map[cname].max_discharge_rate
-    return m.discharge[cname, t] <= max_discharge
-
-
-def soc_balance(m, cname, t):
+def fixed_profile_rule(m, cname, t):
     """ """
     comp = m.system.comp_map[cname]
-    sqrt_rte = sqrt(comp.rte)
-    if t == m.system.time_index[0]:
-        prev = comp.initial_stored
-    else:
-        prev_t = m.system.time_index[t - 1]
-        prev = m.soc[cname, prev_t]
-    return (
-        m.soc[cname, t]
-        == prev + sqrt_rte * m.charge[cname, t] - m.discharge[cname, t] / sqrt_rte
+    if len(comp.profile) == 0:
+        return Constraint.Skip
+    return m.flow[cname, comp.capacity_resource.name, t] == comp.profile[t]
+
+
+# Resource Balance Constraints
+def balance_rule(m, rname, t):
+    """ """
+    prod = sum(
+        m.flow[cname, rname, t]
+        for cname in m.NON_STORAGE
+        if rname in m.system.comp_map[cname].produces_by_name
     )
 
+    cons = sum(
+        m.flow[cname, rname, t]
+        for cname in m.NON_STORAGE
+        if rname in m.system.comp_map[cname].consumes_by_name
+    )
 
-def flow_rule(m, res_name, t):
-    net = 0
-    system = m.system
+    storage_change = sum(
+        m.discharge[s, t] - m.charge[s, t]
+        for s in m.STORAGE
+        if m.system.comp_map[s].resource.name == rname
+    )
+    return prod - cons + storage_change == 0
 
-    for cname in system.non_storage_comp_names:
-        comp = system.comp_map[cname]
-        dispatch = m.dispatch[cname, t]
 
-        # Transfer function explicitly ONLY uses the single dispatch variable
-        inputs = {comp.capacity_resource.name: dispatch}
-
-        # Evaluate transfer_fn using ONLY the dispatch var
-        out_map = comp.transfer_fn(**inputs)
-
-        for rsrc, expr in out_map.items():
-            if rsrc in comp.produces:
-                net += expr
-            if rsrc in comp.consumes:
-                net -= expr
-
-    # Storage components (if any)
-    for stor_name in system.storage_comp_names:
-        net += m.discharge[stor_name, t] - m.charge[stor_name, t]
-
-    return net == 0
+def storage_balance_rule(m, sname, t):
+    """ """
+    comp = m.system.comp_map[sname]
+    if t == m.T.first():
+        soc_prev = comp.initial_stored * comp.max_capacity
+    else:
+        soc_prev = m.SOC[sname, m.T.prev(t)]
+    return m.SOC[sname, t] == soc_prev + (
+        m.charge[sname, t] * comp.rte**0.5 - m.discharge[sname, t] / comp.rte**0.5
+    )

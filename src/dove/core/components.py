@@ -46,6 +46,7 @@ class Component(ABC):
         return [r.name for r in self.consumes]
 
     def __post_init__(self) -> None:
+        """ """
         # convert profile
         self.profile = np.asarray(self.profile, float).ravel()
 
@@ -118,6 +119,7 @@ class Converter(Component):
     ramp_freq: int = 0
 
     def __post_init__(self) -> None:
+        """ """
         super().__post_init__()
         # If no capacity_resource was provided, pick one or error out
         if self.capacity_resource is None and self.consumes and self.produces:
@@ -158,11 +160,12 @@ class Storage(Component):
     periodic_level: bool = True
 
     def __post_init__(self) -> None:
+        """ """
         super().__post_init__()
         if self.capacity_resource is None:
             self.capacity_resource = self.resource
 
-        # Warn if parameters are outside [0, 1]
+        # Error if parameters are outside [0, 1]
         for attr in ("rte", "max_charge_rate", "max_discharge_rate", "initial_stored"):
             val = getattr(self, attr)
             if not (0.0 <= val <= 1.0):
