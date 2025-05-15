@@ -70,7 +70,7 @@ class System:
                     f"Component '{comp.name}' has a profile length that does not match the time index length!"
                 )
             for cf in comp.cashflows:
-                if cf.price_profile is not None and len(cf.price_profile) != len(self.time_index):
+                if cf.price_profile and len(cf.price_profile) != len(self.time_index):
                     raise ValueError(
                         f"Component '{comp.name}' has a cashflow price profile length that does not match the time index length!"
                     )

@@ -32,7 +32,6 @@ managed = true
 [tool.ruff]
 indent-width = 4
 line-length = 100
-target-version = "py311"
 extend-exclude = ["tests/pyomo_tests/*.py"]
 
 [tool.ruff.format]
@@ -71,14 +70,19 @@ max-complexity = 12
     'PLR2004', # magic value used in comparison
 ]
 
-
 [tool.pytest.ini_options]
 minversion = "8.3.5"
-addopts = "-ra -q"
 testpaths = ["tests"]
+log_cli_level = "INFO"
+xfail_strict = true
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]
 
 [tool.mypy]
 plugins = "numpy.typing.mypy_plugin"
+strict = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
 [dependency-groups]
 dev = [
@@ -91,4 +95,3 @@ dev = [
     "sphinx>=8.2.3",
     "sphinx-book-theme>=1.1.4",
 ]
-

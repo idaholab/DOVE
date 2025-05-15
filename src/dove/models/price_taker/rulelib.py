@@ -4,7 +4,7 @@
 
 from typing import TYPE_CHECKING
 
-import pyomo.environ as pyo  # type: ignore
+import pyomo.environ as pyo  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from dove.core import Storage
