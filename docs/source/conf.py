@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 
 project = "DOVE"
-copyright = "2024, Battelle Energy Alliance, LLC"
+project_copyright = "2024, Battelle Energy Alliance, LLC"
 author = "Dylan McDowell"
-release = "0.1.0"
+release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -46,3 +46,10 @@ napoleon_include_init_with_doc = False
 
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
+
+html_theme_options = {
+    "repository_url": "https://github.com/idaholab/DOVE",
+    "use_repository_button": True,
+    "show_navbar_depth": 1,
+    "show_toc_level": 2,
+}

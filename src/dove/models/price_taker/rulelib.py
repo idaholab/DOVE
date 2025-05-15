@@ -76,19 +76,19 @@ def storage_balance_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expres
 
 def charge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     """ """
-    comp: "Storage" = m.system.comp_map[sname]
+    comp: Storage = m.system.comp_map[sname]
     return m.charge[sname, t] <= comp.max_charge_rate * comp.max_capacity
 
 
 def discharge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     """"""
-    comp: "Storage" = m.system.comp_map[sname]
+    comp: Storage = m.system.comp_map[sname]
     return m.discharge[sname, t] <= comp.max_discharge_rate * comp.max_capacity
 
 
 def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     """ """
-    comp: "Storage" = m.system.comp_map[sname]
+    comp: Storage = m.system.comp_map[sname]
     return m.SOC[sname, t] <= comp.max_capacity
 
 

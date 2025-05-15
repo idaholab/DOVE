@@ -3,10 +3,9 @@
 """ """
 
 import pytest
-import numpy as np
 
+from dove.core import Resource, Source
 from dove.core.system import System
-from dove.core import Component, Source, Sink, Converter, Storage, Resource
 
 
 def test_system_initialization_empty():

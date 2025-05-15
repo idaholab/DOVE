@@ -3,7 +3,6 @@
 """ """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -11,4 +10,4 @@ class Resource:
     """ """
 
     name: str
-    unit: Optional[str] = None
+    unit: str | None = None

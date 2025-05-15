@@ -9,12 +9,16 @@ from __future__ import annotations
 import warnings
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
 
-from . import CashFlow, RatioTransfer, Resource, TransferFunc
+from .cashflow import CashFlow
+from .transfers import RatioTransfer, TransferFunc
+
+if TYPE_CHECKING:
+    from .resource import Resource
 
 TimeDependent: TypeAlias = list[float] | NDArray[np.float64]
 

@@ -30,12 +30,12 @@ class System:
 
     @property
     def non_storage_comp_names(self) -> list[str]:
-        """ """
+        """A list of system component names that are not storage instances."""
         return [cn for cn in self.comp_map if not isinstance(self.comp_map[cn], Storage)]
 
     @property
     def storage_comp_names(self) -> list[str]:
-        """ """
+        """A list of system component names that are storage instances."""
         return [cn for cn in self.comp_map if isinstance(self.comp_map[cn], Storage)]
 
     def summary(self) -> None:

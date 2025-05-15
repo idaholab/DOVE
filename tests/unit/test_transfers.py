@@ -4,7 +4,8 @@
 
 import pytest
 from pyomo.environ import Constraint
-from dove.core.transfers import RatioTransfer, PolynomialTransfer
+
+from dove.core.transfers import PolynomialTransfer, RatioTransfer
 
 
 class DummyResource:
