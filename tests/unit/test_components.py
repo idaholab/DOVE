@@ -1,6 +1,7 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
+
 import pytest
 import numpy as np
 
@@ -33,8 +34,16 @@ def test_component_basic_properties_and_profile_conversion():
         ({"max_capacity": -1.0}, ValueError, "max_capacity < 0"),
         ({"max_capacity": 1.0, "min_capacity": 2.0}, ValueError, "min_capacity (2.0) must be in"),
         ({"profile": [-0.5]}, ValueError, "profile contains negative"),
-        ({"capacity_factor": True, "profile": [-0.1, 0.5]}, ValueError, "capacity_factor profile must"),
-        ({"capacity_factor": True, "profile": [0.5, 1.2]}, ValueError, "capacity_factor profile must"),
+        (
+            {"capacity_factor": True, "profile": [-0.1, 0.5]},
+            ValueError,
+            "capacity_factor profile must",
+        ),
+        (
+            {"capacity_factor": True, "profile": [0.5, 1.2]},
+            ValueError,
+            "capacity_factor profile must",
+        ),
         ({"flexibility": "invalid"}, ValueError, "flexibility must be"),
         ({"cashflows": [object()]}, TypeError, "all cashflows must be CashFlow"),
     ],

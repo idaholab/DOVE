@@ -1,17 +1,17 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-"""
-
-"""
+""" """
 
 from __future__ import annotations
+
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import TypeAlias
 
+import numpy as np
 from numpy.typing import NDArray
 
-TimeDependent: TypeAlias = list[float] | NDArray
+TimeDependent: TypeAlias = list[float] | NDArray[np.float64]
 
 
 @dataclass

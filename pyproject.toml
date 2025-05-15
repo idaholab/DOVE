@@ -31,6 +31,7 @@ managed = true
 [tool.ruff]
 indent-width = 4
 line-length = 100
+target-version = "py311"
 
 [tool.ruff.format]
 indent-style = "space"
@@ -38,20 +39,43 @@ quote-style = "double"
 line-ending = "auto"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "D1"]
-ignore = ["E402", "E501", "W505"]
+select = [
+    "E",    # pycodestyle errors (whitespace, indentation, etc.)
+    "F",    # Pyflakes (undefined names, unused imports)
+    "B",    # flake8-bugbear (likely bugs, dangerous patterns)
+    "I",    # isort (import order and grouping)
+    "UP",   # pyupgrade (use modern Python features)
+    "C90",  # mccabe (complexity)
+    "SIM",  # flake8-simplify (unnecessary code, simplifications)
+    "ARG",  # flake8-unused-arguments
+    "DTZ",  # flake8-datetimez (timezone-aware datetimes)
+    "A",    # flake8-builtins (shadowing built-in names)
+    "ANN",  # flake8-annotations (missing type annotations)
+    "C4",   # flake8-comprehensions (unnecessary comprehensions)
+    "TC",    # flake8-type-checking (type checking)
+    "PL",   # pylint (select subset, see below)
+]
+ignore = ["ANN401", "E402", "E501", "W505"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
 
 [tool.pytest.ini_options]
 minversion = "8.3.5"
 addopts = "-ra -q"
 testpaths = ["tests"]
 
+[tool.mypy]
+plugins = "numpy.typing.mypy_plugin"
+
 [dependency-groups]
 dev = [
+    "mypy>=1.15.0",
     "myst-parser>=4.0.1",
+    "pandas-stubs>=2.2.3.250308",
+    "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
     "sphinx>=8.2.3",
     "sphinx-book-theme>=1.1.4",
 ]
-

@@ -1,28 +1,29 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-"""
+""" """
 
-"""
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import TypeAlias, TYPE_CHECKING
 
-from pyomo.environ import Constraint
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeAlias
+
+from pyomo.environ import Constraint, Expression  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from . import Resource
 
-TransferFunc : TypeAlias = "RatioTransfer | PolynomialTransfer"
+TransferFunc: TypeAlias = "RatioTransfer | PolynomialTransfer"
 
 
 @dataclass
 class RatioTransfer:
     """ """
-    input_res: "Resource"
-    output_res: "Resource"
+
+    input_res: Resource
+    output_res: Resource
     ratio: float = 1.0
 
-    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]):
+    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> Expression:
         """
         Enforce output = ratio * input.
         If both input and output are present, enforce: output == ratio * input.
@@ -48,15 +49,19 @@ class RatioTransfer:
                 f"or output '{self.output_res}' in the provided dispatch variables."
             )
 
+
 @dataclass
 class PolynomialTransfer:
     """ """
-    terms: list[tuple[float, dict["Resource", int]]]  # [(coefficient, {resource: exponent, ...}), ...]
 
-    def __call__(self, inputs, outputs):
+    terms: list[
+        tuple[float, dict[Resource, int]]
+    ]  # [(coefficient, {resource: exponent, ...}), ...]
+
+    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> Expression:
         """ """
         total_output = sum(outputs.values())
-        expr = 0
+        expr = 0.0
         for coef, input_exponents in self.terms:
             term = coef
             for res, exp in input_exponents.items():

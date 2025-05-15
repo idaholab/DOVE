@@ -1,14 +1,15 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
-from typing import Self
+
+from typing import Any, Self
 
 import pandas as pd
-import pyomo.environ as pyo
-from pyomo.environ import ConcreteModel, Constraint, Objective, Set, Var, value
+import pyomo.environ as pyo  # type: ignore[import-untyped]
 
-from .. import register_builder
-from ..base import BaseModelBuilder
+from dove.models import register_builder
+from dove.models.base import BaseModelBuilder
+
 from . import rulelib as prl
 
 
@@ -18,7 +19,7 @@ class PriceTakerBuilder(BaseModelBuilder):
 
     def build(self) -> Self:
         """ """
-        self.model = ConcreteModel()
+        self.model = pyo.ConcreteModel()
         self.model.system = self.system
 
         self._add_sets()
@@ -28,7 +29,7 @@ class PriceTakerBuilder(BaseModelBuilder):
 
         return self
 
-    def solve(self, **kw):
+    def solve(self, **kw: Any) -> pyo.ConcreteModel:
         """ """
         solver = pyo.SolverFactory(kw.get("solver", "cbc"))
         solver.solve(self.model)
@@ -43,34 +44,34 @@ class PriceTakerBuilder(BaseModelBuilder):
             for res in comp.produces + comp.consumes:
                 sign = -1 if res in comp.consumes else 1
                 direction = "consumes" if sign == -1 else "produces"
-                vals = [value(m.flow[comp.name, res.name, t]) * sign for t in T]
+                vals = [pyo.value(m.flow[comp.name, res.name, t]) * sign for t in T]
                 data[f"{comp.name}_{res.name}_{direction}"] = vals
 
             if comp.name in m.STORAGE:
-                data[f"{comp.name}_SOC"] = [value(m.SOC[comp.name, t]) for t in T]
-                data[f"{comp.name}_charge"] = [value(m.charge[comp.name, t]) for t in T]
-                data[f"{comp.name}_discharge"] = [value(m.discharge[comp.name, t]) for t in T]
+                data[f"{comp.name}_SOC"] = [pyo.value(m.SOC[comp.name, t]) for t in T]
+                data[f"{comp.name}_charge"] = [pyo.value(m.charge[comp.name, t]) for t in T]
+                data[f"{comp.name}_discharge"] = [pyo.value(m.discharge[comp.name, t]) for t in T]
 
         return pd.DataFrame(data, index=T)
 
-    def _add_sets(self):
+    def _add_sets(self) -> None:
         """ """
         non_storage_comp_names = self.model.system.non_storage_comp_names
         storage_comp_names = self.model.system.storage_comp_names
 
-        self.model.NON_STORAGE = Set(initialize=non_storage_comp_names)
-        self.model.STORAGE = Set(initialize=storage_comp_names)
-        self.model.R = Set(initialize=[r.name for r in self.system.resources])
-        self.model.T = Set(initialize=self.system.time_index, ordered=True)
+        self.model.NON_STORAGE = pyo.Set(initialize=non_storage_comp_names)
+        self.model.STORAGE = pyo.Set(initialize=storage_comp_names)
+        self.model.R = pyo.Set(initialize=[r.name for r in self.system.resources])
+        self.model.T = pyo.Set(initialize=self.system.time_index, ordered=True)
 
-    def _add_variables(self):
+    def _add_variables(self) -> None:
         m = self.model
-        m.flow = Var(m.NON_STORAGE, m.R, m.T, within=pyo.NonNegativeReals)
+        m.flow = pyo.Var(m.NON_STORAGE, m.R, m.T, within=pyo.NonNegativeReals)
 
         # Storage Variables
-        m.SOC = Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
-        m.charge = Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
-        m.discharge = Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.SOC = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.charge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.discharge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
 
         # # Ramp tracking variables
         # m.ramp_up = Var(m.C, m.T, within=NonNegativeReals)
@@ -78,32 +79,21 @@ class PriceTakerBuilder(BaseModelBuilder):
         # m.ramp_up_bin = Var(m.C, m.T, within=Binary)
         # m.ramp_down_bin = Var(m.C, m.T, within=Binary)
 
-    def _add_constraints(self):
-        m, system = self.model, self.system
+    def _add_constraints(self) -> None:
+        m = self.model
 
-        m.transfer = Constraint(m.NON_STORAGE, m.T, rule=prl.transfer_rule)
-        m.capacity = Constraint(m.NON_STORAGE, m.T, rule=prl.capacity_rule)
-        m.min_capacity = Constraint(m.NON_STORAGE, m.T, rule=prl.min_rule)
-        m.fixed_profile = Constraint(m.NON_STORAGE, m.T, rule=prl.fixed_profile_rule)
+        m.transfer = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.transfer_rule)
+        m.capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.capacity_rule)
+        m.min_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.min_rule)
+        m.fixed_profile = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.fixed_profile_rule)
 
-        m.resource_balance = Constraint(m.R, m.T, rule=prl.balance_rule)
+        m.resource_balance = pyo.Constraint(m.R, m.T, rule=prl.balance_rule)
 
         # Storage Constraints
-        m.storage_balance = Constraint(m.STORAGE, m.T, rule=prl.storage_balance_rule)
-
-        m.charge_limit = Constraint(
-            m.STORAGE, m.T,
-            rule=lambda m, s, t: m.charge[s, t] <= system.comp_map[s].max_charge_rate * system.comp_map[s].max_capacity
-        )
-
-        m.discharge_limit = Constraint(
-            m.STORAGE, m.T,
-            rule=lambda m, s, t: m.discharge[s, t] <= system.comp_map[s].max_discharge_rate * system.comp_map[s].max_capacity
-        )
-        m.soc_limit = Constraint(
-            m.STORAGE, m.T,
-            rule=lambda m, s, t: m.SOC[s, t] <= system.comp_map[s].max_capacity
-        )
+        m.storage_balance = pyo.Constraint(m.STORAGE, m.T, rule=prl.storage_balance_rule)
+        m.charge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.charge_limit_rule)
+        m.discharge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.discharge_limit_rule)
+        m.soc_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.soc_limit_rule)
 
         # # Ramp Constraints
         # def ramp_rule(m, cname, t):
@@ -130,16 +120,5 @@ class PriceTakerBuilder(BaseModelBuilder):
         #     yield sum(m.ramp_up_bin[cname, tw] + m.ramp_down_bin[cname, tw] for tw in freq_window) <= comp.ramp_freq
         # m.ramp_freq = Constraint(m.C, m.T, rule=ramp_freq_rule)
 
-    def _add_objective(self):
-        m, system = self.model, self.system
-        def objective_rule(m):
-            total = 0
-            for comp in system.components:
-                # TODO: cashflow defaults to capacity_resource we should find a way to do different tracking vars
-                rname = comp.capacity_resource.name
-                for cf in comp.cashflows:
-                    for t in m.T:
-                        dispatch = m.flow[comp.name, rname, t]
-                        total += cf.sign * cf.price_profile[t] * ((dispatch / cf.dprime) ** cf.scalex)
-            return total
-        m.objective = Objective(rule=objective_rule, sense=pyo.maximize)
+    def _add_objective(self) -> None:
+        self.model.objective = pyo.Objective(rule=prl.objective_rule, sense=pyo.maximize)

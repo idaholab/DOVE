@@ -1,13 +1,12 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-"""
-"""
+""" """
+
 import numpy as np
 
 import dove.core as dc
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     ############################
     ### System Resources
     ############################
@@ -30,12 +29,7 @@ if __name__ == '__main__':
     # indicates that the component will produce `steam` at max_capacity for each time step.
     # This is also the reason why `profile` is not set for this component.
     # There are also no cashflows associated with producing steam from the "steamer."
-    steamer = dc.Source(
-        name="steamer",
-        produces=steam,
-        max_capacity=100,
-        flexibility="fixed"
-    )
+    steamer = dc.Source(name="steamer", produces=steam, max_capacity=100, flexibility="fixed")
 
     # A Storage component doesn't specify a `consumes` and `produces` but defines
     # a `resource` that its capacity is defined in terms of. A Storage can only store
@@ -67,21 +61,21 @@ if __name__ == '__main__':
         name="market_linear",
         consumes=elec,
         max_capacity=2,
-        cashflows=[dc.Revenue("esales", price_profile=linear_price)] # Time Varying Revenue
+        cashflows=[dc.Revenue("esales", price_profile=linear_price)],  # Time Varying Revenue
     )
 
     market_spike = dc.Sink(
         name="market_spike",
         consumes=elec,
         max_capacity=40,
-        cashflows=[dc.Revenue("esales", price_profile=spike_price)], # Time Varying Revenue
+        cashflows=[dc.Revenue("esales", price_profile=spike_price)],  # Time Varying Revenue
     )
 
     steam_offload = dc.Sink(
         name="steam_offload",
         consumes=steam,
         max_capacity=100,
-        cashflows=[dc.Revenue("steam_offload", alpha=0.01)], # Constant Revenue
+        cashflows=[dc.Revenue("steam_offload", alpha=0.01)],  # Constant Revenue
     )
 
     ############################
@@ -94,7 +88,3 @@ if __name__ == '__main__':
     results = sys.solve()
 
     print(results)
-
-
-
-

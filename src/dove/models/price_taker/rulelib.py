@@ -2,11 +2,16 @@
 # ALL RIGHTS RESERVED
 """ """
 
-from pyomo.environ import Constraint
+from typing import TYPE_CHECKING
+
+import pyomo.environ as pyo  # type: ignore
+
+if TYPE_CHECKING:
+    from dove.core import Storage
 
 
 # Transfer Constraints (Converters)
-def transfer_rule(m, cname, t):
+def transfer_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """ """
     comp = m.system.comp_map[cname]
     inputs = {r.name: m.flow[cname, r.name, t] for r in comp.consumes}
@@ -14,28 +19,28 @@ def transfer_rule(m, cname, t):
     return comp.transfer_fn(inputs, outputs)
 
 
-def capacity_rule(m, cname, t):
+def capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """ """
     comp = m.system.comp_map[cname]
     return m.flow[cname, comp.capacity_resource.name, t] <= comp.max_capacity
 
 
-def min_rule(m, cname, t):
+def min_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """ """
     comp = m.system.comp_map[cname]
     return m.flow[cname, comp.capacity_resource.name, t] >= comp.min_capacity
 
 
-def fixed_profile_rule(m, cname, t):
+def fixed_profile_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """ """
     comp = m.system.comp_map[cname]
     if len(comp.profile) == 0:
-        return Constraint.Skip
+        return pyo.Constraint.Skip
     return m.flow[cname, comp.capacity_resource.name, t] == comp.profile[t]
 
 
 # Resource Balance Constraints
-def balance_rule(m, rname, t):
+def balance_rule(m: pyo.ConcreteModel, rname: str, t: int) -> pyo.Expression:
     """ """
     prod = sum(
         m.flow[cname, rname, t]
@@ -57,7 +62,7 @@ def balance_rule(m, rname, t):
     return prod - cons + storage_change == 0
 
 
-def storage_balance_rule(m, sname, t):
+def storage_balance_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     """ """
     comp = m.system.comp_map[sname]
     if t == m.T.first():
@@ -67,3 +72,35 @@ def storage_balance_rule(m, sname, t):
     return m.SOC[sname, t] == soc_prev + (
         m.charge[sname, t] * comp.rte**0.5 - m.discharge[sname, t] / comp.rte**0.5
     )
+
+
+def charge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
+    """ """
+    comp: "Storage" = m.system.comp_map[sname]
+    return m.charge[sname, t] <= comp.max_charge_rate * comp.max_capacity
+
+
+def discharge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
+    """"""
+    comp: "Storage" = m.system.comp_map[sname]
+    return m.discharge[sname, t] <= comp.max_discharge_rate * comp.max_capacity
+
+
+def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
+    """ """
+    comp: "Storage" = m.system.comp_map[sname]
+    return m.SOC[sname, t] <= comp.max_capacity
+
+
+def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
+    """ """
+    total = 0
+    for comp in m.system.components:
+        # TODO: cashflow defaults to capacity_resource
+        # we should find a way to do different resource vars like level/charge/discharge
+        rname = comp.capacity_resource.name
+        for cf in comp.cashflows:
+            for t in m.T:
+                dispatch = m.flow[comp.name, rname, t]
+                total += cf.sign * cf.price_profile[t] * ((dispatch / cf.dprime) ** cf.scalex)
+    return total

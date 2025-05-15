@@ -1,15 +1,24 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
-from typing import Type
 
-BUILDER_REGISTRY: dict[str, Type] = {}
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-def register_builder(name: str):
+if TYPE_CHECKING:
+    from .base import BaseModelBuilder
+
+BUILDER_REGISTRY: dict[str, type["BaseModelBuilder"]] = {}
+
+
+def register_builder(name: str) -> Callable[[type["BaseModelBuilder"]], None]:
     """ """
-    def _decorator(cls: Type):
+
+    def _decorator(cls: type["BaseModelBuilder"]) -> None:
         BUILDER_REGISTRY[name] = cls
+
     return _decorator
+
 
 from .price_taker import PriceTakerBuilder
 

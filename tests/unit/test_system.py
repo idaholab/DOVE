@@ -1,6 +1,7 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
 """ """
+
 import pytest
 import numpy as np
 
@@ -9,11 +10,11 @@ from dove.core import Component, Source, Sink, Converter, Storage, Resource
 
 
 def test_system_initialization_empty():
-  sys = System()
-  assert isinstance(sys.components, list)
-  assert sys.components == []
-  assert isinstance(sys.resources, list)
-  assert sys.resources == []
+    sys = System()
+    assert isinstance(sys.components, list)
+    assert sys.components == []
+    assert isinstance(sys.resources, list)
+    assert sys.resources == []
 
 
 # def test_add_and_get_components_and_resources():
@@ -40,13 +41,13 @@ def test_system_initialization_empty():
 
 
 def test_adding_duplicate_component_name_raises():
-  sys = System()
-  r = Resource(name="res")
-  c1 = Source(name="c", produces=r, max_capacity=1.0, min_capacity=0.0, profile=[0.1])
-  c2 = Source(name="c", produces=r, max_capacity=2.0, min_capacity=0.0, profile=[0.2])
-  sys.add_component(c1)
-  with pytest.raises(ValueError):
-    sys.add_component(c2)
+    sys = System()
+    r = Resource(name="res")
+    c1 = Source(name="c", produces=r, max_capacity=1.0, min_capacity=0.0, profile=[0.1])
+    c2 = Source(name="c", produces=r, max_capacity=2.0, min_capacity=0.0, profile=[0.2])
+    sys.add_component(c1)
+    with pytest.raises(ValueError):
+        sys.add_component(c2)
 
 
 # def test_remove_component_and_resource_cleanup():

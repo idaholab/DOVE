@@ -3,6 +3,7 @@
 """
 ``dove.core``
 """
+
 from .resource import Resource
 from .transfers import RatioTransfer, PolynomialTransfer, TransferFunc
 from .cashflow import CashFlow, Cost, Revenue

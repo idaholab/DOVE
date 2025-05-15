@@ -9,14 +9,14 @@ from __future__ import annotations
 import warnings
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Literal, Optional, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
 
 from . import CashFlow, RatioTransfer, Resource, TransferFunc
 
-TimeDependent: TypeAlias = list[float] | NDArray
+TimeDependent: TypeAlias = list[float] | NDArray[np.float64]
 
 
 @dataclass(kw_only=True)
@@ -28,12 +28,12 @@ class Component(ABC):
     consumes: list[Resource] = field(default_factory=list)
     produces: list[Resource] = field(default_factory=list)
     min_capacity: float = 0.0
-    capacity_resource: Optional[Resource] = None
+    capacity_resource: Resource | None = None
     profile: TimeDependent = field(default_factory=list)
     capacity_factor: bool = False
     flexibility: Literal["flex", "fixed"] = "flex"
     cashflows: list[CashFlow] = field(default_factory=list)
-    transfer_fn: Optional[TransferFunc] = None
+    transfer_fn: TransferFunc | None = None
 
     @property
     def produces_by_name(self) -> list[str]:
@@ -71,9 +71,8 @@ class Component(ABC):
         if not self.capacity_factor:
             if (self.profile < 0).any():
                 raise ValueError(f"{self.name}: profile contains negative values")
-        else:
-            if ((self.profile < 0) | (self.profile > 1)).any():
-                raise ValueError(f"{self.name}: capacity_factor profile must be in [0,1]")
+        elif ((self.profile < 0) | (self.profile > 1)).any():
+            raise ValueError(f"{self.name}: capacity_factor profile must be in [0,1]")
 
         # flexibility
         if self.flexibility not in ("flex", "fixed"):
@@ -91,7 +90,7 @@ class Component(ABC):
 class Source(Component):
     """ """
 
-    def __init__(self, name: str, produces: Resource, **kwargs):
+    def __init__(self, name: str, produces: Resource, **kwargs: Any) -> None:
         """ """
         super().__init__(name=name, produces=[produces], capacity_resource=produces, **kwargs)
         if self.transfer_fn is None:
@@ -103,7 +102,7 @@ class Source(Component):
 class Sink(Component):
     """ """
 
-    def __init__(self, name: str, consumes: Resource, **kwargs):
+    def __init__(self, name: str, consumes: Resource, **kwargs: Any) -> None:
         """ """
         super().__init__(name=name, consumes=[consumes], capacity_resource=consumes, **kwargs)
         if self.transfer_fn is None:
@@ -132,6 +131,7 @@ class Converter(Component):
                     f"Converter {self.name}: capacity_resource not specified, "
                     f"using common resource '{in_res.name}'.",
                     UserWarning,
+                    stacklevel=2,
                 )
             else:
                 # ambiguous capacity_resource

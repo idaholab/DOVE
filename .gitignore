@@ -1,5 +1,5 @@
 ###
-### RAVEN 
+### RAVEN
 ###
 .ravenconfig.xml
 
@@ -27,4 +27,3 @@ docs/build/
 ### VS Code
 ###
 .vscode/
-

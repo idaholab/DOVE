@@ -35,7 +35,3 @@ Authors:
 Dylan McDowell
 Paul Talbot
 Aaron Epiney
-
-
-
-

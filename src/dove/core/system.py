@@ -2,35 +2,41 @@
 # ALL RIGHTS RESERVED
 """ """
 
-from typing import Self
+from typing import Any, Self
 
 import numpy as np
 
-from ..models import BUILDER_REGISTRY
+from dove.models import BUILDER_REGISTRY
+
 from . import Component, Resource, Storage
 
 
 class System:
     """ """
 
-    def __init__(self, components=None, resources=None, time_index=None) -> None:
+    def __init__(
+        self,
+        components: list[Component] | None = None,
+        resources: list[Resource] | None = None,
+        time_index: list[int] | None = None,
+    ) -> None:
         """ """
         self.components: list[Component] = [] if components is None else components
         self.resources: list[Resource] = [] if resources is None else resources
         self.time_index = [0] if time_index is None else time_index
-        self.comp_map = {comp.name: comp for comp in self.components}
-        self.res_map = {res.name: res for res in self.resources}
+        self.comp_map: dict[str, Component] = {comp.name: comp for comp in self.components}
+        self.res_map: dict[str, Resource] = {res.name: res for res in self.resources}
         self._normalize_time_series()
 
     @property
     def non_storage_comp_names(self) -> list[str]:
         """ """
-        return [cn for cn in self.comp_map.keys() if not isinstance(self.comp_map[cn], Storage)]
+        return [cn for cn in self.comp_map if not isinstance(self.comp_map[cn], Storage)]
 
     @property
     def storage_comp_names(self) -> list[str]:
         """ """
-        return [cn for cn in self.comp_map.keys() if isinstance(self.comp_map[cn], Storage)]
+        return [cn for cn in self.comp_map if isinstance(self.comp_map[cn], Storage)]
 
     def summary(self) -> None:
         """ """
@@ -69,31 +75,32 @@ class System:
                         f"Component '{comp.name}' has a cashflow price profile length that does not match the time index length!"
                     )
 
-    def add_component(self, comp) -> Self:
+    def add_component(self, comp: Component) -> Self:
         """ """
         self.components.append(comp)
         self.verify()
         self.comp_map[comp.name] = comp
         return self
 
-    def add_resource(self, res) -> Self:
+    def add_resource(self, res: Resource) -> Self:
         """ """
         self.resources.append(res)
         self.res_map[res.name] = res
         return self
 
-    def build(self):
+    def build(self) -> None:
         """ """
+        # TODO: Implement the build method
         raise NotImplementedError("System method 'build' is not yet implemented!")
 
-    def solve(self, model_type: str = "price_taker", **kw):
+    def solve(self, model_type: str = "price_taker", **kw: dict[str, Any]) -> Any:
         """ """
         try:
             builder_cls = BUILDER_REGISTRY[model_type]
-        except KeyError:
+        except KeyError as err:
             raise ValueError(
                 f"Unknown model type: '{model_type}'! Available: {list(BUILDER_REGISTRY)}"
-            )
+            ) from err
 
         builder = builder_cls(self)
         builder.build()
@@ -108,6 +115,7 @@ class System:
             if comp.capacity_factor:
                 # Means user has supplied a time-series profile to the component
                 # that represents the capacity factor
+                assert isinstance(comp.profile, np.ndarray)
                 comp.profile = comp.profile * comp.max_capacity
 
             if comp.flexibility == "fixed":
@@ -117,5 +125,3 @@ class System:
             for cf in comp.cashflows:
                 if len(cf.price_profile) < 1:
                     cf.price_profile = np.full(len(self.time_index), cf.alpha)
-
-
