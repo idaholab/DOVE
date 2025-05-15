@@ -119,6 +119,7 @@ class System:
                 comp.profile = comp.profile * comp.max_capacity
 
             if comp.flexibility == "fixed":
+                # TODO: Move these into component constructor
                 comp.min_capacity = comp.max_capacity
                 comp.profile = np.full(len(self.time_index), comp.max_capacity)
 
