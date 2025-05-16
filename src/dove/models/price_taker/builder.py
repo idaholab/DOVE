@@ -1,6 +1,33 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-""" """
+"""
+``dove.models.price_taker.builder``
+========================
+
+Price Taker Builder Module
+
+This module provides a builder class for creating price taker optimization models
+within the DOVE framework. A price taker represents a market participant that
+accepts energy market prices as given and optimizes operations accordingly.
+
+The PriceTakerBuilder constructs a Pyomo optimization model with:
+- Sets for components (storage and non-storage), resources, and time periods
+- Variables for resource flows, state of charge, and charge/discharge rates
+- Constraints for resource balances, capacity limits, and storage operations
+- An economic objective function optimizing market participation
+
+The model incorporates both standard generation/consumption components and
+storage components with their associated charge/discharge dynamics and state
+of charge tracking.
+
+Notes
+-----
+The price taker model focuses on economic optimization of resource flows
+without attempting to influence market prices.
+
+See Also
+dove.models.base.BaseModelBuilder : Parent class providing the base builder interface
+"""
 
 from typing import Any, Self
 
@@ -15,10 +42,43 @@ from . import rulelib as prl
 
 @register_builder("price_taker")
 class PriceTakerBuilder(BaseModelBuilder):
-    """ """
+    """
+    Builder class for creating price taker optimization models.
+
+    This class implements the builder pattern to construct a price taker optimization
+    model step by step. A price taker model represents a participant in an energy
+    market that accepts prices as given and optimizes their operations accordingly.
+
+    The builder adds sets, variables, constraints, and an objective function to
+    the optimization model, and provides methods to solve it and extract results.
+
+    Attributes
+    ----------
+    model : pyo.ConcreteModel
+        The Pyomo concrete model being constructed.
+    system : object
+        The energy system being modeled, containing components, resources, and time indices.
+
+    Examples
+    --------
+    >>> builder = PriceTakerBuilder(system)
+    >>> model = builder.build().solve()
+    >>> results = builder.extract_results()
+    """
 
     def build(self) -> Self:
-        """ """
+        """
+        Build the price taker optimization model.
+
+        Creates a Pyomo concrete model and adds the necessary sets, variables,
+        constraints, and objective function to formulate the price taker
+        optimization problem.
+
+        Returns
+        -------
+        Self
+            The builder instance, allowing for method chaining.
+        """
         self.model = pyo.ConcreteModel()
         self.model.system = self.system
 
@@ -30,18 +90,45 @@ class PriceTakerBuilder(BaseModelBuilder):
         return self
 
     def solve(self, **kw: Any) -> pyo.ConcreteModel:
-        """ """
+        """
+        Solve the built optimization model.
+
+        Parameters
+        ----------
+        **kw : Any
+            Keyword arguments for the solver configuration.
+            - solver : str, optional
+                The solver to use for optimization, default is 'cbc'.
+
+        Returns
+        -------
+        pyo.ConcreteModel
+            The solved Pyomo model.
+        """
         solver = pyo.SolverFactory(kw.get("solver", "cbc"))
         solver.solve(self.model)
         return self.model
 
     def extract_results(self) -> pd.DataFrame:
-        """ """
+        """
+        Extract results from the solved model into a DataFrame.
+
+        Collects flow values for all resources produced or consumed by components,
+        as well as state of charge and charge/discharge rates for storage components.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the optimization results with time index
+            and columns for each component-resource flow and storage variables.
+        """
         m = self.model
         data = {}
         T = self.system.time_index
         for comp in self.system.components:
             for res in comp.produces + comp.consumes:
+                # Since everything is defined as positive flow, we need to flip the sign
+                # to make it clear if the component is producing or consuming
                 sign = -1 if res in comp.consumes else 1
                 direction = "consumes" if sign == -1 else "produces"
                 vals = [pyo.value(m.flow[comp.name, res.name, t]) * sign for t in T]
@@ -55,7 +142,15 @@ class PriceTakerBuilder(BaseModelBuilder):
         return pd.DataFrame(data, index=T)
 
     def _add_sets(self) -> None:
-        """ """
+        """
+        Add sets to the optimization model.
+
+        Creates sets for:
+        - NON_STORAGE: Non-storage components
+        - STORAGE: Storage components
+        - R: Resources
+        - T: Time periods (ordered)
+        """
         non_storage_comp_names = self.model.system.non_storage_comp_names
         storage_comp_names = self.model.system.storage_comp_names
 
@@ -65,6 +160,15 @@ class PriceTakerBuilder(BaseModelBuilder):
         self.model.T = pyo.Set(initialize=self.system.time_index, ordered=True)
 
     def _add_variables(self) -> None:
+        """
+        Add decision variables to the optimization model.
+
+        Creates variables for:
+        - flow: Resource flow for non-storage components
+        - SOC: State of charge for storage components
+        - charge: Charging activity for storage components
+        - discharge: Discharging activity for storage components
+        """
         m = self.model
         m.flow = pyo.Var(m.NON_STORAGE, m.R, m.T, within=pyo.NonNegativeReals)
 
@@ -80,6 +184,19 @@ class PriceTakerBuilder(BaseModelBuilder):
         # m.ramp_down_bin = Var(m.C, m.T, within=Binary)
 
     def _add_constraints(self) -> None:
+        """
+        Add constraints to the optimization model.
+
+        Adds various constraints including:
+        - Resource transfer constraints
+        - Capacity constraints
+        - Minimum capacity constraints
+        - Fixed profile constraints
+        - Resource balance constraints
+        - Storage balance constraints
+        - Charging/discharging limits
+        - State of charge limits
+        """
         m = self.model
 
         m.transfer = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.transfer_rule)
@@ -121,4 +238,10 @@ class PriceTakerBuilder(BaseModelBuilder):
         # m.ramp_freq = Constraint(m.C, m.T, rule=ramp_freq_rule)
 
     def _add_objective(self) -> None:
+        """
+        Add the objective function to the optimization model.
+
+        Sets a maximization objective based on the price taker objective rule
+        defined in the rulelib module.
+        """
         self.model.objective = pyo.Objective(rule=prl.objective_rule, sense=pyo.maximize)

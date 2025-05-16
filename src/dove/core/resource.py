@@ -9,10 +9,12 @@ Resources are fundamental entities that can be allocated, tracked, and managed w
 the DOVE system. Each resource is identified by a unique name and can optionally have
 an associated unit of measurement.
 
-Classes:
+Classes
+--------
     Resource: A dataclass representing a system resource with a name and optional unit.
 
-Example:
+Examples
+---------
     ```
     # Create a resource for electricity with kilowatt-hours as unit
     electricity = Resource(name="electricity", unit="kWh")

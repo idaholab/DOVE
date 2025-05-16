@@ -6,26 +6,22 @@
 
 Module containing component classes that form the basis of DOVE models.
 
-The module defines the base `Component` class and its specializations:
-- `Source`: generates a resource
-- `Sink`: consumes a resource
-- `Converter`: consumes, transforms, and produces resources from one type to another
-- `Storage`: stores and releases resources over time
-
 Components are connected through resources they consume and produce, forming
 a directed graph that represents a system model. Each component can have
 associated cash flows to motivate the optimization and transfer functions that define
 how resources flow through the component.
 
-Classes:
-    Component: Abstract base class for all components in a DOVE model
-    Source: Component that produces a resource
-    Sink: Component that consumes a resource
-    Converter: Component that transforms input resources into output resources
-    Storage: Component that can store a resource for later use
+Classes
+----------
+    - `Component`: Abstract base class for all components in a DOVE model
+    - `Source`: Component that produces a resource
+    - `Sink`: Component that consumes a resource
+    - `Converter`: Component that transforms input resources into output resources
+    - `Storage`: Component that can store a resource for later use
 
-Types:
-    TimeDependent: Type alias for time series data (list of floats or NumPy array)
+Types
+----------
+    - `TimeDependent`: Type alias for time series data (list of floats or NumPy array)
 """
 
 from __future__ import annotations

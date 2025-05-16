@@ -19,6 +19,19 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  # Turn this off for now, as its not configured correctly
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.15.0  # Use the sha / tag you want to point at
+  #   hooks:
+  #   -   id: mypy
+  #       args: ["--strict", "--ignore-missing-imports"]
+  #       additional_dependencies: ["numpy.typing", "pandas-stubs", "typeshed-client"]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+    - id: codespell
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:

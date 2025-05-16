@@ -10,7 +10,8 @@ This module defines classes for representing financial cash flows in energy syst
 including both costs and revenues. These cash flows can vary over time and have
 configurable scaling factors.
 
-Classes:
+Classes
+--------
     CashFlow: Abstract base class for all cash flows
     Cost: Represents expenses or negative cash flows
     Revenue: Represents income or positive cash flows

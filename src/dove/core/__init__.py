@@ -2,6 +2,15 @@
 # ALL RIGHTS RESERVED
 """
 ``dove.core``
+========================
+
+Core module for DOVE optimization framework.
+
+This module provides the foundational classes and functions for building
+and managing energy system models in DOVE. It includes classes for
+components, resources, cash flows, and transfer functions. These classes
+are essential for defining the structure and behavior of energy systems
+and for performing optimization and simulation tasks.
 """
 
 from .cashflow import CashFlow, Cost, Revenue

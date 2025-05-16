@@ -62,6 +62,12 @@ class RatioTransfer:
             output_res=Resource("heat"),
             ratio=0.95
         )
+
+    Later, after component instantiation, the transfer can be used evaluate a
+    constraint with dispatch activity values:
+
+    >>> transfer(inputs={"electricity": 100}, outputs={"heat": 95})
+    True
     """
 
     input_res: Resource

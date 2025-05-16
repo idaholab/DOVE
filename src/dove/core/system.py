@@ -11,9 +11,12 @@ resources and components in a coherent framework for optimization and simulation
 The System manages time series data, component interactions, and provides
 methods for building and solving optimization problems.
 
-Classes:
-    System: Main class for creating and managing energy system models
+Classes
+--------
+    - `System`: Main class for creating and managing DOVE energy system models.
 """
+
+from __future__ import annotations
 
 from typing import Any, Self
 

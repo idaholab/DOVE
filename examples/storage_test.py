@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # A Storage component doesn't specify a `consumes` and `produces` but defines
     # a `resource` that its capacity is defined in terms of. A Storage can only store
-    # a singluar resource and dispatch it at a later point in time when advantageous.
+    # a singular resource and dispatch it at a later point in time when advantageous.
     steam_storage = dc.Storage(
         name="steam_storage",
         resource=steam,
