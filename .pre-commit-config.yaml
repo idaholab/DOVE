@@ -44,4 +44,3 @@ repos:
     rev: v4.7.1
     hooks:
       - id: commitizen
-        stages: [pre-push]
