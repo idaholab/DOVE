@@ -3,8 +3,7 @@
 
 ## Documentation
 
-
-### Getting Started
+### 🚀 Get Started
 
 * <project:./getting-started/intro.md>
 * <project:./getting-started/install.md>
@@ -13,47 +12,38 @@
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: Getting Started
+:caption: 🚀 Get Started
 
 getting-started/intro.md
 getting-started/install.md
 getting-started/quick-start.md
 ```
 
-### User Guide
+### 📚 User Guide
 
 * <project:./user-guide/system.md>
 * <project:./user-guide/models.md>
+* <project:./user-guide/examples.md>
 
 
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: User Guide
+:caption: 📚 User Guide
 
 user-guide/system.md
 user-guide/models.md
-
+user-guide/examples.md
 ```
 
-### Examples
+### 📖 References
+
 
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: Examples
+:caption: 📖 References
 
+api/dove
+references/developer.md
 ```
-
-### References
-
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Examples
-
-```
-
-
-
-

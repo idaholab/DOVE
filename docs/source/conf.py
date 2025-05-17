@@ -22,23 +22,31 @@ release = "0.0.1"
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
+    "sphinx_autodoc_typehints",
+    "sphinx_copybutton",
 ]
 
-autosummary_generate = True
-# intersphinx_mapping = {
-#     "python": ("https://docs.python.org/3", None),
-#     "pyomo":  ("https://pyomo.readthedocs.io/en/stable/", None),
-# }
+source_suffix = [".rst", ".md"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "pyomo": ("https://pyomo.readthedocs.io/en/stable/", None),
+}
+
+autodoc_typehints = "description"
+autodoc_class_signature = "separated"
+autodoc_preserve_defaults = True
+napoleon_numpy_docstring = True
+always_document_param_types = True
+autodoc_member_order = "bysource"
 
 
 templates_path = ["_templates"]
-exclude_patterns = []
-
-napoleon_google_docstring = True
-napoleon_numpy_docstring = False
-napoleon_include_init_with_doc = False
 
 
 # -- Options for HTML output -------------------------------------------------

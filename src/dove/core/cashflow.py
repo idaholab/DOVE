@@ -90,10 +90,11 @@ class Cost(CashFlow):
     the fixed value for the length of the simulation.
 
     A time-dependent cost with a specific price profile:
+
     >>> cost = Cost(
     ...     name="Time-Dependent Cost",
     ...     price_profile=[0.5, 1.0, 1.5],
-    ...     alpha=1000.0,)
+    ...     alpha=1000.0)
     """
 
     sign: int = -1
