@@ -2,6 +2,7 @@ dove.core package
 =================
 
 .. automodule:: dove.core
+   :noindex:
    :members:
    :show-inheritance:
    :undoc-members:

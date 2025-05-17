@@ -1,6 +1,6 @@
 [project]
 name = "dove"
-version = "0.0.1"
+version = "0.0.0"
 description = "An extensible Python library for modeling multi-commodity dispatch of energy systems."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -93,6 +93,16 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 skip = './docs/build,./tests/pyomo_tests'
 count = true
 quiet-level = 3
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "pep621"
+tag_format = "v$version"
+version_files = [
+    "pyproject.toml:version",
+    "docs/conf.py:release"
+]
+update_changelog_on_bump = true
 
 [dependency-groups]
 dev = [

@@ -29,6 +29,3 @@ This part of the documentation is currently under construction.
 
 This part of the documentation is currently under construction.
 ```
-
-
-

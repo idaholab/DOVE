@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 project = "DOVE"
 project_copyright = "2024, Battelle Energy Alliance, LLC"
-author = "Dylan McDowell"
-release = "0.0.1"
+author = "Batelle Energy Alliance, LLC"
+release = "0.0.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -2,6 +2,7 @@ dove.models package
 ===================
 
 .. automodule:: dove.models
+   :noindex:
    :members:
    :show-inheritance:
    :undoc-members:

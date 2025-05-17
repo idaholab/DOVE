@@ -1,7 +1,8 @@
-dove package
+API Reference
 ============
 
 .. automodule:: dove
+   :noindex:
    :members:
    :show-inheritance:
    :undoc-members:
