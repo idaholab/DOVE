@@ -128,3 +128,7 @@ def test_storage_invalid_parameters_raise(bad_kwargs, msg_substr):
     with pytest.raises(ValueError) as exc:
         Storage(**init_kwargs)
     assert msg_substr in str(exc.value)
+
+
+def dummy_test():
+    print("HELLO")
