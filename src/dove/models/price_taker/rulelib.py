@@ -162,6 +162,280 @@ def fixed_profile_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expressi
     return m.flow[cname, comp.capacity_resource.name, t] == comp.profile[t]
 
 
+def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Limit rate of increase in component output between time periods.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint limiting upward ramping or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_limit") or comp.ramp_limit >= 1.0 or t == m.T.first():
+        return pyo.Constraint.Skip
+    res = comp.capacity_resource.name
+    return (
+        m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
+        <= comp.ramp_limit * comp.max_capacity
+    )
+
+
+def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Limit rate of decrease in component output between time periods.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint limiting downward ramping or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_limit") or comp.ramp_limit >= 1.0 or t == m.T.first():
+        return pyo.Constraint.Skip
+    res = comp.capacity_resource.name
+    return (
+        m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t]
+        <= comp.ramp_limit * comp.max_capacity
+    )
+
+
+def ramp_track_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Track upward ramps for a component.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint tracking upward ramps or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
+        return pyo.Constraint.Skip
+    res = comp.capacity_resource.name
+    return m.ramp_up[cname, t] >= m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
+
+
+def ramp_track_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Track downward ramps for a component.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint tracking downward ramps or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
+        return pyo.Constraint.Skip
+    res = comp.capacity_resource.name
+    return m.ramp_down[cname, t] >= m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t]
+
+
+def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Limit upward ramp size based on binary variable.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint limiting ramp size or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
+        return pyo.Constraint.Skip
+    return m.ramp_up[cname, t] <= comp.max_capacity * m.ramp_up_bin[cname, t]
+
+
+def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Limit downward ramp size based on binary variable.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint limiting ramp size or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
+        return pyo.Constraint.Skip
+    return m.ramp_down[cname, t] <= comp.max_capacity * m.ramp_down_bin[cname, t]
+
+
+def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Limit frequency of ramping events within a time window.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Constraint limiting ramp frequency or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
+        return pyo.Constraint.Skip
+
+    # Create window of time periods to check for ramping events
+    t_ord = m.T.ord(t)
+    window_start_ord = max(1, t_ord - comp.ramp_freq + 1)
+    freq_window = [t2 for t2 in m.T if window_start_ord <= m.T.ord(t2) <= t_ord]
+
+    return sum(m.ramp_up_bin[cname, tw] + m.ramp_down_bin[cname, tw] for tw in freq_window) <= 1
+
+
+def steady_state_upper_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Define upper bound for steady state operation (no flow increase if in steady state).
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Upper bound constraint for steady state or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if t == m.T.first():
+        return pyo.Constraint.Skip
+
+    res = comp.capacity_resource.name
+    flow_diff = m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
+
+    # If steady_bin is 1, then flow difference must be <= 0
+    M = 2 * comp.max_capacity
+    return flow_diff <= M * (1 - m.steady_bin[cname, t])
+
+
+def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Define lower bound for steady state operation (no flow decrease if in steady state).
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Lower bound constraint for steady state or Constraint.Skip
+    """
+    system = m.system
+    comp = system.comp_map[cname]
+    if t == m.T.first():
+        return pyo.Constraint.Skip
+
+    res = comp.capacity_resource.name
+    flow_diff = m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
+
+    # If steady_bin is 1, then flow difference must be >= 0
+    M = 2 * comp.max_capacity
+    return flow_diff >= -M * (1 - m.steady_bin[cname, t])
+
+
+def state_selection_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+    """
+    Ensure exactly one operational state is active at each time step.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        Pyomo model
+    cname : str
+        Component name
+    t : int
+        Time period
+
+    Returns
+    -------
+    pyo.Constraint
+        Component must be in exactly one state (up, down, or steady)
+    """
+    return m.ramp_up_bin[cname, t] + m.ramp_down_bin[cname, t] + m.steady_bin[cname, t] == 1
+
+
 # Resource Balance Constraints
 def balance_rule(m: pyo.ConcreteModel, rname: str, t: int) -> pyo.Expression:
     """
