@@ -133,12 +133,12 @@ class System:
 
         # Check that time index length matches profiles and price profiles
         for comp in self.components:
-            if comp.profile and len(comp.profile) != len(self.time_index):
+            if len(comp.profile) > 0 and len(comp.profile) != len(self.time_index):
                 raise ValueError(
                     f"Component '{comp.name}' has a profile length that does not match the time index length!"
                 )
             for cf in comp.cashflows:
-                if cf.price_profile and len(cf.price_profile) != len(self.time_index):
+                if len(cf.price_profile) > 0 and len(cf.price_profile) != len(self.time_index):
                     raise ValueError(
                         f"Component '{comp.name}' has a cashflow price profile length that does not match the time index length!"
                     )
