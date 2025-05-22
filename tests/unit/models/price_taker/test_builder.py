@@ -5,6 +5,7 @@
 from itertools import product
 
 import numpy as np
+import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
@@ -49,7 +50,7 @@ def create_example_system():
         consumes=elec,
         max_capacity=1.0,
         min_capacity=0.5,
-        profile=np.array([1.0, 0.0, 1.0]),
+        # profile=np.array([1.0, 0.0, 1.0]),
     )
 
     # Storage
@@ -57,7 +58,7 @@ def create_example_system():
         name="steam_storage",
         resource=steam,
         max_capacity=1.0,
-        profile=np.array([0.0, 0.5, 0.0]),
+        # profile=np.array([0.0, 0.5, 0.0]),
     )
 
     elec_storage = dc.Storage(
@@ -529,3 +530,150 @@ def test_add_objective(add_constraints_setup):
     assert isinstance(obj, pyo.Objective)
     assert obj.rule is not None
     assert not obj.is_minimizing()
+
+
+def test_build(create_example_system):
+    # Set up the builder
+    builder_cls = BUILDER_REGISTRY["price_taker"]
+    builder = builder_cls(create_example_system)
+
+    # Call the method under test
+    returned = builder.build()
+
+    # Check that model and system were added
+    assert isinstance(builder.model, pyo.ConcreteModel)
+    assert builder.model.system is create_example_system
+
+    # Check that sets were added
+    expected_set_names = ["STORAGE", "NON_STORAGE", "R", "T"]
+
+    for set_name in expected_set_names:
+        pyo_set = getattr(builder.model, set_name, None)
+        assert pyo_set is not None
+        assert isinstance(pyo_set, pyo.Set)
+
+    # Check that vars were added
+    expected_var_names = ["flow", "SOC", "charge", "discharge"]
+
+    for var_name in expected_var_names:
+        pyo_var = getattr(builder.model, var_name, None)
+        assert pyo_var is not None
+        assert isinstance(pyo_var, pyo.Var)
+
+    # Check that constraints were added
+    expected_constr_names = [
+        "transfer",
+        "capacity",
+        "min_capacity",
+        # "fixed_profile", # TODO: remove or uncomment
+        "resource_balance",
+        "storage_balance",
+        "charge_limit",
+        "discharge_limit",
+        "soc_limit",
+    ]
+
+    for constr_name in expected_constr_names:
+        pyo_constr = getattr(builder.model, constr_name, None)
+        assert pyo_constr is not None
+        assert isinstance(pyo_constr, pyo.Constraint)
+
+    # Check that objective was added
+    pyo_obj = getattr(builder.model, "objective", None)
+    assert pyo_obj is not None
+    assert isinstance(pyo_obj, pyo.Objective)
+
+    # Check return value
+    assert returned is builder
+
+
+def test_extract_results(create_example_system):
+    # Finish setup of builder
+    builder_cls = BUILDER_REGISTRY["price_taker"]
+    builder = builder_cls(create_example_system)
+    builder.build()
+
+    m = builder.model
+
+    # Set up example of a solved model
+
+    # Set up flow
+    m.flow.set_values(
+        {
+            ("elec_sink", "electricity", 0): 0.5,
+            ("elec_sink", "electricity", 1): 0.5,
+            ("elec_sink", "electricity", 2): 0.5,
+            ("elec_sink", "steam", 0): None,
+            ("elec_sink", "steam", 1): None,
+            ("elec_sink", "steam", 2): None,
+            ("steam_source", "electricity", 0): None,
+            ("steam_source", "electricity", 1): None,
+            ("steam_source", "electricity", 2): None,
+            ("steam_source", "steam", 0): 1.0,
+            ("steam_source", "steam", 1): 1.5,
+            ("steam_source", "steam", 2): 1.0,
+            ("steam_to_elec_converter", "electricity", 0): 0.5,
+            ("steam_to_elec_converter", "electricity", 1): 0.5,
+            ("steam_to_elec_converter", "electricity", 2): 0.5,
+            ("steam_to_elec_converter", "steam", 0): 1.0,
+            ("steam_to_elec_converter", "steam", 1): 1.0,
+            ("steam_to_elec_converter", "steam", 2): 1.0,
+        }
+    )
+
+    # Set up charge and discharge
+    m.charge.set_values(
+        {
+            ("elec_storage", 0): 0.0,
+            ("elec_storage", 1): 0.0,
+            ("elec_storage", 2): 0.0,
+            ("steam_storage", 0): 0.5,
+            ("steam_storage", 1): 1.0,
+            ("steam_storage", 2): 0.5,
+        }
+    )
+
+    # Set up charge, discharge, and SOC
+    m.discharge.set_values(
+        {
+            ("elec_storage", 0): 0.0,
+            ("elec_storage", 1): 0.0,
+            ("elec_storage", 2): 0.0,
+            ("steam_storage", 0): 0.5,
+            ("steam_storage", 1): 0.5,
+            ("steam_storage", 2): 0.5,
+        }
+    )
+
+    m.SOC.set_values(
+        {
+            ("elec_storage", 0): 0.0,
+            ("elec_storage", 1): 0.0,
+            ("elec_storage", 2): 0.0,
+            ("steam_storage", 0): 0.0,
+            ("steam_storage", 1): 0.5,
+            ("steam_storage", 2): 0.5,
+        }
+    )
+
+    # Call the method under test
+    actual_data = builder.extract_results()
+
+    # Expected result
+
+    expected_data = pd.DataFrame(
+        {
+            "steam_source_steam_produces": [1.0, 1.5, 1.0],
+            "steam_to_elec_converter_electricity_produces": [0.5, 0.5, 0.5],
+            "steam_to_elec_converter_steam_consumes": [-1.0, -1.0, -1.0],
+            "elec_sink_electricity_consumes": [-0.5, -0.5, -0.5],
+            "steam_storage_SOC": [0.0, 0.5, 0.5],
+            "steam_storage_charge": [0.5, 1.0, 0.5],
+            "steam_storage_discharge": [0.5, 0.5, 0.5],
+            "elec_storage_SOC": [0.0, 0.0, 0.0],
+            "elec_storage_charge": [-0.0, 0.0, 0.0],
+            "elec_storage_discharge": [0.0, 0.0, 0.0],
+        }
+    )
+
+    assert actual_data.equals(expected_data)
