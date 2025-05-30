@@ -135,7 +135,7 @@ class PriceTakerBuilder(BaseModelBuilder):
                 data[f"{comp.name}_{res.name}_{direction}"] = vals
 
             if comp.name in m.STORAGE:
-                data[f"{comp.name}_SOC"] = [pyo.value(m.SOC[comp.name, t]) for t in T]
+                data[f"{comp.name}_SOC"] = [pyo.value(m.soc[comp.name, t]) for t in T]
                 data[f"{comp.name}_charge"] = [pyo.value(m.charge[comp.name, t]) for t in T]
                 data[f"{comp.name}_discharge"] = [pyo.value(m.discharge[comp.name, t]) for t in T]
         data["objective"] = [pyo.value(m.objective)]
@@ -176,16 +176,27 @@ class PriceTakerBuilder(BaseModelBuilder):
         m.flow = pyo.Var(m.NON_STORAGE, m.R, m.T, within=pyo.NonNegativeReals)
 
         # Storage Variables
-        m.SOC = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.soc = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.charge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.discharge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
 
-        # Ramp tracking variables
-        m.ramp_up = pyo.Var(m.NON_STORAGE, m.T, within=pyo.NonNegativeReals)
-        m.ramp_down = pyo.Var(m.NON_STORAGE, m.T, within=pyo.NonNegativeReals)
-        m.ramp_up_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
-        m.ramp_down_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
-        m.steady_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
+        # Don't add ramping variables if no component has ramp frequency
+        # This is to avoid unnecessary complexity in the model
+        has_ramp_freq = any(
+            hasattr(comp, "ramp_freq") and comp.ramp_freq > 0 for comp in self.system.components
+        )
+        if has_ramp_freq:
+            # `ramp_up` and `ramp_down` vars are made for the sole purpose of tracking ramp events when
+            # `ramp_freq` > 0. They are not meant to be thought of as representing physical flows within
+            # the model, but only as a way of managing `flow` for binary events. The real use for
+            # `ramp_up` and `ramp_down` is when the binary vars set them to 0 which forces `flow` to 0.
+            # These variables are not meant to be thought of as flow differential, so don't try to use
+            # them in any objective functions.
+            m.ramp_up = pyo.Var(m.NON_STORAGE, m.T, within=pyo.NonNegativeReals)
+            m.ramp_down = pyo.Var(m.NON_STORAGE, m.T, within=pyo.NonNegativeReals)
+            m.ramp_up_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
+            m.ramp_down_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
+            m.steady_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
 
     def _add_constraints(self) -> None:
         """
