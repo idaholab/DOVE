@@ -135,10 +135,10 @@ class PriceTakerBuilder(BaseModelBuilder):
                 data[f"{comp.name}_{res.name}_{direction}"] = vals
 
             if comp.name in m.STORAGE:
-                data[f"{comp.name}_SOC"] = [pyo.value(m.SOC[comp.name, t]) for t in T]
+                data[f"{comp.name}_SOC"] = [pyo.value(m.soc[comp.name, t]) for t in T]
                 data[f"{comp.name}_charge"] = [pyo.value(m.charge[comp.name, t]) for t in T]
                 data[f"{comp.name}_discharge"] = [pyo.value(m.discharge[comp.name, t]) for t in T]
-
+        data["objective"] = [pyo.value(m.objective)]
         return pd.DataFrame(data, index=T)
 
     def _add_sets(self) -> None:
@@ -168,20 +168,35 @@ class PriceTakerBuilder(BaseModelBuilder):
         - SOC: State of charge for storage components
         - charge: Charging activity for storage components
         - discharge: Discharging activity for storage components
+        - ramp_up/ramp_down: Track ramping between time periods
+        - ramp_up_bin/ramp_down_bin: Binary indicators for ramping events
+        - steady_bin: Binary indicator for steady state operation
         """
         m = self.model
         m.flow = pyo.Var(m.NON_STORAGE, m.R, m.T, within=pyo.NonNegativeReals)
 
         # Storage Variables
-        m.SOC = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.soc = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.charge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.discharge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
 
-        # # Ramp tracking variables
-        # m.ramp_up = Var(m.C, m.T, within=NonNegativeReals)
-        # m.ramp_down = Var(m.C, m.T, within=NonNegativeReals)
-        # m.ramp_up_bin = Var(m.C, m.T, within=Binary)
-        # m.ramp_down_bin = Var(m.C, m.T, within=Binary)
+        # Don't add ramping variables if no component has ramp frequency
+        # This is to avoid unnecessary complexity in the model
+        has_ramp_freq = any(
+            hasattr(comp, "ramp_freq") and comp.ramp_freq > 0 for comp in self.system.components
+        )
+        if has_ramp_freq:
+            # `ramp_up` and `ramp_down` vars are made for the sole purpose of tracking ramp events when
+            # `ramp_freq` > 0. They are not meant to be thought of as representing physical flows within
+            # the model, but only as a way of managing `flow` for binary events. The real use for
+            # `ramp_up` and `ramp_down` is when the binary vars set them to 0 which forces `flow` to 0.
+            # These variables are not meant to be thought of as flow differential, so don't try to use
+            # them in any objective functions.
+            m.ramp_up = pyo.Var(m.NON_STORAGE, m.T, within=pyo.NonNegativeReals)
+            m.ramp_down = pyo.Var(m.NON_STORAGE, m.T, within=pyo.NonNegativeReals)
+            m.ramp_up_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
+            m.ramp_down_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
+            m.steady_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
 
     def _add_constraints(self) -> None:
         """
@@ -196,6 +211,8 @@ class PriceTakerBuilder(BaseModelBuilder):
         - Storage balance constraints
         - Charging/discharging limits
         - State of charge limits
+        - Ramping constraints (rate limits and frequency limits)
+        - Steady state definition and state selection
         """
         m = self.model
 
@@ -212,30 +229,19 @@ class PriceTakerBuilder(BaseModelBuilder):
         m.discharge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.discharge_limit_rule)
         m.soc_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.soc_limit_rule)
 
-        # # Ramp Constraints
-        # def ramp_rule(m, cname, t):
-        #     comp = system.comp_map[cname]
-        #     if comp.ramp_limit is None or t == m.T.first():
-        #         return pyo.Constraint.Skip
-        #     res = comp.capacity_resource.name
-        #     flow_diff = m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
-        #     yield flow_diff <= comp.ramp_limit
-        #     yield -flow_diff <= comp.ramp_limit
-        # m.ramp_limit = Constraint(m.C, m.T, rule=ramp_rule)
+        # Ramp Constraints
+        m.ramp_up_limit = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_up_rule)
+        m.ramp_down_limit = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_down_rule)
 
-        # # Ramp Frequency Constraints
-        # def ramp_freq_rule(m, cname, t):
-        #     comp = system.comp_map[cname]
-        #     if comp.ramp_freq is None or t == m.T.first():
-        #         return pyo.Constraint.Skip
-        #     yield m.ramp_up[cname, t] >= m.flow[cname, comp.capacity_resource.name, t] - m.flow[cname, comp.capacity_resource.name, m.T.prev(t)]
-        #     yield m.ramp_down[cname, t] >= m.flow[cname, comp.capacity_resource.name, m.T.prev(t)] - m.flow[cname, comp.capacity_resource.name, t]
-        #     yield m.ramp_up[cname, t] <= comp.max_capacity * m.ramp_up_bin[cname, t]
-        #     yield m.ramp_down[cname, t] <= comp.max_capacity * m.ramp_down_bin[cname, t]
-        #     yield m.ramp_up_bin[cname, t] + m.ramp_down_bin[cname, t] <= 1
-        #     freq_window = [t2 for t2 in m.T if m.T.ord(t2) >= m.T.ord(t)-comp.ramp_freq+1 and m.T.ord(t2) <= m.T.ord(t)]
-        #     yield sum(m.ramp_up_bin[cname, tw] + m.ramp_down_bin[cname, tw] for tw in freq_window) <= comp.ramp_freq
-        # m.ramp_freq = Constraint(m.C, m.T, rule=ramp_freq_rule)
+        # Ramp Frequency Constraints
+        m.ramp_track_up = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_track_up_rule)
+        m.ramp_track_down = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_track_down_rule)
+        m.ramp_bin_up = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_bin_up_rule)
+        m.ramp_bin_down = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_bin_down_rule)
+        m.state_selection = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.state_selection_rule)
+        m.steady_state_upper = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.steady_state_upper_rule)
+        m.steady_state_lower = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.steady_state_lower_rule)
+        m.ramp_freq_window = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_freq_window_rule)
 
     def _add_objective(self) -> None:
         """

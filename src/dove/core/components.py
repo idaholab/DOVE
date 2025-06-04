@@ -215,7 +215,7 @@ class Sink(Component):
 
     Notes
     -----
-    By default a Sink uses a `RatioTransfer` function with a 1:1 ratio is created
+    By default a Sink creates a `RatioTransfer` function with a 1:1 ratio
     using the consumed resource as both input and mocked output.
     """
 
@@ -238,7 +238,8 @@ class Converter(Component):
     ----------
     ramp_limit : float
         Maximum rate of change for the component's capacity
-        utilization between timesteps. Default is 1.0 (no limit).
+        utilization between timesteps as a percent of capacity.
+        Must be a value between 0 and 1. Default is 1.0 (no limit).
     ramp_freq : int
         Frequency at which ramp limitations are applied.
         Default is 0 (every timestep).
@@ -276,6 +277,11 @@ class Converter(Component):
             If capacity_resource was not specified but could be determined automatically
         """
         super().__post_init__()
+        if not (0.0 <= self.ramp_limit <= 1.0):
+            raise ValueError(
+                f"Converter {self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
+            )
+
         # If no capacity_resource was provided, pick one or error out
         if self.capacity_resource is None and self.consumes and self.produces:
             in_res = self.consumes[0]
