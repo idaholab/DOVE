@@ -31,6 +31,10 @@ def test_component_basic_properties_and_profile_conversion():
 @pytest.mark.parametrize(
     "kwargs, exc_type, msg_substr",
     [
+        ({"produces": "res"}, TypeError, "produces must be a list"),
+        ({"consumes": "res"}, TypeError, "consumes must be a list"),
+        ({"produces": ["res"]}, TypeError, "all resources must be Resource"),
+        ({"consumes": ["res"]}, TypeError, "all resources must be Resource"),
         ({"max_capacity": -1.0}, ValueError, "max_capacity < 0"),
         ({"max_capacity": 1.0, "min_capacity": 2.0}, ValueError, "min_capacity (2.0) must be in"),
         ({"profile": [-0.5]}, ValueError, "profile contains negative"),
@@ -74,6 +78,22 @@ def test_source_defaults_transfer_function():
     assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
 
 
+@pytest.mark.parametrize(
+    "bad_kwargs, msg_substr",
+    [
+        ({"consumes": Resource(name="res")}, "consumes"),
+        ({"capacity_resource": Resource(name="res")}, "capacity_resource"),
+    ],
+)
+def test_source_invalid_parameters_raise(bad_kwargs, msg_substr):
+    r = Resource(name="src_bad")
+    init_kwargs = {"name": "src_bad", "produces": r, "max_capacity": 5.0}
+    init_kwargs.update(bad_kwargs)
+    with pytest.raises(ValueError) as exc:
+        Source(**init_kwargs)
+    assert msg_substr in str(exc.value)
+
+
 def test_sink_defaults_transfer_function():
     r = Resource(name="fuel")
     sink = Sink(name="sink", max_capacity=8.0, consumes=r)
@@ -85,20 +105,56 @@ def test_sink_defaults_transfer_function():
     assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
 
 
+@pytest.mark.parametrize(
+    "bad_kwargs, msg_substr",
+    [
+        ({"produces": Resource(name="res")}, "produces"),
+        ({"capacity_resource": Resource(name="res")}, "capacity_resource"),
+    ],
+)
+def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
+    r = Resource(name="sink_bad")
+    init_kwargs = {"name": "sink_bad", "consumes": r, "max_capacity": 5.0}
+    init_kwargs.update(bad_kwargs)
+    with pytest.raises(ValueError) as exc:
+        Sink(**init_kwargs)
+    assert msg_substr in str(exc.value)
+
+
 def test_converter_same_resource_sets_capacity_and_warns():
     r = Resource(name="electricity")
     with pytest.warns(UserWarning):
-        conv = Converter(name="conv", max_capacity=15.0, consumes=[r], produces=[r])
+        conv = Converter(
+            name="conv",
+            max_capacity=15.0,
+            consumes=[r],
+            produces=[r],
+            transfer_fn=RatioTransfer(input_res=r, output_res=r),
+        )
     assert conv.capacity_resource is r
 
 
-def test_converter_ambiguous_capacity_resource_requires_explicit():
+@pytest.mark.parametrize("has_transfer_fn", [True, False])
+def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn):
     r1 = Resource(name="in_res")
     r2 = Resource(name="out_res")
+    init_kwargs = {"name": "amb", "max_capacity": 5.0, "consumes": [r1], "produces": [r2]}
+    if has_transfer_fn:
+        init_kwargs.update({"transfer_fn": RatioTransfer(input_res=r1, output_res=r2)})
     # missing transfer_fn and ambiguous resources
     with pytest.raises(ValueError) as exc:
-        Converter(name="amb", max_capacity=5.0, consumes=[r1], produces=[r2])
+        Converter(**init_kwargs)
     assert "ambiguous capacity_resource" in str(exc.value)
+
+
+def test_converter_no_transfer_fn():
+    r1 = Resource(name="r1")
+    r2 = Resource(name="r2")
+    with pytest.raises(ValueError) as exc:
+        Converter(
+            name="bad_conv", max_capacity=1, consumes=[r1], produces=[r2], capacity_resource=r1
+        )
+    assert "transfer_fn specified" in str(exc.value)
 
 
 def test_storage_default_capacity_and_valid_ranges():
@@ -115,6 +171,9 @@ def test_storage_default_capacity_and_valid_ranges():
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
+        ({"produces": Resource(name="res")}, "produces"),
+        ({"consumes": Resource(name="res")}, "consumes"),
+        ({"capacity_resource": Resource(name="res")}, "capacity_resource"),
         ({"rte": 1.5}, "rte"),
         ({"max_charge_rate": -0.1}, "max_charge_rate"),
         ({"max_discharge_rate": 2.0}, "max_discharge_rate"),
