@@ -68,12 +68,14 @@ class System:
             The time periods for simulation. If None, [0] is used.
         """
         self.components: list[Component] = [] if components is None else components
+        self.verify_components_definition()
         self.resources: list[Resource] = [] if resources is None else resources
+        self.verify_resources_definition()
         self.time_index = [0] if time_index is None else time_index
         self.comp_map: dict[str, Component] = {comp.name: comp for comp in self.components}
         self.res_map: dict[str, Resource] = {res.name: res for res in self.resources}
         self._normalize_time_series(components=self.components)
-        self.verify()
+        self.verify_time_series()
 
     @property
     def non_storage_comp_names(self) -> list[str]:
@@ -104,34 +106,70 @@ class System:
         }
         print(info)
 
-    def verify(self) -> None:
+    def verify_components_definition(self) -> None:
         """
-        Verify the integrity of the system.
+        Verify that components are valid.
 
         Checks for:
+        - Type of components
         - Uniqueness of component names
-        - Uniqueness of resource names
-        - Consistency of time series lengths with the system time index
 
         Raises
         ------
+        TypeError
+            If any component is not of type Component
         ValueError
-            If any validation check fails:
-            - Component names are not unique
-            - Resource names are not unique
-            - Component profile length doesn't match time index length
-            - Cashflow price profile length doesn't match time index length
+            If component names are not unique
         """
+        # Check the types of the components
+        for comp in self.components:
+            if not isinstance(comp, Component):
+                raise TypeError(f"Type of {comp} is not Component.")
+
         # Check for unique component names
         component_names = [comp.name for comp in self.components]
         if len(component_names) != len(set(component_names)):
             raise ValueError("Component names must be unique!")
+
+    def verify_resources_definition(self) -> None:
+        """
+        Verify that resources are valid.
+
+        Checks for:
+        - Type of resources
+        - Uniqueness of resource names
+
+        Raises
+        ------
+        TypeError
+            If any resource is not of type Resource
+        ValueError
+            If resource names are not unique
+        """
+        # Check the types of the resources
+        for res in self.resources:
+            if not isinstance(res, Resource):
+                raise TypeError(f"Type of {res} is not Resource.")
 
         # Check for unique resource names
         resource_names = [res.name for res in self.resources]
         if len(resource_names) != len(set(resource_names)):
             raise ValueError("Resource names must be unique!")
 
+    def verify_time_series(self) -> None:
+        """
+        Verify the integrity of the system's time series.
+
+        Checks for:
+        - Consistency of time series lengths with the system time index
+
+        Raises
+        ------
+        ValueError
+            If either validation check fails:
+            - Component profile length doesn't match time index length
+            - Cashflow price profile length doesn't match time index length
+        """
         # Check that time index length matches profiles and price profiles
         for comp in self.components:
             if len(comp.profile) > 0 and len(comp.profile) != len(self.time_index):
@@ -164,8 +202,9 @@ class System:
             If the component validation fails (via verify method).
         """
         self.components.append(comp)
+        self.verify_components_definition()
         self._normalize_time_series(components=[comp])
-        self.verify()
+        self.verify_time_series()
         self.comp_map[comp.name] = comp
         return self
 
@@ -184,8 +223,8 @@ class System:
             The system instance for method chaining.
         """
         self.resources.append(res)
+        self.verify_resources_definition()
         self.res_map[res.name] = res
-        self.verify()
         return self
 
     def build(self) -> None:
