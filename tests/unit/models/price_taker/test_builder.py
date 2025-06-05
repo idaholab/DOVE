@@ -132,7 +132,7 @@ def test_add_variables(builder_setup):
     m = builder_setup.model
 
     actual_flow_keys = set(m.flow.get_values().keys())
-    actual_soc_keys = set(m.SOC.get_values().keys())
+    actual_soc_keys = set(m.soc.get_values().keys())
     actual_charge_keys = set(m.charge.get_values().keys())
     actual_discharge_keys = set(m.discharge.get_values().keys())
 
@@ -403,7 +403,7 @@ def test_add_constraints_adds_storage_balance_constraint(add_constraints_setup, 
         }
     )
 
-    m.SOC.set_values(
+    m.soc.set_values(
         {
             ("steam_storage", 0): 0.0,
             ("steam_storage", 1): 1.0,
@@ -495,7 +495,7 @@ def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_
 
     # Set up required vars for input
     # Recall that steam storage max_capacity = 1; elec storage max_capacity = 2
-    m.SOC.set_values(
+    m.soc.set_values(
         {
             ("steam_storage", 0): 0.0,  # < max_capacity -> constr satisfied
             ("steam_storage", 1): 1.0,  # = max_capacity -> constr satisfied
@@ -553,7 +553,7 @@ def test_build(create_example_system):
         assert isinstance(pyo_set, pyo.Set)
 
     # Check that vars were added
-    expected_var_names = ["flow", "SOC", "charge", "discharge"]
+    expected_var_names = ["flow", "soc", "charge", "discharge"]
 
     for var_name in expected_var_names:
         pyo_var = getattr(builder.model, var_name, None)
@@ -633,7 +633,7 @@ def test_extract_results(create_example_system):
         }
     )
 
-    # Set up charge, discharge, and SOC
+    # Set up charge, discharge, and soc
     m.discharge.set_values(
         {
             ("elec_storage", 0): 0.0,
@@ -645,7 +645,7 @@ def test_extract_results(create_example_system):
         }
     )
 
-    m.SOC.set_values(
+    m.soc.set_values(
         {
             ("elec_storage", 0): 0.0,
             ("elec_storage", 1): 0.0,
@@ -655,6 +655,8 @@ def test_extract_results(create_example_system):
             ("steam_storage", 2): 0.5,
         }
     )
+
+    m.objective.set_value(0.0)
 
     # Call the method under test
     actual_data = builder.extract_results()
@@ -673,6 +675,7 @@ def test_extract_results(create_example_system):
             "elec_storage_SOC": [0.0, 0.0, 0.0],
             "elec_storage_charge": [-0.0, 0.0, 0.0],
             "elec_storage_discharge": [0.0, 0.0, 0.0],
+            "objective": [0.0, 0.0, 0.0],
         }
     )
 
