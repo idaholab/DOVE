@@ -228,6 +228,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         m.charge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.charge_limit_rule)
         m.discharge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.discharge_limit_rule)
         m.soc_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.soc_limit_rule)
+        m.periodic_storage = pyo.Constraint(m.STORAGE, rule=prl.periodic_storage_rule)
 
         # Ramp Constraints
         m.ramp_up_limit = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.ramp_up_rule)

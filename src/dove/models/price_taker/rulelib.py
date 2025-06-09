@@ -588,6 +588,33 @@ def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     return m.soc[sname, t] <= comp.max_capacity
 
 
+def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Constraint:
+    """
+    Enforce periodic storage level for a storage component.
+
+    This constraint ensures that the state of charge (SOC) at the final time step
+    equals the initial state of charge, respecting the `initial_stored` attribute.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        The Pyomo model instance containing system components and variables.
+    sname : str
+        The name of the storage component.
+
+    Returns
+    -------
+    pyo.Constraint
+        A Pyomo constraint enforcing periodic storage level.
+    """
+    comp = m.system.comp_map[sname]
+    if not comp.periodic_level:
+        return pyo.Constraint.Skip
+
+    # Enforce SOC at the final time step equals the initial SOC
+    return m.soc[sname, m.T.last()] == comp.initial_stored * comp.max_capacity
+
+
 def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
     """
     Calculate the objective function expression for a price-taker optimization model.
