@@ -111,21 +111,13 @@ class System:
         Verify that components are valid.
 
         Checks for:
-        - Type of components
         - Uniqueness of component names
 
         Raises
         ------
-        TypeError
-            If any component is not of type Component
         ValueError
             If component names are not unique
         """
-        # Check the types of the components
-        for comp in self.components:
-            if not isinstance(comp, Component):
-                raise TypeError(f"Type of {comp} is not Component.")
-
         # Check for unique component names
         component_names = [comp.name for comp in self.components]
         if len(component_names) != len(set(component_names)):

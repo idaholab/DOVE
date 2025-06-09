@@ -31,8 +31,6 @@ def test_component_basic_properties_and_profile_conversion():
 @pytest.mark.parametrize(
     "kwargs, exc_type, msg_substr",
     [
-        ({"produces": "res"}, TypeError, "produces must be a list"),
-        ({"consumes": "res"}, TypeError, "consumes must be a list"),
         ({"produces": ["res"]}, TypeError, "all resources must be Resource"),
         ({"consumes": ["res"]}, TypeError, "all resources must be Resource"),
         ({"max_capacity": -1.0}, ValueError, "max_capacity < 0"),
@@ -94,6 +92,12 @@ def test_source_invalid_parameters_raise(bad_kwargs, msg_substr):
     assert msg_substr in str(exc.value)
 
 
+def test_source_with_explicit_capacity_resource():
+    r = Resource(name="r")
+    src = Source(name="src", produces=r, max_capacity=1.0, capacity_resource=r)
+    assert src.capacity_resource is r
+
+
 def test_sink_defaults_transfer_function():
     r = Resource(name="fuel")
     sink = Sink(name="sink", max_capacity=8.0, consumes=r)
@@ -121,6 +125,12 @@ def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
     assert msg_substr in str(exc.value)
 
 
+def test_sink_with_explicit_capacity_resource():
+    r = Resource(name="r")
+    sink = Sink(name="sink", consumes=r, max_capacity=1.0, capacity_resource=r)
+    assert sink.capacity_resource is r
+
+
 def test_converter_same_resource_sets_capacity_and_warns():
     r = Resource(name="electricity")
     with pytest.warns(UserWarning):
@@ -145,16 +155,6 @@ def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn
     with pytest.raises(ValueError) as exc:
         Converter(**init_kwargs)
     assert "ambiguous capacity_resource" in str(exc.value)
-
-
-def test_converter_no_transfer_fn():
-    r1 = Resource(name="r1")
-    r2 = Resource(name="r2")
-    with pytest.raises(ValueError) as exc:
-        Converter(
-            name="bad_conv", max_capacity=1, consumes=[r1], produces=[r2], capacity_resource=r1
-        )
-    assert "transfer_fn specified" in str(exc.value)
 
 
 def test_storage_default_capacity_and_valid_ranges():

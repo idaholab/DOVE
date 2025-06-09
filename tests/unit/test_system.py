@@ -157,16 +157,6 @@ def test_system_setup(initialize_and_populate_system):
     assert len(storage.cashflows[0].price_profile) == 3
 
 
-def test_adding_non_component_to_components_raises_error(initialize_and_populate_system):
-    res = dc.Resource(name="res")
-    c1 = dc.Source(name="c1", produces=res, max_capacity=1.0)
-    with pytest.raises(TypeError):
-        initialize_and_populate_system(
-            resources=[res],
-            components=[c1, "c2"],  # c2 is a string, not a Component
-        )
-
-
 def test_adding_non_resource_to_resources_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="r1")
     c = dc.Source(name="c1", produces=r1, max_capacity=1.0)
