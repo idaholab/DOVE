@@ -29,16 +29,14 @@ from __future__ import annotations
 import warnings
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
 
 from .cashflow import CashFlow
+from .resource import Resource
 from .transfers import RatioTransfer, TransferFunc
-
-if TYPE_CHECKING:
-    from .resource import Resource
 
 TimeDependent: TypeAlias = list[float] | NDArray[np.float64]
 
@@ -113,16 +111,18 @@ class Component(ABC):
         This method performs various checks and conversions to ensure the component is properly configured:
         1. Converts profile to a numpy array of floats
         2. Validates capacity constraints (min/max)
-        3. Ensures capacity_resource is in either consumes or produces
-        4. Validates profile values based on capacity_factor setting
-        5. Checks that flexibility is either 'flex' or 'fixed'
-        6. Verifies all cashflows are CashFlow instances
+        3. Verifies all resources are Resource instances
+        4. Ensures capacity_resource is in either consumes or produces
+        5. Validates profile values based on capacity_factor setting
+        6. Checks that flexibility is either 'flex' or 'fixed'
+        7. Verifies all cashflows are CashFlow instances
 
         Raises
         ------
         ValueError
             If any validation check fails
         TypeError
+            If resources is not a list of Resource instances
             If cashflows contains elements that are not CashFlow instances
         """
         # convert profile
@@ -135,6 +135,10 @@ class Component(ABC):
             raise ValueError(
                 f"{self.name}: min_capacity ({self.min_capacity}) must be in [0, {self.max_capacity}]"
             )
+
+        # resources
+        if not all(isinstance(res, Resource) for res in self.produces + self.consumes):
+            raise TypeError(f"{self.name}: all resources must be Resource instances")
 
         # capacity resource consistency
         if self.capacity_resource:
@@ -181,6 +185,11 @@ class Source(Component):
     **kwargs : Any
         Additional arguments to pass to the parent Component class.
 
+    Raises
+    ------
+    ValueError
+        If 'consumes' or 'capacity_resource' is found in the kwargs
+
     Notes
     -----
     By default, a Source uses a RatioTransfer function with a 1:1 ratio,
@@ -189,7 +198,24 @@ class Source(Component):
     """
 
     def __init__(self, name: str, produces: Resource, **kwargs: Any) -> None:
+        if "consumes" in kwargs:
+            raise ValueError(
+                f"{name}: Keyword argument 'consumes' was provided for a Source, but sources cannot consume."
+                "Please remove keyword argument."
+            )
+
+        if "capacity_resource" in kwargs:
+            if kwargs["capacity_resource"] == produces:
+                del kwargs["capacity_resource"]
+            else:
+                raise ValueError(
+                    f"{name}: Keyword argument 'capacity_resource' was provided as a different resource "
+                    "than the component produces, which is not permitted for a Source. Please set "
+                    f"'capacity_resource' to {produces} explicitly, or remove it, and it will be set implicitly."
+                )
+
         super().__init__(name=name, produces=[produces], capacity_resource=produces, **kwargs)
+
         if self.transfer_fn is None:
             res = produces
             self.transfer_fn = RatioTransfer(input_res=res, output_res=res, ratio=1.0)
@@ -213,6 +239,11 @@ class Sink(Component):
     **kwargs : Any
         Additional keyword arguments to pass to the Component parent class.
 
+    Raises
+    ------
+    ValueError
+        If 'produces' or 'capacity_resource' is found in the kwargs
+
     Notes
     -----
     By default a Sink creates a `RatioTransfer` function with a 1:1 ratio
@@ -220,7 +251,24 @@ class Sink(Component):
     """
 
     def __init__(self, name: str, consumes: Resource, **kwargs: Any) -> None:
+        if "produces" in kwargs:
+            raise ValueError(
+                f"{name}: Keyword argument 'produces' was specified for a Sink, but sinks cannot produce."
+                "Please remove keyword argument."
+            )
+
+        if "capacity_resource" in kwargs:
+            if kwargs["capacity_resource"] == consumes:
+                del kwargs["capacity_resource"]
+            else:
+                raise ValueError(
+                    f"{name}: Keyword argument 'capacity_resource' was specified as a different resource "
+                    "than the component consumes, which is not permitted for a Sink. Please set "
+                    f"'capacity_resource' to {consumes} explicitly, or remove it, and it will be set implicitly."
+                )
+
         super().__init__(name=name, consumes=[consumes], capacity_resource=consumes, **kwargs)
+
         if self.transfer_fn is None:
             res = consumes
             self.transfer_fn = RatioTransfer(input_res=res, output_res=res, ratio=1.0)
@@ -267,7 +315,7 @@ class Converter(Component):
         1. If no capacity_resource was provided, attempts to determine one:
            - If the same resource is consumed and produced, uses that resource
            - Otherwise raises an error indicating ambiguity
-        2. Warns or raises errors if capacity_resource is ambiguous and/or transfer_fn is missing
+        2. Warns or raises errors if capacity_resource is ambiguous
 
         Raises
         ------
@@ -341,7 +389,7 @@ class Storage(Component):
         It's important to note that some Component attributes may not be
         applicable to Storage components, such as `produces`, `consumes`,
         and `capacity_resource`. These attributes are set automatically
-        based on the `resource` parameter.
+        based on the `resource` parameter as necessary.
 
     Notes
     -----
@@ -370,8 +418,17 @@ class Storage(Component):
         Raises
         ------
         ValueError
+            If 'produces', 'consumes', or 'capacity_resource' was added
             If any of the rate parameters are outside the range [0, 1]
         """
+        # Error if unaccepted attribute was added
+        for bad_attr in ("produces", "consumes", "capacity_resource"):
+            if getattr(self, bad_attr):
+                raise ValueError(
+                    f"Unaccepted keyword argument '{bad_attr}' provided to Storage {self.name}. "
+                    "Please remove keyword argument."
+                )
+
         super().__post_init__()
         if self.capacity_resource is None:
             self.capacity_resource = self.resource
