@@ -35,11 +35,12 @@ if TYPE_CHECKING:
 BUILDER_REGISTRY: dict[str, type["BaseModelBuilder"]] = {}
 
 
-def register_builder(name: str) -> Callable[[type["BaseModelBuilder"]], None]:
-    """ """
+def register_builder(name: str) -> Callable[[type["BaseModelBuilder"]], type["BaseModelBuilder"]]:
+    """Register a model builder class under the given name."""
 
-    def _decorator(cls: type["BaseModelBuilder"]) -> None:
+    def _decorator(cls: type["BaseModelBuilder"]) -> type["BaseModelBuilder"]:
         BUILDER_REGISTRY[name] = cls
+        return cls
 
     return _decorator
 
