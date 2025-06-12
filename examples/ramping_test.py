@@ -51,14 +51,14 @@ def create_test_system(with_ramping=True):
     npp = Source(
         name="npp",
         produces=steam,
-        max_capacity=700,
+        max_capacity_profile=np.full(len(hours), 700),
     )
 
     npp_bop = Converter(
         name="npp_bop",
         consumes=[steam],
         produces=[electricity],
-        max_capacity=BOP_CAPACITY,
+        max_capacity_profile=np.full(len(hours), BOP_CAPACITY),
         capacity_resource=electricity,
         transfer_fn=RatioTransfer(steam, electricity, 0.333),
     )
@@ -72,7 +72,7 @@ def create_test_system(with_ramping=True):
     ngcc = Source(
         name="ngcc",
         produces=electricity,
-        max_capacity=400,
+        max_capacity_profile=np.full(len(hours), 400),
         cashflows=[Cost(name="ngcc_cost", alpha=0.3)],
     )
 
@@ -81,11 +81,7 @@ def create_test_system(with_ramping=True):
     demand_profile = np.array([1e-5, 200, 200, 300, 100, 100, 1e-5, 200, 400, 200, 1e-5])
 
     grid = Sink(
-        name="grid",
-        consumes=electricity,
-        max_capacity=max(demand_profile),
-        profile=demand_profile,
-        # flexibility="fixed"
+        name="grid", consumes=electricity, max_capacity_profile=demand_profile, flexibility="fixed"
     )
 
     # Create and populate the system
@@ -96,7 +92,6 @@ def create_test_system(with_ramping=True):
     system.add_component(npp_bop)
     system.add_component(ngcc)
     system.add_component(grid)
-    system._normalize_time_series()
 
     return system
 
