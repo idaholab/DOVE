@@ -29,6 +29,7 @@ a 'system' attribute containing component and resource information.
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pyomo.environ as pyo  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
@@ -153,10 +154,8 @@ def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
     if not hasattr(comp, "ramp_limit") or t == m.T.first():
         return pyo.Constraint.Skip
     res = comp.capacity_resource.name
-    return (
-        m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
-        <= comp.ramp_limit * comp.max_capacity_profile[t]
-    )
+    max_allowed_ramp = comp.ramp_limit * np.max(comp.max_capacity_profile)
+    return m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)] <= max_allowed_ramp
 
 
 def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
@@ -182,10 +181,8 @@ def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
     if not hasattr(comp, "ramp_limit") or t == m.T.first():
         return pyo.Constraint.Skip
     res = comp.capacity_resource.name
-    return (
-        m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t]
-        <= comp.ramp_limit * comp.max_capacity_profile[t]
-    )
+    max_allowed_ramp = comp.ramp_limit * np.max(comp.max_capacity_profile)
+    return m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t] <= max_allowed_ramp
 
 
 def ramp_track_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
@@ -476,7 +473,7 @@ def storage_balance_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expres
     """
     comp = m.system.comp_map[sname]
     if t == m.T.first():
-        soc_prev = comp.initial_stored * comp.max_capacity_profile[t]
+        soc_prev = comp.initial_stored * np.max(comp.max_capacity_profile)
     else:
         soc_prev = m.soc[sname, m.T.prev(t)]
     return m.soc[sname, t] == soc_prev + (
@@ -508,7 +505,7 @@ def charge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expressio
         or equal to the maximum charging rate (as a proportion of maximum capacity)
     """
     comp: Storage = m.system.comp_map[sname]
-    return m.charge[sname, t] <= comp.max_charge_rate * comp.max_capacity_profile[t]
+    return m.charge[sname, t] <= comp.max_charge_rate * np.max(comp.max_capacity_profile)
 
 
 def discharge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
@@ -531,7 +528,7 @@ def discharge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expres
         discharge rate times the maximum capacity of the storage component at the given timestep
     """
     comp: Storage = m.system.comp_map[sname]
-    return m.discharge[sname, t] <= comp.max_discharge_rate * comp.max_capacity_profile[t]
+    return m.discharge[sname, t] <= comp.max_discharge_rate * np.max(comp.max_capacity_profile)
 
 
 def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
@@ -581,7 +578,7 @@ def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Constraint:
         return pyo.Constraint.Skip
 
     # Enforce SOC at the final time step equals the initial SOC
-    return m.soc[sname, m.T.last()] == comp.initial_stored * comp.max_capacity_profile[0]
+    return m.soc[sname, m.T.last()] == comp.initial_stored * np.max(comp.max_capacity_profile)
 
 
 def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
