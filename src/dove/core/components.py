@@ -198,12 +198,12 @@ class Component(ABC):
         """
         for cf in self.cashflows:
             if not isinstance(cf, CashFlow):
-                raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
+                raise TypeError(f"{self.name}: {cf.name}: all cashflows must be CashFlow instances")
             if len(cf.price_profile) < 1:
                 cf.price_profile = np.full(len(self.max_capacity_profile), cf.alpha)
             elif len(cf.price_profile) != len(self.max_capacity_profile):
                 raise ValueError(
-                    f"{self.name}: {cf.name}: cashflow price_profile length "
+                    f"{self.name}: {cf.name}: cashflow price profile length "
                     "does not match component profile length!"
                 )
 
