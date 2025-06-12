@@ -47,28 +47,23 @@ class Component(ABC):
     A base component class for energy system modeling.
 
     This abstract class defines the common interface and validation for components
-    in an energy system. Components have capacity constraints, can consume and produce
-    resources, may have time-dependent profiles, and can have associated cashflows.
+    in an energy system. Components have time-dependent capacity constraints, can consume and produce
+    resources, and can have associated cashflows.
 
     Attributes
     ----------
     name : str
         Unique identifier for the component.
-    max_capacity : float
-        Maximum operational capacity of the component.
+    max_capacity_profile : TimeDependent
+        Time-dependent maximum operational capacity of the component.
     consumes : list[Resource]
         Resources consumed by this component.
     produces : list[Resource]
         Resources produced by this component.
-    min_capacity : float
-        Minimum operational capacity, defaults to 0.0.
+    min_capacity : TimeDependent
+        Time-dependent minimum operational capacity; defaults to 0.0 for every timestep.
     capacity_resource : Resource | None
         The resource that defines capacity, if any.
-    profile : TimeDependent
-        Time-dependent profile for operation, as a numpy array.
-    capacity_factor : bool
-        Whether the profile represents a capacity factor (0-1)
-        rather than absolute values.
     flexibility : Literal["flex", "fixed"]
         Whether the component's operation is flexible or fixed in optimization.
     cashflows : list[CashFlow]
@@ -83,13 +78,11 @@ class Component(ABC):
     """
 
     name: str
-    max_capacity: float
+    max_capacity_profile: TimeDependent
     consumes: list[Resource] = field(default_factory=list)
     produces: list[Resource] = field(default_factory=list)
-    min_capacity: float = 0.0
+    min_capacity_profile: TimeDependent = field(default_factory=list)
     capacity_resource: Resource | None = None
-    profile: TimeDependent = field(default_factory=list)
-    capacity_factor: bool = False
     flexibility: Literal["flex", "fixed"] = "flex"
     cashflows: list[CashFlow] = field(default_factory=list)
     transfer_fn: TransferFunc | None = None
@@ -109,13 +102,16 @@ class Component(ABC):
         Validate and process the component's attributes after initialization.
 
         This method performs various checks and conversions to ensure the component is properly configured:
-        1. Converts profile to a numpy array of floats
-        2. Validates capacity constraints (min/max)
-        3. Verifies all resources are Resource instances
-        4. Ensures capacity_resource is in either consumes or produces
-        5. Validates profile values based on capacity_factor setting
-        6. Checks that flexibility is either 'flex' or 'fixed'
-        7. Verifies all cashflows are CashFlow instances
+        1. Converts max_capacity_profile to a numpy array of floats
+        2. Validates max_capacity_profile values
+        3. Checks that flexibility is either 'flex' or 'fixed'
+        4. Checks that only one of fixed flexibility and min_capacity_profile is specified
+        5. Sets min_capacity_profile equal to max_capacity_profile if flexibility is fixed
+        6. Populates min_capacity_profile if not explicitly set by the user
+        7. Validates min_capacity_profile values
+        8. Verifies all resources are Resource instances
+        9. Ensures capacity_resource is in either consumes or produces
+        10. Calls _validate_cashflows to validate cashflows
 
         Raises
         ------
@@ -123,18 +119,46 @@ class Component(ABC):
             If any validation check fails
         TypeError
             If resources is not a list of Resource instances
-            If cashflows contains elements that are not CashFlow instances
         """
-        # convert profile
-        self.profile = np.asarray(self.profile, float).ravel()
+        # convert max_capacity_profile
+        self.max_capacity_profile = np.asarray(self.max_capacity_profile, float).ravel()
 
-        # capacities
-        if self.max_capacity < 0:
-            raise ValueError(f"{self.name}: max_capacity < 0 ({self.max_capacity})")
-        if not (0 <= self.min_capacity <= self.max_capacity):
+        # validate max_capacity_profile
+        if (self.max_capacity_profile < 0).any():
+            raise ValueError(f"{self.name}: max_capacity_profile contains negative values")
+
+        # flexibility
+        if self.flexibility not in ("flex", "fixed"):
             raise ValueError(
-                f"{self.name}: min_capacity ({self.min_capacity}) must be in [0, {self.max_capacity}]"
+                f"{self.name}: flexibility must be 'flex' or 'fixed', got {self.flexibility}"
             )
+
+        if self.flexibility == "fixed":
+            if len(self.min_capacity_profile) > 0:
+                raise ValueError(
+                    f"{self.name}: both min_capacity_profile and fixed flexibility were specified"
+                )
+            self.min_capacity_profile = self.max_capacity_profile
+
+        # set default min_capacity_profile
+        if len(self.min_capacity_profile) < 1:
+            self.min_capacity_profile = np.full(len(self.max_capacity_profile), 0.0)
+        else:
+            # validate min_capacity_profile
+            if len(self.min_capacity_profile) != len(self.max_capacity_profile):
+                raise ValueError(
+                    f"{self.name}: length of min_capacity_profile does not equal length of max_capacity_profile"
+                    f"({len(self.min_capacity_profile)} != {len(self.max_capacity_profile)})"
+                )
+
+            for min_cap_value, max_cap_value in zip(
+                self.min_capacity_profile, self.max_capacity_profile, strict=True
+            ):
+                if not (0 <= min_cap_value <= max_cap_value):
+                    raise ValueError(
+                        f"{self.name}: each value in min_capacity_profile must be in "
+                        f"[0, <max_capacity_profile value>] ({min_cap_value} is not in [0, {max_cap_value}])"
+                    )
 
         # resources
         if not all(isinstance(res, Resource) for res in self.produces + self.consumes):
@@ -149,23 +173,30 @@ class Component(ABC):
                     "not in consumes or produces"
                 )
 
-        # profile checks
-        if not self.capacity_factor:
-            if (self.profile < 0).any():
-                raise ValueError(f"{self.name}: profile contains negative values")
-        elif ((self.profile < 0) | (self.profile > 1)).any():
-            raise ValueError(f"{self.name}: capacity_factor profile must be in [0,1]")
-
-        # flexibility
-        if self.flexibility not in ("flex", "fixed"):
-            raise ValueError(
-                f"{self.name}: flexibility must be 'flex' or 'fixed', got {self.flexibility}"
-            )
-
         # cashflows
+        self._validate_cashflows()
+
+    def _validate_cashflows(self) -> None:
+        """
+        Validate cashflows and expand cashflow price_profiles if not provided by the user.
+
+        Raises
+        ------
+        TypeError:
+            If cashflows contains elements that are not CashFlow instances
+        ValueError:
+            If any cashflow's price_profile is a different length from the component's capacity profile length
+        """
         for cf in self.cashflows:
             if not isinstance(cf, CashFlow):
-                raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
+                raise TypeError(f"{self.name}: {cf.name}: all cashflows must be CashFlow instances")
+            if len(cf.price_profile) < 1:
+                cf.price_profile = np.full(len(self.max_capacity_profile), cf.alpha)
+            elif len(cf.price_profile) != len(self.max_capacity_profile):
+                raise ValueError(
+                    f"{self.name}: {cf.name}: cashflow price profile length "
+                    "does not match component profile length!"
+                )
 
 
 @dataclass

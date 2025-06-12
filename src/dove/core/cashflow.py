@@ -65,6 +65,17 @@ class CashFlow(ABC):
     price_is_levelized: bool = False
     sign: int = 0
 
+    def __post_init__(self) -> None:
+        """
+        Process the cashflow's price_profile after initialization.
+        """
+        # Convert price_profile
+        self.price_profile = np.asarray(self.price_profile, float).ravel()
+
+        # Scale price profile by alpha
+        if len(self.price_profile) > 0:
+            self.price_profile = np.multiply(self.alpha, self.price_profile)
+
 
 @dataclass
 class Cost(CashFlow):
