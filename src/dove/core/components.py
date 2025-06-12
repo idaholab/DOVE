@@ -60,7 +60,7 @@ class Component(ABC):
         Resources consumed by this component.
     produces : list[Resource]
         Resources produced by this component.
-    min_capacity : TimeDependent
+    min_capacity_profile : TimeDependent
         Time-dependent minimum operational capacity; defaults to 0.0 for every timestep.
     capacity_resource : Resource | None
         The resource that defines capacity, if any.
@@ -108,10 +108,11 @@ class Component(ABC):
         4. Checks that only one of fixed flexibility and min_capacity_profile is specified
         5. Sets min_capacity_profile equal to max_capacity_profile if flexibility is fixed
         6. Populates min_capacity_profile if not explicitly set by the user
-        7. Validates min_capacity_profile values
-        8. Verifies all resources are Resource instances
-        9. Ensures capacity_resource is in either consumes or produces
-        10. Calls _validate_cashflows to validate cashflows
+        7. Converts min_capacity_profile to a numpy array of floats if necessary
+        8. Validates min_capacity_profile values
+        9. Verifies all resources are Resource instances
+        10. Ensures capacity_resource is in either consumes or produces
+        11. Calls _validate_cashflows to validate cashflows
 
         Raises
         ------
@@ -140,10 +141,13 @@ class Component(ABC):
                 )
             self.min_capacity_profile = self.max_capacity_profile
 
-        # set default min_capacity_profile
         if len(self.min_capacity_profile) < 1:
+            # set default min_capacity_profile
             self.min_capacity_profile = np.full(len(self.max_capacity_profile), 0.0)
         else:
+            # convert min_capacity_profile
+            self.min_capacity_profile = np.asarray(self.min_capacity_profile, float).ravel()
+
             # validate min_capacity_profile
             if len(self.min_capacity_profile) != len(self.max_capacity_profile):
                 raise ValueError(
@@ -189,12 +193,12 @@ class Component(ABC):
         """
         for cf in self.cashflows:
             if not isinstance(cf, CashFlow):
-                raise TypeError(f"{self.name}: {cf.name}: all cashflows must be CashFlow instances")
+                raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
             if len(cf.price_profile) < 1:
                 cf.price_profile = np.full(len(self.max_capacity_profile), cf.alpha)
             elif len(cf.price_profile) != len(self.max_capacity_profile):
                 raise ValueError(
-                    f"{self.name}: {cf.name}: cashflow price profile length "
+                    f"{self.name}: {cf.name}: cashflow price_profile length "
                     "does not match component profile length!"
                 )
 

@@ -161,7 +161,7 @@ class System:
         for comp in self.components:
             if len(comp.max_capacity_profile) != len(self.time_index):
                 raise ValueError(
-                    f"Component '{comp.name}' has a capacity profile length"
+                    f"Component '{comp.name}' has a capacity profile length "
                     "that does not match the time index length!"
                 )
 
