@@ -44,11 +44,6 @@ def test_component_basic_properties():
         ),
         ({"flexibility": "invalid"}, ValueError, "flexibility must be"),
         (
-            {"flexibility": "fixed", "min_capacity_profile": [0.5]},
-            ValueError,
-            "min_capacity_profile and fixed flexibility",
-        ),
-        (
             {"max_capacity_profile": [1.0], "min_capacity_profile": [1.0, 0.5]},
             ValueError,
             "length of min_capacity_profile does not equal length of max_capacity_profile",
@@ -73,6 +68,17 @@ def test_component_capacity_resource_not_in_consumes_or_produces():
 
 def test_min_capacity_profile_set_for_fixed_flexibility():
     c = Component(name="c", max_capacity_profile=[2.0, 3.0], flexibility="fixed")
+    assert c.min_capacity_profile.tolist() == [2.0, 3.0]
+
+
+def test_min_capacity_profile_and_fixed_flexibility_specified_warns():
+    with pytest.warns(UserWarning):
+        c = Component(
+            name="c",
+            max_capacity_profile=[2.0, 3.0],
+            min_capacity_profile=[1.0, 1.0],
+            flexibility="fixed",
+        )
     assert c.min_capacity_profile.tolist() == [2.0, 3.0]
 
 

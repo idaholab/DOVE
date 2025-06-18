@@ -105,9 +105,9 @@ class Component(ABC):
         1. Converts max_capacity_profile to a numpy array of floats
         2. Validates max_capacity_profile values
         3. Checks that flexibility is either 'flex' or 'fixed'
-        4. Checks that only one of fixed flexibility and min_capacity_profile is specified
+        4. Warns if fixed flexibility and min_capacity_profile were both set by the user
         5. Sets min_capacity_profile equal to max_capacity_profile if flexibility is fixed
-        6. Populates min_capacity_profile if not explicitly set by the user
+        6. Populates min_capacity_profile if necessary
         7. Converts min_capacity_profile to a numpy array of floats if necessary
         8. Validates min_capacity_profile values
         9. Verifies all resources are Resource instances
@@ -120,6 +120,8 @@ class Component(ABC):
             If any validation check fails
         TypeError
             If resources is not a list of Resource instances
+        UserWarning
+            If min_capacity_profile and fixed flexibility were both explicitly specified for a component
         """
         # convert max_capacity_profile
         self.max_capacity_profile = np.asarray(self.max_capacity_profile, float).ravel()
@@ -136,8 +138,11 @@ class Component(ABC):
 
         if self.flexibility == "fixed":
             if len(self.min_capacity_profile) > 0:
-                raise ValueError(
-                    f"{self.name}: both min_capacity_profile and fixed flexibility were specified"
+                warnings.warn(
+                    f"{self.name}: both min_capacity_profile and fixed flexibility were specified. "
+                    "Overriding min_capacity_profile in order to fix profile at max_capacity_profile",
+                    UserWarning,
+                    stacklevel=2,
                 )
             self.min_capacity_profile = self.max_capacity_profile
 
