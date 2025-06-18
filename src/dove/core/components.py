@@ -312,10 +312,11 @@ class Converter(Component):
         Perform post-initialization validation and setup.
 
         This method calls the parent class's post-initialization and then:
-        1. If no capacity_resource was provided, attempts to determine one:
+        1. Validates ramp_limit and ramp_freq values
+        2. If no capacity_resource was provided, attempts to determine one:
            - If the same resource is consumed and produced, uses that resource
            - Otherwise raises an error indicating ambiguity
-        2. Warns or raises errors if capacity_resource is ambiguous
+        3. Warns or raises errors if capacity_resource is ambiguous
 
         Raises
         ------
@@ -328,6 +329,10 @@ class Converter(Component):
         if not (0.0 <= self.ramp_limit <= 1.0):
             raise ValueError(
                 f"Converter {self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
+            )
+        if self.ramp_freq < 0:
+            raise ValueError(
+                f"Converter {self.name}: 'ramp_freq'={self.ramp_freq} must be positive"
             )
 
         # If no capacity_resource was provided, pick one or error out
