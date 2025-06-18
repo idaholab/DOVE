@@ -179,6 +179,30 @@ def test_sink_with_explicit_capacity_resource():
 
 
 @pytest.mark.unit()
+@pytest.mark.parametrize(
+    "bad_kwargs, msg_substr",
+    [
+        ({"ramp_limit": 1.1}, "ramp_limit"),
+        ({"ramp_freq": -1}, "ramp_freq"),
+    ],
+)
+def test_converter_bad_ramp_values_raise(bad_kwargs, msg_substr):
+    r1 = Resource(name="r1")
+    r2 = Resource(name="r2")
+    init_kwargs = {
+        "name": "conv",
+        "max_capacity_profile": [1.0],
+        "consumes": [r1],
+        "produces": [r2],
+        "transfer_fn": RatioTransfer(input_res=r1, output_res=r2),
+    }
+    init_kwargs.update(bad_kwargs)
+    with pytest.raises(ValueError) as exc:
+        Converter(**init_kwargs)
+    assert msg_substr in str(exc.value)
+
+
+@pytest.mark.unit()
 def test_converter_same_resource_sets_capacity_and_warns():
     r = Resource(name="electricity")
     with pytest.warns(UserWarning):

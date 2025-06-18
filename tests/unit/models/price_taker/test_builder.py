@@ -41,6 +41,8 @@ def create_example_system():
         consumes=[steam],
         produces=[elec],
         capacity_resource=steam,
+        ramp_freq=2,
+        ramp_limit=0.4,
         transfer_fn=dc.RatioTransfer(input_res=steam, output_res=elec, ratio=0.5),
     )
 
@@ -53,7 +55,11 @@ def create_example_system():
 
     # Storage
     steam_storage = dc.Storage(
-        name="steam_storage", resource=steam, max_capacity_profile=[1.0, 1.0, 1.0]
+        name="steam_storage",
+        resource=steam,
+        max_capacity_profile=[1.0, 1.0, 1.0],
+        initial_stored=0.5,
+        periodic_level=True,
     )
 
     elec_storage = dc.Storage(
@@ -62,6 +68,8 @@ def create_example_system():
         max_charge_rate=0.5,
         max_discharge_rate=0.25,
         max_capacity_profile=[2.0, 2.0, 2.0],
+        initial_stored=0.2,
+        periodic_level=False,
     )
 
     components = [steam_source, steam_to_elec_converter, elec_sink, steam_storage, elec_storage]
@@ -129,9 +137,16 @@ def test_add_variables(builder_setup):
     m = builder_setup.model
 
     actual_flow_keys = set(m.flow.get_values().keys())
+
     actual_soc_keys = set(m.soc.get_values().keys())
     actual_charge_keys = set(m.charge.get_values().keys())
     actual_discharge_keys = set(m.discharge.get_values().keys())
+
+    actual_ramp_up_keys = set(m.ramp_up.get_values().keys())
+    actual_ramp_down_keys = set(m.ramp_down.get_values().keys())
+    actual_ramp_up_bin_keys = set(m.ramp_up_bin.get_values().keys())
+    actual_ramp_down_bin_keys = set(m.ramp_down_bin.get_values().keys())
+    actual_steady_bin_keys = set(m.steady_bin.get_values().keys())
 
     # Build combinations for keys in expected content of vars
 
@@ -140,12 +155,20 @@ def test_add_variables(builder_setup):
 
     expected_flow_keys = set(product(sys.non_storage_comp_names, res_names, sys.time_index))
     expected_storage_keys = set(product(sys.storage_comp_names, sys.time_index))
+    expected_ramp_keys = set(product(sys.non_storage_comp_names, sys.time_index))
 
     # Check that sets of keys are as expected
     assert actual_flow_keys == expected_flow_keys
+
     assert actual_soc_keys == expected_storage_keys
     assert actual_charge_keys == expected_storage_keys
     assert actual_discharge_keys == expected_storage_keys
+
+    assert actual_ramp_up_keys == expected_ramp_keys
+    assert actual_ramp_down_keys == expected_ramp_keys
+    assert actual_ramp_up_bin_keys == expected_ramp_keys
+    assert actual_ramp_down_bin_keys == expected_ramp_keys
+    assert actual_steady_bin_keys == expected_ramp_keys
 
 
 @pytest.fixture()
@@ -517,6 +540,668 @@ def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_
 
     # Verify constraint
     check_constraint(m, "soc_limit", False, expected_soc_limit_result)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_periodic_storage_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    # Recall that steam storage initial_stored = 0.5; elec storage periodic_level = False
+    m.soc.set_values(
+        {
+            ("steam_storage", 0): 0.0,
+            ("steam_storage", 1): 1.0,
+            ("steam_storage", 2): 0.0,  # < initial_stored -> constr fails
+            ("elec_storage", 0): 1.0,
+            ("elec_storage", 1): 2.0,
+            ("elec_storage", 2): 2.0,  # no level requirement -> constr skipped
+        }
+    )
+
+    # Expected results
+    expected_periodic_level_result = {"steam_storage": False}
+
+    # Verify constraint
+    check_constraint(m, "periodic_storage", True, expected_periodic_level_result)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_up_limit_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    # Recall that steam to elec converter ramp_limit = 0.5; max_capacity_profile = [1, 1, 1]
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", "steam", 1): 0.4,  # == max allowed ramp -> constr satisfied
+            ("steam_to_elec_converter", "steam", 2): 1.0,  # > max allowed ramp -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_up_limit_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_up_limit", False, expected_ramp_up_limit_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_down_limit_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    # Recall that steam to elec converter ramp_limit = 0.5; max_capacity_profile = [1, 1, 1]
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 1.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", "steam", 1): 0.6,  # == max allowed ramp -> constr satisfied
+            ("steam_to_elec_converter", "steam", 2): 0.0,  # > max allowed ramp -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_down_limit_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_down_limit", False, expected_ramp_down_limit_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_track_up_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 0.0,
+            ("steam_to_elec_converter", "steam", 1): 0.4,
+            ("steam_to_elec_converter", "steam", 2): 0.8,
+        }
+    )
+
+    m.ramp_up.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.4,  # == flow difference -> constr satisfied
+            ("steam_to_elec_converter", 2): 0.3,  # < flow difference -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_track_up_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_track_up", False, expected_ramp_track_up_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_track_down_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 0.8,
+            ("steam_to_elec_converter", "steam", 1): 0.4,
+            ("steam_to_elec_converter", "steam", 2): 0.0,
+        }
+    )
+
+    m.ramp_down.set_values(
+        {
+            ("steam_to_elec_converter", 0): 1.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.4,  # ramp == flow difference -> constr satisfied
+            ("steam_to_elec_converter", 2): 0.3,  # ramp < flow difference -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_track_up_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_track_down", False, expected_ramp_track_up_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_bin_up_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_up.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.2,
+            ("steam_to_elec_converter", 1): 0.2,
+            ("steam_to_elec_converter", 2): 0.2,
+        }
+    )
+
+    m.ramp_up_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 1,  # ramping and binary = 1 -> constr satisfied
+            ("steam_to_elec_converter", 2): 0,  # ramping and binary = 0 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_up_bin_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_bin_up", False, expected_ramp_up_bin_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_bin_down_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_down.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.2,
+            ("steam_to_elec_converter", 1): 0.2,
+            ("steam_to_elec_converter", 2): 0.2,
+        }
+    )
+
+    m.ramp_down_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 1,  # ramping and binary = 1 -> constr satisfied
+            ("steam_to_elec_converter", 2): 0,  # ramping and binary = 0 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_down_bin_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_bin_down", False, expected_ramp_down_bin_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_state_selection_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_up_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 1,
+            ("steam_to_elec_converter", 2): 0,
+        }
+    )
+    m.ramp_down_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 0,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+    m.steady_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 0,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+
+    # Expected results
+    expected_state_selection_results = {
+        ("steam_to_elec_converter", 0): False,  # zero of the bins are true -> constr fails
+        ("steam_to_elec_converter", 1): True,  # one of the bins is true -> constr succeeds
+        ("steam_to_elec_converter", 2): False,  # two of the bins are true -> constr fails
+    }
+
+    # Verify constraint
+    check_constraint(m, "state_selection", True, expected_state_selection_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_steady_state_upper_constraint(
+    add_constraints_setup, check_constraint
+):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.steady_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 1,
+            ("steam_to_elec_converter", 1): 1,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+
+    m.ramp_up.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.0,  # not ramping up; steady bin = 1 -> satisfied
+            ("steam_to_elec_converter", 2): 0.2,  # ramping up; steady bin = 1 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_steady_state_upper_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "steady_state_upper", False, expected_steady_state_upper_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_steady_state_lower_constraint(
+    add_constraints_setup, check_constraint
+):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.steady_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 1,
+            ("steam_to_elec_converter", 1): 1,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+
+    m.ramp_down.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.0,  # not ramping down; steady bin = 1 -> satisfied
+            ("steam_to_elec_converter", 2): 0.2,  # ramping down; steady bin = 1 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_steady_state_lower_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "steady_state_lower", False, expected_steady_state_lower_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_freq_window_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_up_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 1,  # first ramp event in window -> cosntr satisfied
+            ("steam_to_elec_converter", 2): 0,
+        }
+    )
+
+    m.ramp_down_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 0,
+            ("steam_to_elec_converter", 2): 1,  # second ramp event in window -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_freq_window_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_freq_window", False, expected_ramp_freq_window_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_periodic_storage_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    # Recall that steam storage initial_stored = 0.5; elec storage periodic_level = False
+    m.soc.set_values(
+        {
+            ("steam_storage", 0): 0.0,
+            ("steam_storage", 1): 1.0,
+            ("steam_storage", 2): 0.0,  # < initial_stored -> constr fails
+            ("elec_storage", 0): 1.0,
+            ("elec_storage", 1): 2.0,
+            ("elec_storage", 2): 2.0,  # no level requirement -> constr skipped
+        }
+    )
+
+    # Expected results
+    expected_periodic_level_result = {"steam_storage": False}
+
+    # Verify constraint
+    check_constraint(m, "periodic_storage", True, expected_periodic_level_result)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_up_limit_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    # Recall that steam to elec converter ramp_limit = 0.5; max_capacity_profile = [1, 1, 1]
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", "steam", 1): 0.4,  # == max allowed ramp -> constr satisfied
+            ("steam_to_elec_converter", "steam", 2): 1.0,  # > max allowed ramp -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_up_limit_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_up_limit", False, expected_ramp_up_limit_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_down_limit_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    # Recall that steam to elec converter ramp_limit = 0.5; max_capacity_profile = [1, 1, 1]
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 1.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", "steam", 1): 0.6,  # == max allowed ramp -> constr satisfied
+            ("steam_to_elec_converter", "steam", 2): 0.0,  # > max allowed ramp -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_down_limit_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_down_limit", False, expected_ramp_down_limit_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_track_up_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 0.0,
+            ("steam_to_elec_converter", "steam", 1): 0.4,
+            ("steam_to_elec_converter", "steam", 2): 0.8,
+        }
+    )
+
+    m.ramp_up.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.4,  # == flow difference -> constr satisfied
+            ("steam_to_elec_converter", 2): 0.3,  # < flow difference -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_track_up_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_track_up", False, expected_ramp_track_up_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_track_down_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam", 0): 0.8,
+            ("steam_to_elec_converter", "steam", 1): 0.4,
+            ("steam_to_elec_converter", "steam", 2): 0.0,
+        }
+    )
+
+    m.ramp_down.set_values(
+        {
+            ("steam_to_elec_converter", 0): 1.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.4,  # ramp == flow difference -> constr satisfied
+            ("steam_to_elec_converter", 2): 0.3,  # ramp < flow difference -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_track_up_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_track_down", False, expected_ramp_track_up_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_bin_up_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_up.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.2,
+            ("steam_to_elec_converter", 1): 0.2,
+            ("steam_to_elec_converter", 2): 0.2,
+        }
+    )
+
+    m.ramp_up_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 1,  # ramping and binary = 1 -> constr satisfied
+            ("steam_to_elec_converter", 2): 0,  # ramping and binary = 0 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_up_bin_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_bin_up", False, expected_ramp_up_bin_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_bin_down_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_down.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.2,
+            ("steam_to_elec_converter", 1): 0.2,
+            ("steam_to_elec_converter", 2): 0.2,
+        }
+    )
+
+    m.ramp_down_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 1,  # ramping and binary = 1 -> constr satisfied
+            ("steam_to_elec_converter", 2): 0,  # ramping and binary = 0 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_down_bin_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_bin_down", False, expected_ramp_down_bin_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_state_selection_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_up_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 1,
+            ("steam_to_elec_converter", 2): 0,
+        }
+    )
+    m.ramp_down_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 0,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+    m.steady_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 0,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+
+    # Expected results
+    expected_state_selection_results = {
+        ("steam_to_elec_converter", 0): False,  # zero of the bins are true -> constr fails
+        ("steam_to_elec_converter", 1): True,  # one of the bins is true -> constr succeeds
+        ("steam_to_elec_converter", 2): False,  # two of the bins are true -> constr fails
+    }
+
+    # Verify constraint
+    check_constraint(m, "state_selection", True, expected_state_selection_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_steady_state_upper_constraint(
+    add_constraints_setup, check_constraint
+):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.steady_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 1,
+            ("steam_to_elec_converter", 1): 1,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+
+    m.ramp_up.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.0,  # not ramping up; steady bin = 1 -> satisfied
+            ("steam_to_elec_converter", 2): 0.2,  # ramping up; steady bin = 1 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_steady_state_upper_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "steady_state_upper", False, expected_steady_state_upper_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_steady_state_lower_constraint(
+    add_constraints_setup, check_constraint
+):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.steady_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 1,
+            ("steam_to_elec_converter", 1): 1,
+            ("steam_to_elec_converter", 2): 1,
+        }
+    )
+
+    m.ramp_down.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
+            ("steam_to_elec_converter", 1): 0.0,  # not ramping down; steady bin = 1 -> satisfied
+            ("steam_to_elec_converter", 2): 0.2,  # ramping down; steady bin = 1 -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_steady_state_lower_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "steady_state_lower", False, expected_steady_state_lower_results)
+
+
+@pytest.mark.unit()
+def test_add_constraints_adds_ramp_freq_window_constraint(add_constraints_setup, check_constraint):
+    m = add_constraints_setup.model
+
+    # Set up required vars for input
+    m.ramp_up_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 1,  # first ramp event in window -> cosntr satisfied
+            ("steam_to_elec_converter", 2): 0,
+        }
+    )
+
+    m.ramp_down_bin.set_values(
+        {
+            ("steam_to_elec_converter", 0): 0,
+            ("steam_to_elec_converter", 1): 0,
+            ("steam_to_elec_converter", 2): 1,  # second ramp event in window -> constr fails
+        }
+    )
+
+    # Expected results
+    expected_ramp_freq_window_results = {
+        ("steam_to_elec_converter", 1): True,
+        ("steam_to_elec_converter", 2): False,
+    }
+
+    # Verify constraint
+    check_constraint(m, "ramp_freq_window", False, expected_ramp_freq_window_results)
 
 
 @pytest.mark.unit()
