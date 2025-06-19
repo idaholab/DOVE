@@ -7,9 +7,9 @@ Defines some functions that can be used to check whether constraints are working
 import numpy as np
 
 
-def max_capacity_profile_working(sys, results, comp_name, column_name):
+def max_capacity_profile_working(sys, results, comp_name, activity_col):
     comp = sys.comp_map[comp_name]
-    activity_profile = results.loc[:, column_name].values
+    activity_profile = results.loc[:, activity_col].values
 
     if (abs(activity_profile) < comp.max_capacity_profile + 1e-6).all():
         print(f"✅ Max capacity profile constraint working correctly for {comp_name}!")
@@ -23,9 +23,9 @@ def max_capacity_profile_working(sys, results, comp_name, column_name):
     print()
 
 
-def min_capacity_profile_working(sys, results, comp_name, column_name):
+def min_capacity_profile_working(sys, results, comp_name, activity_col):
     comp = sys.comp_map[comp_name]
-    activity_profile = results.loc[:, column_name].values
+    activity_profile = results.loc[:, activity_col].values
 
     if (abs(activity_profile) > comp.min_capacity_profile - 1e-6).all():
         print(f"✅ Min capacity profile constraint working correctly for {comp_name}!")
@@ -37,6 +37,15 @@ def min_capacity_profile_working(sys, results, comp_name, column_name):
         sys, results, comp_name, "min_capacity_profile", new_min_capacity_profile
     )
     print()
+
+
+def fixed_flexibility_working(sys, comp_name):
+    comp = sys.comp_map[comp_name]
+
+    if np.all(comp.min_capacity_profile == comp.max_capacity_profile):
+        print(f"✅ Fixed flexibility constraint working correctly for {comp_name}!")
+    else:
+        print(f"❌ Fixed flexibility constraint violated for {comp_name}!")
 
 
 def ramp_limit_working(sys, results, comp_name, column_name):
