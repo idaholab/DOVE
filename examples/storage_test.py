@@ -29,7 +29,12 @@ if __name__ == "__main__":
     # indicates that the component will produce `steam` at max_capacity for each time step.
     # This is also the reason why `profile` is not set for this component.
     # There are also no cashflows associated with producing steam from the "steamer."
-    steamer = dc.Source(name="steamer", produces=steam, max_capacity=100, flexibility="fixed")
+    steamer = dc.Source(
+        name="steamer",
+        produces=steam,
+        max_capacity_profile=np.full(len(linear_price), 100),
+        flexibility="fixed",
+    )
 
     # A Storage component doesn't specify a `consumes` and `produces` but defines
     # a `resource` that its capacity is defined in terms of. A Storage can only store
@@ -37,7 +42,7 @@ if __name__ == "__main__":
     steam_storage = dc.Storage(
         name="steam_storage",
         resource=steam,
-        max_capacity=100,
+        max_capacity_profile=np.full(len(linear_price), 100),
         rte=0.9,
     )
 
@@ -48,7 +53,7 @@ if __name__ == "__main__":
         name="generator",
         consumes=[steam],
         produces=[elec],
-        max_capacity=90,
+        max_capacity_profile=np.full(len(linear_price), 90),
         capacity_resource=steam,
         transfer_fn=dc.RatioTransfer(steam, elec, 0.5),
     )
@@ -60,21 +65,21 @@ if __name__ == "__main__":
     market_linear = dc.Sink(
         name="market_linear",
         consumes=elec,
-        max_capacity=2,
+        max_capacity_profile=np.full(len(linear_price), 2),
         cashflows=[dc.Revenue("esales", price_profile=linear_price)],  # Time Varying Revenue
     )
 
     market_spike = dc.Sink(
         name="market_spike",
         consumes=elec,
-        max_capacity=40,
+        max_capacity_profile=np.full(len(linear_price), 40),
         cashflows=[dc.Revenue("esales", price_profile=spike_price)],  # Time Varying Revenue
     )
 
     steam_offload = dc.Sink(
         name="steam_offload",
         consumes=steam,
-        max_capacity=100,
+        max_capacity_profile=np.full(len(linear_price), 100),
         cashflows=[dc.Revenue("steam_offload", alpha=0.01)],  # Constant Revenue
     )
 

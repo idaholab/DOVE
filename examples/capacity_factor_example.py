@@ -35,32 +35,40 @@ if __name__ == "__main__":
         ]
     )
 
+    wind_max_cap_ts = np.multiply(10, wind_cap_fac_ts)
     wind = dc.Source(
         name="wind",
         produces=elec,
-        max_capacity=10,
-        profile=wind_cap_fac_ts,
-        capacity_factor=True,
+        max_capacity_profile=wind_max_cap_ts,
     )
 
     npp = dc.Source(
-        name="npp", produces=elec, max_capacity=20, cashflows=[dc.Cost("var_OM", alpha=3.5e3)]
+        name="npp",
+        produces=elec,
+        max_capacity_profile=np.full(len(wind_cap_fac_ts), 20),
+        cashflows=[dc.Cost("var_OM", alpha=3.5e3)],
     )
 
     grid = dc.Sink(
         name="grid",
         consumes=elec,
-        max_capacity=35,
+        max_capacity_profile=np.full(len(wind_cap_fac_ts), 35),
         flexibility="fixed",
         cashflows=[dc.Revenue("e_sales", alpha=50e3)],
     )
 
     importelec = dc.Source(
-        name="import", produces=elec, max_capacity=100, cashflows=[dc.Cost("import", alpha=1e6)]
+        name="import",
+        produces=elec,
+        max_capacity_profile=np.full(len(wind_cap_fac_ts), 100),
+        cashflows=[dc.Cost("import", alpha=1e6)],
     )
 
     exportelec = dc.Sink(
-        name="export", consumes=elec, max_capacity=100, cashflows=[dc.Cost("export", alpha=1e6)]
+        name="export",
+        consumes=elec,
+        max_capacity_profile=np.full(len(wind_cap_fac_ts), 100),
+        cashflows=[dc.Cost("export", alpha=1e6)],
     )
 
     sys = dc.System(

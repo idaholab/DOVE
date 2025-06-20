@@ -2,7 +2,6 @@
 # ALL RIGHTS RESERVED
 """ """
 
-import numpy as np
 import pytest
 
 import dove.core as dc
@@ -55,9 +54,9 @@ def test_system_initialization_empty():
 
 def test_system_summary(capsys):
     r = dc.Resource(name="res")
-    src = dc.Source(name="src", max_capacity=4.0, produces=r)
-    sink = dc.Sink(name="sink", max_capacity=2.0, consumes=r)
-    storage = dc.Storage(name="storage", max_capacity=1.0, resource=r)
+    src = dc.Source(name="src", max_capacity_profile=[4.0], produces=r)
+    sink = dc.Sink(name="sink", max_capacity_profile=[2.0], consumes=r)
+    storage = dc.Storage(name="storage", max_capacity_profile=[1.0], resource=r)
     sys = dc.System(components=[src, sink, storage], resources=[r])
 
     sys.summary()  # Pytest will automatically capture stdout
@@ -79,19 +78,19 @@ def test_system_setup(initialize_and_populate_system):
 
     src = dc.Source(
         name="src",
-        max_capacity=10.0,
+        max_capacity_profile=[10.0, 10.0, 10.0],
         produces=r_w,
         cashflows=[dc.Cost(name="src_cf", alpha=2)],
     )
     sink = dc.Sink(
         name="sink",
-        max_capacity=5.0,
+        max_capacity_profile=[5.0, 5.0, 5.0],
         consumes=r_e,
         cashflows=[dc.Cost(name="sink_cf", alpha=2)],
     )
     conv = dc.Converter(
         name="conv",
-        max_capacity=8.0,
+        max_capacity_profile=[8.0, 8.0, 8.0],
         consumes=[r_w],
         produces=[r_e],
         capacity_resource=r_w,
@@ -100,7 +99,7 @@ def test_system_setup(initialize_and_populate_system):
     )
     storage = dc.Storage(
         name="storage",
-        max_capacity=2.0,
+        max_capacity_profile=[2.0, 2.0, 2.0],
         resource=r_e,
         cashflows=[dc.Cost(name="storage_cf", alpha=2)],
     )
@@ -110,7 +109,9 @@ def test_system_setup(initialize_and_populate_system):
     # - Adding components and resources after initialization
     # - Adding some components and resources at initialization and some after
     sys = initialize_and_populate_system(
-        components=[src, sink, conv, storage], resources=[r_w, r_e], time_index=np.array([1, 2, 4])
+        components=[src, sink, conv, storage],
+        resources=[r_w, r_e],
+        time_index=[1, 2, 4],
     )
 
     # Check component list
@@ -140,26 +141,12 @@ def test_system_setup(initialize_and_populate_system):
     assert sys.res_map["electricity"] is r_e
 
     # Check time index
-    assert (sys.time_index == np.array([1, 2, 4])).all()
-
-    # Check that time series were normalized
-    # NOT a thorough test of normalization; just checking that it was called for each component
-    assert src.cashflows[0].price_profile is not None
-    assert len(src.cashflows[0].price_profile) == 3
-
-    assert sink.cashflows[0].price_profile is not None
-    assert len(sink.cashflows[0].price_profile) == 3
-
-    assert conv.cashflows[0].price_profile is not None
-    assert len(conv.cashflows[0].price_profile) == 3
-
-    assert storage.cashflows[0].price_profile is not None
-    assert len(storage.cashflows[0].price_profile) == 3
+    assert sys.time_index == [1, 2, 4]
 
 
 def test_adding_non_resource_to_resources_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="r1")
-    c = dc.Source(name="c1", produces=r1, max_capacity=1.0)
+    c = dc.Source(name="c1", produces=r1, max_capacity_profile=[1.0])
     with pytest.raises(TypeError):
         initialize_and_populate_system(
             resources=[r1, "r2"],
@@ -169,8 +156,8 @@ def test_adding_non_resource_to_resources_raises_error(initialize_and_populate_s
 
 def test_adding_duplicate_component_name_raises_error(initialize_and_populate_system):
     r = dc.Resource(name="res")
-    c1 = dc.Source(name="c", produces=r, max_capacity=1.0, min_capacity=0.0, profile=[0.1])
-    c2 = dc.Source(name="c", produces=r, max_capacity=2.0, min_capacity=0.0, profile=[0.2])
+    c1 = dc.Source(name="c", produces=r, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
+    c2 = dc.Source(name="c", produces=r, max_capacity_profile=[2.0], min_capacity_profile=[0.0])
     with pytest.raises(ValueError):
         initialize_and_populate_system(resources=[r], components=[c1, c2])
 
@@ -178,95 +165,25 @@ def test_adding_duplicate_component_name_raises_error(initialize_and_populate_sy
 def test_adding_duplicate_resource_name_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="res")
     r2 = dc.Resource(name="res")
-    c1 = dc.Source(name="c1", produces=r1, max_capacity=1.0, min_capacity=0.0, profile=[0.1])
-    c2 = dc.Source(name="c2", produces=r2, max_capacity=2.0, min_capacity=0.0, profile=[0.2])
+    c1 = dc.Source(name="c1", produces=r1, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
+    c2 = dc.Source(name="c2", produces=r2, max_capacity_profile=[2.0], min_capacity_profile=[0.0])
     with pytest.raises(ValueError):
         initialize_and_populate_system(resources=[r1, r2], components=[c1, c2])
 
 
 def test_inconsistent_comp_profile_length_raises_error(initialize_and_populate_system):
     r = dc.Resource(name="res")
-    c = dc.Source(name="c", produces=r, max_capacity=1.0, min_capacity=0.0, profile=[0.1])
-    with pytest.raises(ValueError):
+    c = dc.Source(name="c", produces=r, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
+    with pytest.raises(ValueError) as exc:
         initialize_and_populate_system(resources=[r], components=[c], time_index=[1, 2])
-
-
-def test_inconsistent_cf_price_profile_length_raises_error(initialize_and_populate_system):
-    r = dc.Resource(name="res")
-    c = dc.Source(
-        name="c",
-        produces=r,
-        max_capacity=1.0,
-        min_capacity=0.0,
-        profile=[0.1, 0.2],
-        cashflows=[dc.Cost(name="cf", price_profile=np.array([2]))],
-    )
-    with pytest.raises(ValueError):
-        initialize_and_populate_system(resources=[r], components=[c], time_index=[1, 2])
+    assert "capacity profile length that does not match" in str(exc.value)
 
 
 def test_solve_with_unknown_model_type_raises_error():
     r = dc.Resource(name="res")
-    src = dc.Source(name="src", produces=r, max_capacity=1.0)
-    sink = dc.Sink(name="sink", consumes=r, max_capacity=1.0)
+    src = dc.Source(name="src", produces=r, max_capacity_profile=[1.0])
+    sink = dc.Sink(name="sink", consumes=r, max_capacity_profile=[1.0])
     sys = dc.System(components=[src, sink], resources=[r])
 
     with pytest.raises(ValueError):
         sys.solve(model_type="quantum_mechanical")  # We don't have a quantum_mechanical model
-
-
-def test_normalize_time_series():
-    r1 = dc.Resource(name="r1")
-    r2 = dc.Resource(name="r2")
-
-    cap_factor_comp = dc.Source(
-        name="src",
-        produces=r1,
-        max_capacity=10,
-        profile=[0.5, 1.0, 0.5],
-        capacity_factor=True,
-        cashflows=[dc.Cost(name="src_cost", alpha=2)],  # No price profile
-    )
-    fixed_flex_comp = dc.Sink(
-        name="sink",
-        consumes=r2,
-        max_capacity=4,
-        flexibility="fixed",
-        cashflows=[
-            dc.Revenue(
-                name="sink_revenue",
-                alpha=2,
-                price_profile=np.array([2, 3, 4]),  # Price profile and alpha
-            )
-        ],
-    )
-    cap_factor_and_fixed_flex_comp = dc.Converter(
-        name="conv",
-        consumes=[r1],
-        produces=[r2],
-        max_capacity=5,
-        capacity_resource=r1,
-        profile=[0.8, 0.6, 0.6],
-        capacity_factor=True,
-        flexibility="fixed",
-        transfer_fn=dc.RatioTransfer(input_res=r1, output_res=r2, ratio=0.5),
-    )
-
-    # Constructing the system should automatically normalize components
-    sys = dc.System(
-        components=[cap_factor_comp, fixed_flex_comp],  # Only two of the components
-        resources=[r1, r2],
-        time_index=np.array([1, 2, 3]),
-    )
-
-    # Adding a component should automatically normalize it also
-    sys.add_component(cap_factor_and_fixed_flex_comp)
-
-    # Check component profiles
-    assert (sys.comp_map["src"].profile == np.array([5.0, 10.0, 5.0])).all()
-    assert (sys.comp_map["sink"].profile == np.array([4.0, 4.0, 4.0])).all()
-    assert (sys.comp_map["conv"].profile == np.array([4.0, 3.0, 3.0])).all()
-
-    # Check cashflow price profiles
-    assert (sys.comp_map["src"].cashflows[0].price_profile == np.array([2, 2, 2])).all()
-    assert (sys.comp_map["sink"].cashflows[0].price_profile == np.array([4, 6, 8])).all()
