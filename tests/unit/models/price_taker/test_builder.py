@@ -4,7 +4,6 @@
 
 from itertools import product
 
-import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
@@ -33,12 +32,12 @@ def create_example_system():
     steam_source = dc.Source(
         name="steam_source",
         produces=steam,
-        max_capacity=2.0,
+        max_capacity_profile=[2.0, 2.0, 2.0],
     )
 
     steam_to_elec_converter = dc.Converter(
         name="steam_to_elec_converter",
-        max_capacity=1.0,
+        max_capacity_profile=[1.0, 1.0, 1.0],
         consumes=[steam],
         produces=[elec],
         capacity_resource=steam,
@@ -50,9 +49,8 @@ def create_example_system():
     elec_sink = dc.Sink(
         name="elec_sink",
         consumes=elec,
-        max_capacity=1.0,
-        min_capacity=0.5,
-        # profile=np.array([1.0, 0.0, 1.0]),
+        max_capacity_profile=[1.0, 1.0, 1.0],
+        min_capacity_profile=[0.5, 0.5, 0.5],
     )
 
     # Storage
@@ -77,7 +75,7 @@ def create_example_system():
     components = [steam_source, steam_to_elec_converter, elec_sink, steam_storage, elec_storage]
 
     ### Set up times
-    time_index = np.array([0, 1, 2])
+    time_index = [0, 1, 2]
 
     ### Create and return system
     sys = dc.System(components, resources, time_index)
@@ -121,7 +119,7 @@ def test_add_sets(builder_setup):
     assert set(actual_non_storage) == set(expected_non_storage)
     assert set(actual_storage) == set(expected_storage)
     assert set(actual_r) == set(expected_r)
-    assert (list(actual_t) == expected_t).all()  # We do care about the order for this one
+    assert list(actual_t) == expected_t  # We do care about the order for this one
 
 
 def test_add_variables(builder_setup):
@@ -258,25 +256,25 @@ def test_add_constraints_adds_transfer_constraint(add_constraints_setup, check_c
     check_constraint(m, "transfer", True, expected_transfer_result)
 
 
-def test_add_constraints_adds_capacity_constraint(add_constraints_setup, check_constraint):
+def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
     # Set up required vars for input
     # Recall that:
-    # steam_source.max_capacity == 2.0
-    # steam_to_elec_converter.max_capacity == 1.0
-    # elec_sink.max_capacity == 1.0
+    # steam_source.max_capacity_profile == [2.0, 2.0, 2.0]
+    # steam_to_elec_converter.max_capacity_profile == [1.0, 1.0, 1.0]
+    # elec_sink.max_capacity_profile == [1.0, 1.0, 1.0]
     m.flow.set_values(
         {
-            ("steam_source", "steam", 0): 1.0,  # < max_capacity -> constr satisfied
-            ("steam_source", "steam", 1): 2.0,  # = max_capacity -> constr satisfied
-            ("steam_source", "steam", 2): 3.0,  # > max_capacity -> constr fails
-            ("steam_to_elec_converter", "steam", 0): 0.0,  # < max_capacity -> constr satisfied
-            ("steam_to_elec_converter", "steam", 1): 1.0,  # = max_capacity -> constr satisfied
-            ("steam_to_elec_converter", "steam", 2): 2.0,  # > max_capacity -> constr fails
-            ("elec_sink", "electricity", 0): 0.0,  # < max_capacity -> constr satisfied
-            ("elec_sink", "electricity", 1): 1.0,  # = max_capacity -> constr satisfied
-            ("elec_sink", "electricity", 2): 2.0,  # > max_capacity -> constr fails
+            ("steam_source", "steam", 0): 1.0,  # < max capacity -> constr satisfied
+            ("steam_source", "steam", 1): 2.0,  # = max capacity -> constr satisfied
+            ("steam_source", "steam", 2): 3.0,  # > max capacity -> constr fails
+            ("steam_to_elec_converter", "steam", 0): 0.0,  # < max capacity -> constr satisfied
+            ("steam_to_elec_converter", "steam", 1): 1.0,  # = max capacity -> constr satisfied
+            ("steam_to_elec_converter", "steam", 2): 2.0,  # > max capacity -> constr fails
+            ("elec_sink", "electricity", 0): 0.0,  # < max capacity -> constr satisfied
+            ("elec_sink", "electricity", 1): 1.0,  # = max capacity -> constr satisfied
+            ("elec_sink", "electricity", 2): 2.0,  # > max capacity -> constr fails
         }
     )
 
@@ -294,25 +292,25 @@ def test_add_constraints_adds_capacity_constraint(add_constraints_setup, check_c
     }
 
     # Verify constraint
-    check_constraint(m, "capacity", False, expected_cap_result)
+    check_constraint(m, "max_capacity", False, expected_cap_result)
 
 
 def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
     # Set up required vars for input
-    # Recall that elec_sink.min_capacity == 0.5; default is 0.0
+    # Recall that elec_sink.min_capacity_profile == [0.5, 0.5, 0.5]; default is [0.0, 0.0, 0.0]
     m.flow.set_values(
         {
-            ("steam_source", "steam", 0): 0.0,  # = min_capacity -> constr satisfied
-            ("steam_source", "steam", 1): 0.0,  # = min_capacity -> constr satisfied
-            ("steam_source", "steam", 2): 0.0,  # = min_capacity -> constr satisfied
-            ("steam_to_elec_converter", "steam", 0): 0.0,  # = min_capacity -> constr satisfied
-            ("steam_to_elec_converter", "steam", 1): 0.0,  # = min_capacity -> constr satisfied
-            ("steam_to_elec_converter", "steam", 2): 0.0,  # = min_capacity -> constr satisfied
-            ("elec_sink", "electricity", 0): 0.0,  # < min_capacity -> constr fails
-            ("elec_sink", "electricity", 1): 0.5,  # = min_capacity -> constr satisfied
-            ("elec_sink", "electricity", 2): 1.0,  # > min_capacity -> constr satisfied
+            ("steam_source", "steam", 0): 0.0,  # = min capacity -> constr satisfied
+            ("steam_source", "steam", 1): 0.0,  # = min capacity -> constr satisfied
+            ("steam_source", "steam", 2): 0.0,  # = min capacity -> constr satisfied
+            ("steam_to_elec_converter", "steam", 0): 0.0,  # = min capacity -> constr satisfied
+            ("steam_to_elec_converter", "steam", 1): 0.0,  # = min capacity -> constr satisfied
+            ("steam_to_elec_converter", "steam", 2): 0.0,  # = min capacity -> constr satisfied
+            ("elec_sink", "electricity", 0): 0.0,  # < min capacity -> constr fails
+            ("elec_sink", "electricity", 1): 0.5,  # = min capacity -> constr satisfied
+            ("elec_sink", "electricity", 2): 1.0,  # > min capacity -> constr satisfied
         }
     )
 
@@ -331,12 +329,6 @@ def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, che
 
     # Verify constraint
     check_constraint(m, "min_capacity", False, expected_min_cap_result)
-
-
-@pytest.mark.skip("TODO if necessary")
-def test_add_constraints_adds_fixed_profile_constraint(add_constraints_setup, check_constraint):
-    # TODO if this constraint is not removed soon
-    pass
 
 
 def test_add_constraints_adds_resource_balance_constraint(add_constraints_setup, check_constraint):
@@ -452,16 +444,16 @@ def test_add_constraints_adds_charge_limit_constraint(add_constraints_setup, che
     m = add_constraints_setup.model
 
     # Set up required vars for input
-    # Recall that for steam storage, max_capacity = 1, default max_charge_rate = 1
-    # For elec storage, max_charge_rate = 0.5, max_capacity = 2
+    # Recall that for steam storage, max_capacity_profile = [1, 1, 1], default max_charge_rate = 1
+    # For elec storage, max_charge_rate = 0.5, max_capacity_profile = [2, 2, 2]
     m.charge.set_values(
         {
-            ("steam_storage", 0): 0.0,  # < max_charge_rate * max_capacity -> constr satisfied
-            ("steam_storage", 1): 1.0,  # = max_charge_rate * max_capacity -> constr satisfied
-            ("steam_storage", 2): 2.0,  # > max_charge_rate * max_capacity -> constr fails
-            ("elec_storage", 0): 0.0,  # < max_charge_rate * max_capacity -> constr satisfied
-            ("elec_storage", 1): 1.0,  # = max_charge_rate * max_capacity -> constr satisfied
-            ("elec_storage", 2): 2.0,  # > max_charge_rate * max_capacity -> constr fails
+            ("steam_storage", 0): 0.0,  # < max_charge_rate * max capacity -> constr satisfied
+            ("steam_storage", 1): 1.0,  # = max_charge_rate * max capacity -> constr satisfied
+            ("steam_storage", 2): 2.0,  # > max_charge_rate * max capacity -> constr fails
+            ("elec_storage", 0): 0.0,  # < max_charge_rate * max capacity -> constr satisfied
+            ("elec_storage", 1): 1.0,  # = max_charge_rate * max capacity -> constr satisfied
+            ("elec_storage", 2): 2.0,  # > max_charge_rate * max capacity -> constr fails
         }
     )
 
@@ -483,16 +475,16 @@ def test_add_constraints_adds_discharge_limit_constraint(add_constraints_setup, 
     m = add_constraints_setup.model
 
     # Set up required vars for input
-    # Recall that for steam storage, max_capacity = 1, default max_discharge_rate = 1
-    # For elec storage, max_capacity = 2, max_discharge_rate = 0.25
+    # Recall that for steam storage, max_capacity_profile = [1, 1, 1], default max_discharge_rate = 1
+    # For elec storage, max_capacity_profile = [2, 2, 2], max_discharge_rate = 0.25
     m.discharge.set_values(
         {
-            ("steam_storage", 0): 0.0,  # < max_discharge_rate * max_capacity -> constr satisfied
-            ("steam_storage", 1): 1.0,  # = max_discharge_rate * max_capacity -> constr satisfied
-            ("steam_storage", 2): 2.0,  # > max_discharge_rate * max_capacity -> constr fails
-            ("elec_storage", 0): 0.0,  # < max_discharge_rate * max_capacity -> constr satisfied
-            ("elec_storage", 1): 0.5,  # = max_discharge_rate * max_capacity -> constr satisfied
-            ("elec_storage", 2): 1.0,  # > max_discharge_rate * max_capacity -> constr fails
+            ("steam_storage", 0): 0.0,  # < max_discharge_rate * max capacity -> constr satisfied
+            ("steam_storage", 1): 1.0,  # = max_discharge_rate * max capacity -> constr satisfied
+            ("steam_storage", 2): 2.0,  # > max_discharge_rate * max capacity -> constr fails
+            ("elec_storage", 0): 0.0,  # < max_discharge_rate * max capacity -> constr satisfied
+            ("elec_storage", 1): 0.5,  # = max_discharge_rate * max capacity -> constr satisfied
+            ("elec_storage", 2): 1.0,  # > max_discharge_rate * max capacity -> constr fails
         }
     )
 
@@ -514,15 +506,15 @@ def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_
     m = add_constraints_setup.model
 
     # Set up required vars for input
-    # Recall that steam storage max_capacity = 1; elec storage max_capacity = 2
+    # Recall that steam storage max_capacity_profile = [1, 1, 1]; elec storage max_capacity_profile = [2, 2, 2]
     m.soc.set_values(
         {
-            ("steam_storage", 0): 0.0,  # < max_capacity -> constr satisfied
-            ("steam_storage", 1): 1.0,  # = max_capacity -> constr satisfied
-            ("steam_storage", 2): 2.0,  # > max_capacity -> constr fails
-            ("elec_storage", 0): 1.0,  # < max_capacity -> constr satisfied
-            ("elec_storage", 1): 2.0,  # = max_capacity -> constr satisfied
-            ("elec_storage", 2): 3.0,  # > max_capacity -> constr fails
+            ("steam_storage", 0): 0.0,  # < max capacity -> constr satisfied
+            ("steam_storage", 1): 1.0,  # = max capacity -> constr satisfied
+            ("steam_storage", 2): 2.0,  # > max capacity -> constr fails
+            ("elec_storage", 0): 1.0,  # < max capacity -> constr satisfied
+            ("elec_storage", 1): 2.0,  # = max capacity -> constr satisfied
+            ("elec_storage", 2): 3.0,  # > max capacity -> constr fails
         }
     )
 
@@ -903,9 +895,8 @@ def test_build(create_example_system):
     # Check that constraints were added
     expected_constr_names = [
         "transfer",
-        "capacity",
+        "max_capacity",
         "min_capacity",
-        # "fixed_profile", # TODO: remove or uncomment
         "resource_balance",
         "storage_balance",
         "charge_limit",
