@@ -33,8 +33,9 @@ jobs:
 
       - name: Print summary coverage results
         run: echo "Total coverage from all tests:"
-        run: uv run coverage report
-        run: echo "For detailed coverage results, download 'coverage_results' artifact, unzip, and open 'index.html'."
+        run: |
+          uv run coverage report
+          echo "For detailed coverage results, download 'coverage_results' artifact, unzip, and open 'index.html'."
 
       - name: Archive detailed coverage results
         uses: actions/upload-artifact@v4
@@ -45,7 +46,8 @@ jobs:
       - name: Run examples
         # This is to ensure that the examples run as expected, not to improve testing or coverage
         # If any examples fail to run, this workflow will fail
-        run: uv run python examples/capacity_factor_example.py
-        run: uv run python examples/ramping_test.py
-        run: uv run python examples/storage_test.py
-        run: uv run python examples/transfer_example.py
+        run: |
+          uv run python examples/capacity_factor_example.py
+          uv run python examples/ramping_test.py
+          uv run python examples/storage_test.py
+          uv run python examples/transfer_example.py
