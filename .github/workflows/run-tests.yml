@@ -32,8 +32,8 @@ jobs:
         run: uv run pytest -m integration --cov=src/dove --cov-branch --cov-append --cov-report=html
 
       - name: Print summary coverage results
-        run: echo "Total coverage from all tests:"
         run: |
+          echo "Total coverage from all tests:"
           uv run coverage report
           echo "For detailed coverage results, download 'coverage_results' artifact, unzip, and open 'index.html'."
 
