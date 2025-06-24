@@ -18,6 +18,9 @@ jobs:
       - name: Install the project
         run: uv sync --locked --all-extras --dev
 
+      - name: Install solvers
+        run: sudo apt-get install coinor-cbc coinor-libcbc-dev
+
       # - name: Lint with Ruff
       #   run: |
       #     # Run Ruff for linting
