@@ -72,11 +72,15 @@ max-complexity = 12
 
 [tool.pytest.ini_options]
 minversion = "8.3.5"
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
 log_cli_level = "INFO"
 xfail_strict = true
 addopts = ["-ra", "--strict-config", "--strict-markers"]
 filterwarnings = ["error"]
+markers = [
+    "unit: Marks tests as unit tests, to be run before integration tests",
+    "integration: Marks tests as integration tests, to be run after unit tests"
+]
 
 [tool.mypy]
 exclude = [

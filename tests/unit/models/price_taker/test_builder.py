@@ -84,6 +84,7 @@ def builder_setup(create_example_system):
     return price_taker_builder
 
 
+@pytest.mark.unit()
 def test_add_sets(builder_setup):
     # Call method under test
     builder_setup._add_sets()
@@ -114,6 +115,7 @@ def test_add_sets(builder_setup):
     assert list(actual_t) == expected_t  # We do care about the order for this one
 
 
+@pytest.mark.unit()
 def test_add_variables(builder_setup):
     # Add sets to builder so the variables can use them
     builder_setup._add_sets()
@@ -203,6 +205,7 @@ def check_constraint():
     return _check_constraint
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_transfer_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
     ### Transfer constraint
@@ -233,6 +236,7 @@ def test_add_constraints_adds_transfer_constraint(add_constraints_setup, check_c
     check_constraint(m, "transfer", True, expected_transfer_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -272,6 +276,7 @@ def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, che
     check_constraint(m, "max_capacity", False, expected_cap_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -308,6 +313,7 @@ def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, che
     check_constraint(m, "min_capacity", False, expected_min_cap_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_resource_balance_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -365,6 +371,7 @@ def test_add_constraints_adds_resource_balance_constraint(add_constraints_setup,
     check_constraint(m, "resource_balance", True, expected_res_balance_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_storage_balance_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -417,6 +424,7 @@ def test_add_constraints_adds_storage_balance_constraint(add_constraints_setup, 
     check_constraint(m, "storage_balance", True, expected_storage_balance_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_charge_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -448,6 +456,7 @@ def test_add_constraints_adds_charge_limit_constraint(add_constraints_setup, che
     check_constraint(m, "charge_limit", False, expected_charge_limit_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_discharge_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -479,6 +488,7 @@ def test_add_constraints_adds_discharge_limit_constraint(add_constraints_setup, 
     check_constraint(m, "discharge_limit", False, expected_discharge_limit_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -509,6 +519,7 @@ def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_
     check_constraint(m, "soc_limit", False, expected_soc_limit_result)
 
 
+@pytest.mark.unit()
 def test_add_objective(add_constraints_setup):
     # Call the method under test
     add_constraints_setup._add_objective()
@@ -521,6 +532,7 @@ def test_add_objective(add_constraints_setup):
     assert not obj.is_minimizing()
 
 
+@pytest.mark.unit()
 def test_build(create_example_system):
     # Set up the builder
     builder_cls = BUILDER_REGISTRY["price_taker"]
@@ -575,6 +587,7 @@ def test_build(create_example_system):
     assert returned is builder
 
 
+@pytest.mark.unit()
 def test_extract_results(create_example_system):
     # Finish setup of builder
     builder_cls = BUILDER_REGISTRY["price_taker"]
