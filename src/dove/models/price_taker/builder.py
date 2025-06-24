@@ -204,9 +204,8 @@ class PriceTakerBuilder(BaseModelBuilder):
 
         Adds various constraints including:
         - Resource transfer constraints
-        - Capacity constraints
+        - Maximum capacity constraints
         - Minimum capacity constraints
-        - Fixed profile constraints
         - Resource balance constraints
         - Storage balance constraints
         - Charging/discharging limits
@@ -217,9 +216,8 @@ class PriceTakerBuilder(BaseModelBuilder):
         m = self.model
 
         m.transfer = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.transfer_rule)
-        m.capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.capacity_rule)
-        m.min_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.min_rule)
-        m.fixed_profile = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.fixed_profile_rule)
+        m.max_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.max_capacity_rule)
+        m.min_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.min_capacity_rule)
 
         m.resource_balance = pyo.Constraint(m.R, m.T, rule=prl.balance_rule)
 

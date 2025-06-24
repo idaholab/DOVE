@@ -20,8 +20,6 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-import numpy as np
-
 from dove.models import BUILDER_REGISTRY
 
 from . import Component, Resource, Storage
@@ -74,7 +72,6 @@ class System:
         self.time_index = [0] if time_index is None else time_index
         self.comp_map: dict[str, Component] = {comp.name: comp for comp in self.components}
         self.res_map: dict[str, Resource] = {res.name: res for res in self.resources}
-        self._normalize_time_series(components=self.components)
         self.verify_time_series()
 
     @property
@@ -158,21 +155,15 @@ class System:
         Raises
         ------
         ValueError
-            If either validation check fails:
-            - Component profile length doesn't match time index length
-            - Cashflow price profile length doesn't match time index length
+            If component capacity profile length doesn't match time index length
         """
-        # Check that time index length matches profiles and price profiles
+        # Check that time index length matches component capacity profiles
         for comp in self.components:
-            if len(comp.profile) > 0 and len(comp.profile) != len(self.time_index):
+            if len(comp.max_capacity_profile) != len(self.time_index):
                 raise ValueError(
-                    f"Component '{comp.name}' has a profile length that does not match the time index length!"
+                    f"Component '{comp.name}' has a capacity profile length "
+                    "that does not match the time index length!"
                 )
-            for cf in comp.cashflows:
-                if len(cf.price_profile) > 0 and len(cf.price_profile) != len(self.time_index):
-                    raise ValueError(
-                        f"Component '{comp.name}' has a cashflow price profile length that does not match the time index length!"
-                    )
 
     def add_component(self, comp: Component) -> Self:
         """
@@ -195,7 +186,6 @@ class System:
         """
         self.components.append(comp)
         self.verify_components_definition()
-        self._normalize_time_series(components=[comp])
         self.verify_time_series()
         self.comp_map[comp.name] = comp
         return self
@@ -266,38 +256,3 @@ class System:
         builder.build()
         builder.solve(**kw)
         return builder.extract_results()
-
-    def _normalize_time_series(self, components: list[Component]) -> None:
-        """
-        Normalize time series data within components.
-
-        This internal method:
-        1. Scales capacity factor profiles by max_capacity
-        2. Handles fixed flexibility components when the profile hasn't been explicitly defined by
-           setting min_capacity equal to max_capacity and creating a constant profile
-        3. Expands cashflow price profiles to match the time index length
-        4. Scales cashflow price profiles by alpha
-
-        Parameters
-        ----------
-        components : list[Component]
-            The components whose time series data to normalize.
-        """
-        # I guess these are all the variables we might expect to be varying over time?
-        for comp in components:
-            if comp.capacity_factor:
-                # Means user has supplied a time-series profile to the component
-                # that represents the capacity factor
-                assert isinstance(comp.profile, np.ndarray)
-                comp.profile = comp.profile * comp.max_capacity
-
-            if comp.flexibility == "fixed" and len(comp.profile) < 1:
-                # TODO: Move these into component constructor
-                comp.min_capacity = comp.max_capacity
-                comp.profile = np.full(len(self.time_index), comp.max_capacity)
-
-            for cf in comp.cashflows:
-                if len(cf.price_profile) < 1:
-                    cf.price_profile = np.full(len(self.time_index), 1)
-
-                cf.price_profile = np.multiply(cf.alpha, cf.price_profile)

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from dove.core import (
+    CashFlow,
     Component,
     Converter,
     RatioTransfer,
@@ -16,13 +17,15 @@ from dove.core import (
 )
 
 
-def test_component_basic_properties_and_profile_conversion():
-    comp = Component(name="comp", max_capacity=5.0, min_capacity=1.0, profile=[0.1, 0.2, 0.3])
+def test_component_basic_properties():
+    comp = Component(
+        name="comp", max_capacity_profile=[5.0, 4.0, 5.0], min_capacity_profile=[1.0, 1.0, 2.0]
+    )
     # capacities and profile
-    assert comp.max_capacity == 5.0
-    assert comp.min_capacity == 1.0
-    assert isinstance(comp.profile, np.ndarray)
-    assert comp.profile.tolist() == [0.1, 0.2, 0.3]
+    assert isinstance(comp.max_capacity_profile, np.ndarray)
+    assert comp.max_capacity_profile.tolist() == [5.0, 4.0, 5.0]
+    assert isinstance(comp.min_capacity_profile, np.ndarray)
+    assert comp.min_capacity_profile.tolist() == [1.0, 1.0, 2.0]
     # empty consumes/produces
     assert comp.consumes_by_name == []
     assert comp.produces_by_name == []
@@ -33,25 +36,23 @@ def test_component_basic_properties_and_profile_conversion():
     [
         ({"produces": ["res"]}, TypeError, "all resources must be Resource"),
         ({"consumes": ["res"]}, TypeError, "all resources must be Resource"),
-        ({"max_capacity": -1.0}, ValueError, "max_capacity < 0"),
-        ({"max_capacity": 1.0, "min_capacity": 2.0}, ValueError, "min_capacity (2.0) must be in"),
-        ({"profile": [-0.5]}, ValueError, "profile contains negative"),
+        ({"max_capacity_profile": [-1.0]}, ValueError, "max_capacity_profile contains negative"),
         (
-            {"capacity_factor": True, "profile": [-0.1, 0.5]},
+            {"max_capacity_profile": [1.0], "min_capacity_profile": [2.0]},
             ValueError,
-            "capacity_factor profile must",
-        ),
-        (
-            {"capacity_factor": True, "profile": [0.5, 1.2]},
-            ValueError,
-            "capacity_factor profile must",
+            "each value in min_capacity_profile must be in",
         ),
         ({"flexibility": "invalid"}, ValueError, "flexibility must be"),
+        (
+            {"max_capacity_profile": [1.0], "min_capacity_profile": [1.0, 0.5]},
+            ValueError,
+            "length of min_capacity_profile does not equal length of max_capacity_profile",
+        ),
         ({"cashflows": [object()]}, TypeError, "all cashflows must be CashFlow"),
     ],
 )
 def test_component_invalid_initialization(kwargs, exc_type, msg_substr):
-    init_kwargs = {"name": "bad", "max_capacity": 1.0}
+    init_kwargs = {"name": "bad", "max_capacity_profile": [1.0]}
     init_kwargs.update(kwargs)
     with pytest.raises(exc_type) as exc:
         Component(**init_kwargs)
@@ -61,13 +62,46 @@ def test_component_invalid_initialization(kwargs, exc_type, msg_substr):
 def test_component_capacity_resource_not_in_consumes_or_produces():
     r = Resource(name="res")
     with pytest.raises(ValueError) as exc:
-        Component(name="bad", max_capacity=1.0, capacity_resource=r)
+        Component(name="bad", max_capacity_profile=[1.0], capacity_resource=r)
     assert "capacity_resource" in str(exc.value)
+
+
+def test_min_capacity_profile_set_for_fixed_flexibility():
+    c = Component(name="c", max_capacity_profile=[2.0, 3.0], flexibility="fixed")
+    assert c.min_capacity_profile.tolist() == [2.0, 3.0]
+
+
+def test_min_capacity_profile_and_fixed_flexibility_specified_warns():
+    with pytest.warns(UserWarning):
+        c = Component(
+            name="c",
+            max_capacity_profile=[2.0, 3.0],
+            min_capacity_profile=[1.0, 1.0],
+            flexibility="fixed",
+        )
+    assert c.min_capacity_profile.tolist() == [2.0, 3.0]
+
+
+def test_cf_price_profile_length_does_not_match():
+    with pytest.raises(ValueError) as exc:
+        Component(
+            name="c",
+            max_capacity_profile=[1.0],
+            cashflows=[CashFlow(name="cf", price_profile=[1.0, 1.2])],
+        )
+    assert "cashflow price_profile length does not match" in str(exc.value)
+
+
+def test_cf_price_profile_expanded():
+    c = Component(
+        name="c", max_capacity_profile=[1.0, 2.0], cashflows=[CashFlow(name="cf", alpha=2.0)]
+    )
+    assert c.cashflows[0].price_profile.tolist() == [2.0, 2.0]
 
 
 def test_source_defaults_transfer_function():
     r = Resource(name="water")
-    src = Source(name="src", max_capacity=10.0, produces=r)
+    src = Source(name="src", max_capacity_profile=[10.0], produces=r)
     assert src.produces == [r]
     assert src.consumes == []
     assert src.capacity_resource is r
@@ -85,7 +119,7 @@ def test_source_defaults_transfer_function():
 )
 def test_source_invalid_parameters_raise(bad_kwargs, msg_substr):
     r = Resource(name="src_bad")
-    init_kwargs = {"name": "src_bad", "produces": r, "max_capacity": 5.0}
+    init_kwargs = {"name": "src_bad", "produces": r, "max_capacity_profile": [5.0]}
     init_kwargs.update(bad_kwargs)
     with pytest.raises(ValueError) as exc:
         Source(**init_kwargs)
@@ -94,13 +128,13 @@ def test_source_invalid_parameters_raise(bad_kwargs, msg_substr):
 
 def test_source_with_explicit_capacity_resource():
     r = Resource(name="r")
-    src = Source(name="src", produces=r, max_capacity=1.0, capacity_resource=r)
+    src = Source(name="src", produces=r, max_capacity_profile=[1.0], capacity_resource=r)
     assert src.capacity_resource is r
 
 
 def test_sink_defaults_transfer_function():
     r = Resource(name="fuel")
-    sink = Sink(name="sink", max_capacity=8.0, consumes=r)
+    sink = Sink(name="sink", max_capacity_profile=[8.0], consumes=r)
     assert sink.consumes == [r]
     assert sink.produces == []
     assert sink.capacity_resource is r
@@ -118,7 +152,7 @@ def test_sink_defaults_transfer_function():
 )
 def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
     r = Resource(name="sink_bad")
-    init_kwargs = {"name": "sink_bad", "consumes": r, "max_capacity": 5.0}
+    init_kwargs = {"name": "sink_bad", "consumes": r, "max_capacity_profile": [5.0]}
     init_kwargs.update(bad_kwargs)
     with pytest.raises(ValueError) as exc:
         Sink(**init_kwargs)
@@ -127,7 +161,7 @@ def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
 
 def test_sink_with_explicit_capacity_resource():
     r = Resource(name="r")
-    sink = Sink(name="sink", consumes=r, max_capacity=1.0, capacity_resource=r)
+    sink = Sink(name="sink", consumes=r, max_capacity_profile=[1.0], capacity_resource=r)
     assert sink.capacity_resource is r
 
 
@@ -159,7 +193,7 @@ def test_converter_same_resource_sets_capacity_and_warns():
     with pytest.warns(UserWarning):
         conv = Converter(
             name="conv",
-            max_capacity=15.0,
+            max_capacity_profile=[15.0],
             consumes=[r],
             produces=[r],
             transfer_fn=RatioTransfer(input_res=r, output_res=r),
@@ -171,7 +205,7 @@ def test_converter_same_resource_sets_capacity_and_warns():
 def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn):
     r1 = Resource(name="in_res")
     r2 = Resource(name="out_res")
-    init_kwargs = {"name": "amb", "max_capacity": 5.0, "consumes": [r1], "produces": [r2]}
+    init_kwargs = {"name": "amb", "max_capacity_profile": [5.0], "consumes": [r1], "produces": [r2]}
     if has_transfer_fn:
         init_kwargs.update({"transfer_fn": RatioTransfer(input_res=r1, output_res=r2)})
     # missing transfer_fn and ambiguous resources
@@ -182,7 +216,7 @@ def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn
 
 def test_storage_default_capacity_and_valid_ranges():
     r = Resource(name="stor_res")
-    st = Storage(name="stor", max_capacity=20.0, resource=r)
+    st = Storage(name="stor", max_capacity_profile=[20.0], resource=r)
     assert st.resource is r
     assert st.capacity_resource is r
     # default attributes are in [0,1]
@@ -205,7 +239,7 @@ def test_storage_default_capacity_and_valid_ranges():
 )
 def test_storage_invalid_parameters_raise(bad_kwargs, msg_substr):
     r = Resource(name="stor_bad")
-    init_kwargs = {"name": "stor_bad", "max_capacity": 5.0, "resource": r}
+    init_kwargs = {"name": "stor_bad", "max_capacity_profile": [5.0], "resource": r}
     init_kwargs.update(bad_kwargs)
     with pytest.raises(ValueError) as exc:
         Storage(**init_kwargs)
