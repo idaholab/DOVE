@@ -1,3 +1,10 @@
+# Copyright 2024, Battelle Energy Alliance, LLC
+# ALL RIGHTS RESERVED
+"""
+These tests check that the optimization is working properly given a
+variety of cashflow configurations on components in the system.
+"""
+
 import numpy as np
 import pandas as pd
 import pytest
