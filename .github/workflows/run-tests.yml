@@ -14,6 +14,7 @@ jobs:
 
       - name: Install solvers
         run: |
+          conda env list
           conda install conda-forge::coin-or-cbc
           conda install conda-forge::ipopt
 
