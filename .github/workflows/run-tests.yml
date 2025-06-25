@@ -13,9 +13,8 @@ jobs:
           auto-update-conda: true
 
       - name: Install solvers
-        shell: bash -el {0}
+        shell: bash -el {0}  # Shell MUST be explicitly specified for conda env to activate
         run: |
-          conda env list
           conda install conda-forge::coin-or-cbc
           conda install conda-forge::ipopt
 
@@ -43,6 +42,7 @@ jobs:
         run: uv run pytest -m unit --cov=src/dove --cov-branch
 
       - name: Run integration tests
+        shell: bash -el {0}
         # Append branch coverage of the src/dove dir and save results in html format
         run: uv run pytest -m integration --cov=src/dove --cov-branch --cov-append --cov-report=html
 
@@ -61,6 +61,7 @@ jobs:
       - name: Run examples
         # This is to ensure that the examples run as expected, not to improve testing or coverage
         # If any examples fail to run, this workflow will fail
+        shell: bash -el {0}
         run: |
           uv run python examples/capacity_factor_example.py
           uv run python examples/ramping_test.py
