@@ -13,6 +13,7 @@ jobs:
           auto-update-conda: true
 
       - name: Install solvers
+        shell: bash -el {0}
         run: |
           conda env list
           conda install conda-forge::coin-or-cbc
