@@ -5,21 +5,32 @@ jobs:
   test-dove-linux:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: "latest"
+          channels: conda-forge, defaults
+          auto-update-conda: true
+          auto-activate-base: true
+
+      - name: Install solvers
+        run: |
+          conda install conda-forge::coincbc
+          conda install conda-forge::ipopt
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: "Set up Python"
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version-file: ".python-version"
 
       - name: Install the project
         run: uv sync --locked --all-extras --dev
-
-      - name: Install solvers
-        run: sudo apt-get install coinor-cbc coinor-libcbc-dev
 
       # - name: Lint with Ruff
       #   run: |
