@@ -1,7 +1,9 @@
 name: Bump version
 
 on:
-  pull_request
+  push:
+    branches:
+      - feature/automatic-versioning-and-more
 
   # push:
   #   branches:
