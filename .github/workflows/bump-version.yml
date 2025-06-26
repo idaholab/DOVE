@@ -22,12 +22,11 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           changelog_increment_filename: body.md
-          dry_run: true
 
-      # - name: Github release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     body_path: "body.md"
-      #     tag_name: ${{ env.REVISION }}
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Github release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: "body.md"
+          tag_name: ${{ env.REVISION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
