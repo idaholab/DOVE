@@ -44,6 +44,7 @@ def initialize_and_populate_system(request):
 ### TEST DEFINITIONS
 
 
+@pytest.mark.unit()
 def test_system_initialization_empty():
     sys = dc.System()
     assert isinstance(sys.components, list)
@@ -52,6 +53,7 @@ def test_system_initialization_empty():
     assert sys.resources == []
 
 
+@pytest.mark.unit()
 def test_system_summary(capsys):
     r = dc.Resource(name="res")
     src = dc.Source(name="src", max_capacity_profile=[4.0], produces=r)
@@ -69,6 +71,7 @@ def test_system_summary(capsys):
     assert "storage" in captured.out
 
 
+@pytest.mark.unit()
 def test_system_setup(initialize_and_populate_system):
     """
     Tests __init__, add_component, add_resource, non_storage_comp_names, and storage_comp_names
@@ -144,6 +147,7 @@ def test_system_setup(initialize_and_populate_system):
     assert sys.time_index == [1, 2, 4]
 
 
+@pytest.mark.unit()
 def test_adding_non_resource_to_resources_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="r1")
     c = dc.Source(name="c1", produces=r1, max_capacity_profile=[1.0])
@@ -154,6 +158,7 @@ def test_adding_non_resource_to_resources_raises_error(initialize_and_populate_s
         )
 
 
+@pytest.mark.unit()
 def test_adding_duplicate_component_name_raises_error(initialize_and_populate_system):
     r = dc.Resource(name="res")
     c1 = dc.Source(name="c", produces=r, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
@@ -162,6 +167,7 @@ def test_adding_duplicate_component_name_raises_error(initialize_and_populate_sy
         initialize_and_populate_system(resources=[r], components=[c1, c2])
 
 
+@pytest.mark.unit()
 def test_adding_duplicate_resource_name_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="res")
     r2 = dc.Resource(name="res")
@@ -171,6 +177,7 @@ def test_adding_duplicate_resource_name_raises_error(initialize_and_populate_sys
         initialize_and_populate_system(resources=[r1, r2], components=[c1, c2])
 
 
+@pytest.mark.unit()
 def test_inconsistent_comp_profile_length_raises_error(initialize_and_populate_system):
     r = dc.Resource(name="res")
     c = dc.Source(name="c", produces=r, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
@@ -179,6 +186,7 @@ def test_inconsistent_comp_profile_length_raises_error(initialize_and_populate_s
     assert "capacity profile length that does not match" in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_solve_with_unknown_model_type_raises_error():
     r = dc.Resource(name="res")
     src = dc.Source(name="src", produces=r, max_capacity_profile=[1.0])

@@ -17,6 +17,7 @@ from dove.core import (
 )
 
 
+@pytest.mark.unit()
 def test_component_basic_properties():
     comp = Component(
         name="comp", max_capacity_profile=[5.0, 4.0, 5.0], min_capacity_profile=[1.0, 1.0, 2.0]
@@ -31,6 +32,7 @@ def test_component_basic_properties():
     assert comp.produces_by_name == []
 
 
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "kwargs, exc_type, msg_substr",
     [
@@ -59,6 +61,7 @@ def test_component_invalid_initialization(kwargs, exc_type, msg_substr):
     assert msg_substr in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_component_capacity_resource_not_in_consumes_or_produces():
     r = Resource(name="res")
     with pytest.raises(ValueError) as exc:
@@ -66,11 +69,13 @@ def test_component_capacity_resource_not_in_consumes_or_produces():
     assert "capacity_resource" in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_min_capacity_profile_set_for_fixed_flexibility():
     c = Component(name="c", max_capacity_profile=[2.0, 3.0], flexibility="fixed")
     assert c.min_capacity_profile.tolist() == [2.0, 3.0]
 
 
+@pytest.mark.unit()
 def test_min_capacity_profile_and_fixed_flexibility_specified_warns():
     with pytest.warns(UserWarning):
         c = Component(
@@ -82,6 +87,7 @@ def test_min_capacity_profile_and_fixed_flexibility_specified_warns():
     assert c.min_capacity_profile.tolist() == [2.0, 3.0]
 
 
+@pytest.mark.unit()
 def test_cf_price_profile_length_does_not_match():
     with pytest.raises(ValueError) as exc:
         Component(
@@ -92,6 +98,7 @@ def test_cf_price_profile_length_does_not_match():
     assert "cashflow price_profile length does not match" in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_cf_price_profile_expanded():
     c = Component(
         name="c", max_capacity_profile=[1.0, 2.0], cashflows=[CashFlow(name="cf", alpha=2.0)]
@@ -99,6 +106,7 @@ def test_cf_price_profile_expanded():
     assert c.cashflows[0].price_profile.tolist() == [2.0, 2.0]
 
 
+@pytest.mark.unit()
 def test_source_defaults_transfer_function():
     r = Resource(name="water")
     src = Source(name="src", max_capacity_profile=[10.0], produces=r)
@@ -110,6 +118,7 @@ def test_source_defaults_transfer_function():
     assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
 
 
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
@@ -126,12 +135,14 @@ def test_source_invalid_parameters_raise(bad_kwargs, msg_substr):
     assert msg_substr in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_source_with_explicit_capacity_resource():
     r = Resource(name="r")
     src = Source(name="src", produces=r, max_capacity_profile=[1.0], capacity_resource=r)
     assert src.capacity_resource is r
 
 
+@pytest.mark.unit()
 def test_sink_defaults_transfer_function():
     r = Resource(name="fuel")
     sink = Sink(name="sink", max_capacity_profile=[8.0], consumes=r)
@@ -143,6 +154,7 @@ def test_sink_defaults_transfer_function():
     assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
 
 
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
@@ -159,12 +171,14 @@ def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
     assert msg_substr in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_sink_with_explicit_capacity_resource():
     r = Resource(name="r")
     sink = Sink(name="sink", consumes=r, max_capacity_profile=[1.0], capacity_resource=r)
     assert sink.capacity_resource is r
 
 
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
@@ -188,6 +202,7 @@ def test_converter_bad_ramp_values_raise(bad_kwargs, msg_substr):
     assert msg_substr in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_converter_same_resource_sets_capacity_and_warns():
     r = Resource(name="electricity")
     with pytest.warns(UserWarning):
@@ -201,6 +216,7 @@ def test_converter_same_resource_sets_capacity_and_warns():
     assert conv.capacity_resource is r
 
 
+@pytest.mark.unit()
 @pytest.mark.parametrize("has_transfer_fn", [True, False])
 def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn):
     r1 = Resource(name="in_res")
@@ -214,6 +230,7 @@ def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn
     assert "ambiguous capacity_resource" in str(exc.value)
 
 
+@pytest.mark.unit()
 def test_storage_default_capacity_and_valid_ranges():
     r = Resource(name="stor_res")
     st = Storage(name="stor", max_capacity_profile=[20.0], resource=r)
@@ -225,6 +242,7 @@ def test_storage_default_capacity_and_valid_ranges():
         assert 0.0 <= val <= 1.0
 
 
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [

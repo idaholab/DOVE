@@ -92,6 +92,7 @@ def builder_setup(create_example_system):
     return price_taker_builder
 
 
+@pytest.mark.unit()
 def test_add_sets(builder_setup):
     # Call method under test
     builder_setup._add_sets()
@@ -122,6 +123,7 @@ def test_add_sets(builder_setup):
     assert list(actual_t) == expected_t  # We do care about the order for this one
 
 
+@pytest.mark.unit()
 def test_add_variables(builder_setup):
     # Add sets to builder so the variables can use them
     builder_setup._add_sets()
@@ -226,6 +228,7 @@ def check_constraint():
     return _check_constraint
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_transfer_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
     ### Transfer constraint
@@ -256,6 +259,7 @@ def test_add_constraints_adds_transfer_constraint(add_constraints_setup, check_c
     check_constraint(m, "transfer", True, expected_transfer_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -295,6 +299,7 @@ def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, che
     check_constraint(m, "max_capacity", False, expected_cap_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -331,6 +336,7 @@ def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, che
     check_constraint(m, "min_capacity", False, expected_min_cap_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_resource_balance_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -388,6 +394,7 @@ def test_add_constraints_adds_resource_balance_constraint(add_constraints_setup,
     check_constraint(m, "resource_balance", True, expected_res_balance_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_storage_balance_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -440,6 +447,7 @@ def test_add_constraints_adds_storage_balance_constraint(add_constraints_setup, 
     check_constraint(m, "storage_balance", True, expected_storage_balance_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_charge_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -471,6 +479,7 @@ def test_add_constraints_adds_charge_limit_constraint(add_constraints_setup, che
     check_constraint(m, "charge_limit", False, expected_charge_limit_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_discharge_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -502,6 +511,7 @@ def test_add_constraints_adds_discharge_limit_constraint(add_constraints_setup, 
     check_constraint(m, "discharge_limit", False, expected_discharge_limit_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -532,6 +542,7 @@ def test_add_constraints_adds_soc_limit_constraint(add_constraints_setup, check_
     check_constraint(m, "soc_limit", False, expected_soc_limit_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_periodic_storage_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -555,6 +566,7 @@ def test_add_constraints_adds_periodic_storage_constraint(add_constraints_setup,
     check_constraint(m, "periodic_storage", True, expected_periodic_level_result)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_up_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -578,6 +590,7 @@ def test_add_constraints_adds_ramp_up_limit_constraint(add_constraints_setup, ch
     check_constraint(m, "ramp_up_limit", False, expected_ramp_up_limit_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_down_limit_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -601,6 +614,7 @@ def test_add_constraints_adds_ramp_down_limit_constraint(add_constraints_setup, 
     check_constraint(m, "ramp_down_limit", False, expected_ramp_down_limit_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_track_up_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -631,6 +645,7 @@ def test_add_constraints_adds_ramp_track_up_constraint(add_constraints_setup, ch
     check_constraint(m, "ramp_track_up", False, expected_ramp_track_up_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_track_down_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -661,6 +676,7 @@ def test_add_constraints_adds_ramp_track_down_constraint(add_constraints_setup, 
     check_constraint(m, "ramp_track_down", False, expected_ramp_track_up_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_bin_up_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -691,6 +707,7 @@ def test_add_constraints_adds_ramp_bin_up_constraint(add_constraints_setup, chec
     check_constraint(m, "ramp_bin_up", False, expected_ramp_up_bin_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_bin_down_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -721,6 +738,7 @@ def test_add_constraints_adds_ramp_bin_down_constraint(add_constraints_setup, ch
     check_constraint(m, "ramp_bin_down", False, expected_ramp_down_bin_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_state_selection_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -758,6 +776,7 @@ def test_add_constraints_adds_state_selection_constraint(add_constraints_setup, 
     check_constraint(m, "state_selection", True, expected_state_selection_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_steady_state_upper_constraint(
     add_constraints_setup, check_constraint
 ):
@@ -790,6 +809,7 @@ def test_add_constraints_adds_steady_state_upper_constraint(
     check_constraint(m, "steady_state_upper", False, expected_steady_state_upper_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_steady_state_lower_constraint(
     add_constraints_setup, check_constraint
 ):
@@ -822,6 +842,7 @@ def test_add_constraints_adds_steady_state_lower_constraint(
     check_constraint(m, "steady_state_lower", False, expected_steady_state_lower_results)
 
 
+@pytest.mark.unit()
 def test_add_constraints_adds_ramp_freq_window_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
@@ -852,6 +873,7 @@ def test_add_constraints_adds_ramp_freq_window_constraint(add_constraints_setup,
     check_constraint(m, "ramp_freq_window", False, expected_ramp_freq_window_results)
 
 
+@pytest.mark.unit()
 def test_add_objective(add_constraints_setup):
     # Call the method under test
     add_constraints_setup._add_objective()
@@ -864,6 +886,7 @@ def test_add_objective(add_constraints_setup):
     assert not obj.is_minimizing()
 
 
+@pytest.mark.unit()
 def test_build(create_example_system):
     # Set up the builder
     builder_cls = BUILDER_REGISTRY["price_taker"]
@@ -918,6 +941,7 @@ def test_build(create_example_system):
     assert returned is builder
 
 
+@pytest.mark.unit()
 def test_extract_results(create_example_system):
     # Finish setup of builder
     builder_cls = BUILDER_REGISTRY["price_taker"]
