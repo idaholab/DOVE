@@ -13,6 +13,7 @@ class DummyResource:
         self.name = name
 
 
+@pytest.mark.unit()
 def test_ratio_transfer_enforces_ratio_true():
     res_in = DummyResource("in_res")
     res_out = DummyResource("out_res")
@@ -23,6 +24,7 @@ def test_ratio_transfer_enforces_ratio_true():
     assert rt(inputs, outputs) is True
 
 
+@pytest.mark.unit()
 def test_ratio_transfer_enforces_ratio_false():
     res_in = DummyResource("in_res")
     res_out = DummyResource("out_res")
@@ -33,6 +35,7 @@ def test_ratio_transfer_enforces_ratio_false():
     assert rt(inputs, outputs) is False
 
 
+@pytest.mark.unit()
 def test_ratio_transfer_only_output_skips_constraint():
     res_in = DummyResource("in_res")
     res_out = DummyResource("out_res")
@@ -43,6 +46,7 @@ def test_ratio_transfer_only_output_skips_constraint():
     assert result is Constraint.Skip
 
 
+@pytest.mark.unit()
 def test_ratio_transfer_only_input_skips_constraint():
     res_in = DummyResource("in_res")
     res_out = DummyResource("out_res")
@@ -53,6 +57,7 @@ def test_ratio_transfer_only_input_skips_constraint():
     assert result is Constraint.Skip
 
 
+@pytest.mark.unit()
 def test_ratio_transfer_no_vars_raises_value_error():
     res_in = DummyResource("in_res")
     res_out = DummyResource("out_res")
@@ -61,6 +66,7 @@ def test_ratio_transfer_no_vars_raises_value_error():
         rt({}, {})
 
 
+@pytest.mark.unit()
 def test_polynomial_transfer_single_term():
     # f(x) = 2 * x^2
     x = DummyResource("x")
@@ -70,6 +76,7 @@ def test_polynomial_transfer_single_term():
     assert pt(inputs, outputs) is True
 
 
+@pytest.mark.unit()
 def test_polynomial_transfer_multiple_terms():
     # f(x, z) = 1* x^1 * z^1 + 3* x^2
     x = DummyResource("x")
@@ -85,6 +92,7 @@ def test_polynomial_transfer_multiple_terms():
     assert pt(inputs, outputs) is True
 
 
+@pytest.mark.unit()
 def test_polynomial_transfer_empty_terms_zero_output():
     # no terms => expr = 0 => total_output must be 0
     pt = PolynomialTransfer(terms=[])
@@ -93,6 +101,7 @@ def test_polynomial_transfer_empty_terms_zero_output():
     assert pt(inputs, outputs) is True
 
 
+@pytest.mark.unit()
 def test_polynomial_transfer_mismatch_raises_false():
     # single term but outputs sum doesn't match
     x = DummyResource("x")

@@ -1,6 +1,6 @@
 [project]
 name = "dove"
-version = "0.0.0"
+version = "0.1.0"
 description = "An extensible Python library for modeling multi-commodity dispatch of energy systems."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -84,11 +84,15 @@ max-complexity = 12
 
 [tool.pytest.ini_options]
 minversion = "8.3.5"
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
 log_cli_level = "INFO"
 xfail_strict = true
 addopts = ["-ra", "--strict-config", "--strict-markers"]
 filterwarnings = ["error"]
+markers = [
+    "unit: Marks tests as unit tests, to be run before integration tests",
+    "integration: Marks tests as integration tests, to be run after unit tests"
+]
 
 [tool.mypy]
 exclude = [

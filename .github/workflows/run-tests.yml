@@ -5,12 +5,26 @@ jobs:
   test-dove-linux:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: "latest"
+          channels: conda-forge, defaults
+          auto-update-conda: true
+
+      - name: Install solvers
+        shell: bash -el {0}  # Shell MUST be explicitly specified for conda env to activate
+        run: |
+          conda install conda-forge::coin-or-cbc
+          conda install conda-forge::ipopt
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: "Set up Python"
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version-file: ".python-version"
@@ -23,6 +37,33 @@ jobs:
       #     # Run Ruff for linting
       #     uvx ruff check .
 
-      - name: Run tests
-        # For example, using `pytest`
-        run: uv run pytest --cov --cov-branch
+      - name: Run unit tests
+        # Check branch coverage of the src/dove dir and automatically print coverage results
+        run: uv run pytest -m unit --cov=src/dove --cov-branch
+
+      - name: Run integration tests
+        shell: bash -el {0}
+        # Append branch coverage of the src/dove dir and save results in html format
+        run: uv run pytest -m integration --cov=src/dove --cov-branch --cov-append --cov-report=html
+
+      - name: Print summary coverage results
+        run: |
+          echo "Total coverage from all tests:"
+          uv run coverage report
+          echo "For detailed coverage results, download 'coverage_results' artifact, unzip, and open 'index.html'."
+
+      - name: Archive detailed coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_results
+          path: htmlcov
+
+      - name: Run examples
+        # This is to ensure that the examples run as expected, not to improve testing or coverage
+        # If any examples fail to run, this workflow will fail
+        shell: bash -el {0}
+        run: |
+          uv run python examples/capacity_factor_example.py
+          uv run python examples/ramping_test.py
+          uv run python examples/storage_test.py
+          uv run python examples/transfer_example.py
