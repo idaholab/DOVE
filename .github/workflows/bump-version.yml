@@ -3,14 +3,11 @@ name: Bump version
 on:
   push:
     branches:
-      - feature/automatic-versioning-and-more
-
-  # push:
-  #   branches:
-  #     - main
+      - main
 
 jobs:
   bump-version:
+    if: github.repository == 'idaholab/DOVE'
     if: ${{ ! startsWith(github.event.head_commit.message, 'bump:') }}
     runs-on: ubuntu-latest
     name: "Bump version, create changelog, and tag github release"
