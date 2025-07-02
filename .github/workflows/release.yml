@@ -1,0 +1,29 @@
+name: release
+
+on: push
+
+jobs:
+  release:
+    if: ${{ github.repository == 'idaholab/DOVE' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    name: "Github release"
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Release on github
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if bump was pushed
+        run: |
+          git fetch origin
+          git checkout main
+          WARN="If you haven't yet, remember to push the commit containing the version bump to main"
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+          if ! echo "$LAST_COMMIT_MSG" |  grep -q "bump: "; then
+          echo "::warning title=PUSH-BUMP::$WARN";
+          fi

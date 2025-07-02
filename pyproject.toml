@@ -114,13 +114,12 @@ quiet-level = 3
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "0.0.0"
-version_provider = "pep621"
+version_provider = "uv"
 tag_format = "v$version"
 version_files = [
     "pyproject.toml:version",
     "docs/source/conf.py:release",
 ]
-version_scheme = "semver"
 update_changelog_on_bump = true
 
 [dependency-groups]
