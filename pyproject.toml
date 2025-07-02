@@ -113,7 +113,6 @@ quiet-level = 3
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.0.0"
 version_provider = "uv"
 tag_format = "v$version"
 version_files = [
