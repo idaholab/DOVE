@@ -225,6 +225,8 @@ def test_storage_default_capacity_and_valid_ranges():
         ({"produces": Resource(name="res")}, "produces"),
         ({"consumes": Resource(name="res")}, "consumes"),
         ({"capacity_resource": Resource(name="res")}, "capacity_resource"),
+        ({"flexibility": "fixed"}, "flexibility"),
+        ({"max_capacity_profile": [4.0, 5.0]}, "max_capacity_profile"),
         ({"rte": 1.5}, "rte"),
         ({"max_charge_rate": -0.1}, "max_charge_rate"),
         ({"max_discharge_rate": 2.0}, "max_discharge_rate"),
@@ -233,7 +235,7 @@ def test_storage_default_capacity_and_valid_ranges():
 )
 def test_storage_invalid_parameters_raise(bad_kwargs, msg_substr):
     r = Resource(name="stor_bad")
-    init_kwargs = {"name": "stor_bad", "max_capacity_profile": [5.0], "resource": r}
+    init_kwargs = {"name": "stor_bad", "max_capacity_profile": [5.0, 5.0], "resource": r}
     init_kwargs.update(bad_kwargs)
     with pytest.raises(ValueError) as exc:
         Storage(**init_kwargs)
