@@ -827,8 +827,8 @@ def test_add_constraints_adds_steady_state_lower_constraint(
     m.ramp_down.set_values(
         {
             ("steam_to_elec_converter", 0): 0.0,  # first t -> constraint skipped
-            ("steam_to_elec_converter", 1): 0.0,  # not ramping down; steady bin = 1 -> satisfied
-            ("steam_to_elec_converter", 2): 0.2,  # ramping down; steady bin = 1 -> constr fails
+            ("steam_to_elec_converter", 1): 0.0,  # not ramping; steady bin = 1 -> satisfied
+            ("steam_to_elec_converter", 2): -0.2,  # ramping; steady bin = 1 -> constr fails
         }
     )
 
