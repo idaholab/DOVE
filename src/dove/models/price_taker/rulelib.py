@@ -369,9 +369,9 @@ def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
     if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
         return pyo.Constraint.Skip
 
-    # If steady_bin is 1, then flow difference must be <= 0
+    # If steady_bin is 1, then flow difference must be >= 0
     M = 2 * comp.max_capacity_profile[t]
-    return m.ramp_down[cname, t] <= M * (1 - m.steady_bin[cname, t])
+    return m.ramp_down[cname, t] >= -M * (1 - m.steady_bin[cname, t])
 
 
 def state_selection_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
