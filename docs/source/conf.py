@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 project = "DOVE"
 project_copyright = "2024, Battelle Energy Alliance, LLC"
-author = "Batelle Energy Alliance, LLC"
+author = "Battelle Energy Alliance, LLC"
 release = "0.2.0"
 
 # -- General configuration ---------------------------------------------------
