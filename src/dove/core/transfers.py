@@ -25,8 +25,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeAlias
 
-import pyomo.environ as pyo  # type: ignore[import-untyped]
-
 if TYPE_CHECKING:
     from . import Resource
 
@@ -63,20 +61,22 @@ class RatioTransfer:
             ratio=0.95
         )
 
-    Later, after component instantiation, the transfer can be used evaluate a
+    Later, after component instantiation, the transfer can be used to evaluate a
     constraint with dispatch activity values:
 
     >>> transfer(inputs={"electricity": 100}, outputs={"heat": 95})
-    True
+    [95, 95]
+
+    Since these values are equal, the constraint is satisfied.
     """
 
     input_res: Resource
     output_res: Resource
     ratio: float = 1.0
 
-    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> pyo.Expression:
+    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> list[float]:
         """
-        Create a constraint that enforces the output value to be a fixed ratio of the input value.
+        Provide values for a constraint that enforces the output to be a fixed ratio of the input.
 
         This method handles three cases:
         1. Both input and output resources exist: enforce output == ratio * input
@@ -92,8 +92,8 @@ class RatioTransfer:
 
         Returns
         -------
-        pyo.Expression
-            A constraint enforcing the ratio relation, or Constraint.Skip for Source/Sink cases.
+        list[float]
+            A list of values that must be equal for the transfer constraint to be satisfied.
 
         Raises
         ------
@@ -104,15 +104,15 @@ class RatioTransfer:
         has_output = self.output_res.name in outputs
 
         if has_input and has_output:
-            return outputs[self.output_res.name] == self.ratio * inputs[self.input_res.name]
+            return [outputs[self.output_res.name], self.ratio * inputs[self.input_res.name]]
 
         elif has_output and not has_input:
             # Source: output = output (tautology)
-            return pyo.Constraint.Skip
+            return []
 
         elif has_input and not has_output:
             # Sink: input = input (tautology)
-            return pyo.Constraint.Skip
+            return []
 
         else:
             raise ValueError(
@@ -157,14 +157,14 @@ class PolynomialTransfer:
 
     terms: list[tuple[float, dict[Resource, int]]]
 
-    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> pyo.Expression:
+    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> list[float]:
         """
-        Create a constraint expression that relates inputs to outputs for this transfer function.
+        Provide values for a constraint that relates inputs to outputs for this transfer function.
 
-        The function constructs a constraint where the sum of all outputs equals the evaluated
-        transfer function based on inputs. The transfer function is evaluated by computing
-        each term (coefficient times product of input variables raised to their exponents)
-        and summing them.
+        The function provides values for an equality constraint such that the sum of all outputs
+        equals the evaluated transfer function based on inputs. The transfer function is evaluated
+        by computing each term (coefficient times product of input variables raised to their
+        exponents) and summing them.
 
         Parameters
         ----------
@@ -175,9 +175,8 @@ class PolynomialTransfer:
 
         Returns
         -------
-        pyo.Expression
-            A Pyomo expression representing the constraint: total_output == f(inputs)
-            where f is the transfer function defined by the terms.
+        list(float)
+            A list of values that must be equal for the transfer constraint to be satisfied.
         """
         total_output = sum(outputs.values())
         expr = 0.0
@@ -186,4 +185,4 @@ class PolynomialTransfer:
             for res, exp in input_exponents.items():
                 term *= inputs[res.name] ** exp
             expr += term
-        return total_output == expr
+        return [total_output, expr]
