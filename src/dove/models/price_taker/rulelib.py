@@ -36,39 +36,56 @@ if TYPE_CHECKING:
     from dove.core import Storage
 
 
-# Transfer Constraints (Converters)
-def transfer_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
+def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
     """
-    Create a PyomoExpression for a price-taker component's transfer rule.
+    Sets up a block that handles resource transfer for components.
 
-    This function implements the conservation rule for price-taker components,
-    applying the component-specific transfer function to relate inputs to outputs
-    at the specified time step.
+    The function creates a Pyomo Block that is specific to a non-storage component. It finds the
+    flow information for this component at the given timestep and provides this data to the
+    component's transfer function, which returns a list of values. This function creates a variable
+    on the block called transfer_size. A constraint is also created on the block that forces each
+    value in the list from the transfer function to equal the transfer_size. Effectively, every
+    value in the list from the transfer function is forced to be equal, which establishes the
+    desired relationship between the inputs and outputs for the component.
 
     Parameters
     ----------
-    m : pyo.ConcreteModel
-        The Pyomo model containing the system representation.
+    b : pyo.Block
+        The Pyomo block to populate with transfer information and constraints.
     cname : str
-        The name of the component.
+        The name of the component for which the transfer block is being defined.
     t : int
-        The time step for which the constraint applies.
+        The time step for which the block applies.
 
     Returns
     -------
-    pyo.Expression
-        A Pyomo expression representing the transfer equation for the component
-        at time t.
+    None
 
     Notes
     -----
-    The component's transfer_fn method is called with dictionaries of input
-    and output flow variables, indexed by resource name.
+    This function assumes that the component has a defined capacity_resource attribute, a
+    time-dependent max_capacity_profile, and an appropriate transfer_fn. These should already
+    have been validated.
     """
+    # Get the model's current behavior (flows)
+    m = b.model()
     comp = m.system.comp_map[cname]
-    inputs = {r.name: m.flow[cname, r.name, t] for r in comp.consumes}
-    outputs = {r.name: m.flow[cname, r.name, t] for r in comp.produces}
-    return comp.transfer_fn(inputs, outputs)
+    input_res_quantities = {r.name: m.flow[cname, "consumes", r.name, t] for r in comp.consumes}
+    output_res_quantities = {r.name: m.flow[cname, "produces", r.name, t] for r in comp.produces}
+
+    # Apply transfer function to get list of values that should be equal
+    tf_values = comp.transfer_fn(input_res_quantities, output_res_quantities)
+
+    MIN_VALUES = 2
+    if len(tf_values) >= MIN_VALUES:  # If resource transfer is applicable
+        # Create necessary variable
+        b.transfer_size = pyo.Var(within=pyo.NonNegativeReals)
+
+        # Create constraint to force equality of all returned values
+        def transfer_rule(b: pyo.Block, req_value: float) -> pyo.Expression:
+            return req_value == b.transfer_size
+
+        b.transfer_constr = pyo.Constraint(tf_values, rule=transfer_rule)
 
 
 def max_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:

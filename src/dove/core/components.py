@@ -462,7 +462,7 @@ class Storage(Component):
             If any of the rate parameters are outside the range [0, 1]
         """
         # Error if unaccepted attribute was added
-        for bad_attr in ("produces", "consumes", "capacity_resource"):
+        for bad_attr in ("produces", "consumes", "capacity_resource", "transfer_fn"):
             if getattr(self, bad_attr):
                 raise ValueError(
                     f"Unaccepted keyword argument '{bad_attr}' provided to Storage {self.name}. "
