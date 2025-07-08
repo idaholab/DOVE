@@ -12,7 +12,8 @@ or economic transformations such as energy conversion, efficiency losses, or
 material transformations.
 
 The module defines two main transfer function types:
-- RatioTransfer: Simple linear relationship between inputs and outputs (e.g., efficiency)
+- RatioTransfer: Simple linear relationship between one input and one output (e.g., efficiency)
+- MultiRatioTransfer: Linear relationship between multiple inputs and outputs
 - PolynomialTransfer: More complex non-linear relationship described by polynomial terms
 
 These transfer functions can be used to model various energy conversion processes
@@ -121,6 +122,7 @@ class RatioTransfer:
             )
 
 
+@dataclass()
 class MultiRatioTransfer:
     """
     A transfer class that enforces ratio relationships between multiple input and output resources.
@@ -188,16 +190,16 @@ class MultiRatioTransfer:
             If an input or output resource cannot be found in the dispatch variables
         """
         for input_res in self.input_resources:
-            if input_res not in inputs:
+            if input_res.name not in inputs:
                 raise ValueError(
-                    f"MultiRatioTransfer: Input resource {input_res.name} "
+                    f"MultiRatioTransfer: Input resource '{input_res.name}' "
                     "not found in the provided dispatch variable for inputs"
                 )
 
         for output_res in self.output_resources:
-            if output_res not in outputs:
+            if output_res.name not in outputs:
                 raise ValueError(
-                    f"MultiRatioTransfer: Output resource {output_res.name} "
+                    f"MultiRatioTransfer: Output resource '{output_res.name}' "
                     "not found in the provided dispatch variable for outputs"
                 )
 

@@ -70,8 +70,8 @@ def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
     # Get the model's current behavior (flows)
     m = b.model()
     comp = m.system.comp_map[cname]
-    input_res_quantities = {r.name: m.flow[cname, "consumes", r.name, t] for r in comp.consumes}
-    output_res_quantities = {r.name: m.flow[cname, "produces", r.name, t] for r in comp.produces}
+    input_res_quantities = {r.name: m.flow[cname, r.name, t] for r in comp.consumes}
+    output_res_quantities = {r.name: m.flow[cname, r.name, t] for r in comp.produces}
 
     # Apply transfer function to get list of values that should be equal
     tf_values = comp.transfer_fn(input_res_quantities, output_res_quantities)
@@ -82,10 +82,10 @@ def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
         b.transfer_size = pyo.Var(within=pyo.NonNegativeReals)
 
         # Create constraint to force equality of all returned values
-        def transfer_rule(b: pyo.Block, req_value: float) -> pyo.Expression:
-            return req_value == b.transfer_size
+        def transfer_rule(b: pyo.Block, i: int) -> pyo.Expression:
+            return tf_values[i] == b.transfer_size
 
-        b.transfer_constr = pyo.Constraint(tf_values, rule=transfer_rule)
+        b.transfer_constr = pyo.Constraint(range(len(tf_values)), rule=transfer_rule)
 
 
 def max_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
