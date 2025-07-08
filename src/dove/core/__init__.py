@@ -23,7 +23,7 @@ from .components import (
 )
 from .resource import Resource
 from .system import System
-from .transfers import PolynomialTransfer, RatioTransfer, TransferFunc
+from .transfers import MultiRatioTransfer, PolynomialTransfer, RatioTransfer, TransferFunc
 
 __all__ = [
     "System",
@@ -37,6 +37,7 @@ __all__ = [
     "Resource",
     "Revenue",
     "RatioTransfer",
+    "MultiRatioTransfer",
     "PolynomialTransfer",
     "TransferFunc",
 ]
