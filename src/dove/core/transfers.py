@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, TypeAlias
 if TYPE_CHECKING:
     from . import Resource
 
-TransferFunc: TypeAlias = "RatioTransfer | PolynomialTransfer"
+TransferFunc: TypeAlias = "RatioTransfer | MultiRatioTransfer | PolynomialTransfer"
 
 
 @dataclass
@@ -67,7 +67,7 @@ class RatioTransfer:
     >>> transfer(inputs={"electricity": 100}, outputs={"heat": 95})
     [95, 95]
 
-    Since these values are equal, the constraint is satisfied.
+    Since these values are equal, the constraint should be satisfied.
     """
 
     input_res: Resource
@@ -119,6 +119,93 @@ class RatioTransfer:
                 f"RatioTransfer could not find either input '{self.input_res}' "
                 f"or output '{self.output_res}' in the provided dispatch variables."
             )
+
+
+class MultiRatioTransfer:
+    """
+    A transfer class that enforces ratio relationships between multiple input and output resources.
+
+    This class models the conversion of one or more resources to one or more other resources with
+    specified ratios. For example, it could represent energy conversion with multiple required
+    inputs or material transformation that involves relevant waste products. This class is intended
+    to be used to enforce relationships between input and output quantities as well as ratios between
+    multiple different inputs and ratios between multiple different outputs.
+
+    Parameters
+    ----------
+    input_resources : dict[Resource, float]
+        A dictionary keyed by the input resources to the component with values that are the
+        relative amounts required of that resource to enable conversion to output resources.
+    output_resources : Resource
+        A dictionary keyed by the output resources to the component with values that are the
+        relative amounts produced of that resource when the inputs are supplied.
+
+
+    Examples
+    --------
+    Create a transfer that converts 1.8 units of heat and 1.0 units of electricity to 0.5 units of
+    hydrogen (assuming "heat", "electricity", and "hydrogen" are all Resource instances):
+
+    >>> transfer = MultiRatioTransfer(
+            input_resources={heat: 1.8, electricity: 1.0},
+            output_resources={hydrogen: 0.5},
+        )
+
+    Later, after component instantiation, the transfer can be used to evaluate a
+    constraint with dispatch activity values:
+
+    >>> transfer(inputs={"heat": 180, "electricity": 100}, outputs={"hydrogen": 50})
+    [100, 100, 100]
+
+    Since these values are all equal, the constraint should be satisfied.
+    """
+
+    input_resources: dict[Resource, float]
+    output_resources: dict[Resource, float]
+
+    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> list[float]:
+        """
+        Provide values for inputs and outputs adjusted by the respective required ratios for each.
+
+        This function returns a list of input and output quantities, adjusted by (divided by) the
+        ratios provided.
+
+        Parameters
+        ----------
+        inputs : dict[str, float]
+            Dictionary mapping resource names to their input flow values.
+        outputs : dict[str, float]
+            Dictionary mapping resource names to their output flow values.
+
+        Returns
+        -------
+        list[float]
+            A list of values that must be equal for the transfer constraint to be satisfied.
+
+        Raises
+        ------
+        ValueError
+            If an input or output resource cannot be found in the dispatch variables
+        """
+        for input_res in self.input_resources:
+            if input_res not in inputs:
+                raise ValueError(
+                    f"MultiRatioTransfer: Input resource {input_res.name} "
+                    "not found in the provided dispatch variable for inputs"
+                )
+
+        for output_res in self.output_resources:
+            if output_res not in outputs:
+                raise ValueError(
+                    f"MultiRatioTransfer: Output resource {output_res.name} "
+                    "not found in the provided dispatch variable for outputs"
+                )
+
+        weighted_inputs = [inputs[res.name] / ratio for res, ratio in self.input_resources.items()]
+        weighted_outputs = [
+            outputs[res.name] / ratio for res, ratio in self.output_resources.items()
+        ]
+        return weighted_inputs + weighted_outputs
 
 
 @dataclass
