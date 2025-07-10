@@ -352,10 +352,11 @@ class Converter(Component):
         Perform post-initialization validation and setup.
 
         This method calls the parent class's post-initialization and then:
-        1. If no capacity_resource was provided, attempts to determine one:
+        1. Validates ramp_limit and ramp_freq values
+        2. If no capacity_resource was provided, attempts to determine one:
            - If the same resource is consumed and produced, uses that resource
            - Otherwise raises an error indicating ambiguity
-        2. Warns or raises errors if capacity_resource is ambiguous
+        3. Warns or raises errors if capacity_resource is ambiguous
 
         Raises
         ------
@@ -368,6 +369,10 @@ class Converter(Component):
         if not (0.0 <= self.ramp_limit <= 1.0):
             raise ValueError(
                 f"Converter {self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
+            )
+        if self.ramp_freq < 0:
+            raise ValueError(
+                f"Converter {self.name}: 'ramp_freq'={self.ramp_freq} must be positive"
             )
 
         # If no capacity_resource was provided, pick one or error out
@@ -451,15 +456,18 @@ class Storage(Component):
         Initialize the Storage component after instance creation.
 
         This method validates input parameters of the Storage component:
-        - Sets the capacity_resource to resource if not provided
+        - Checks that unaccepted attributes for Storage components have not been added
         - Checks if parameters (rte, max_charge_rate, max_discharge_rate, initial_stored) are within the range [0, 1]
         - Calls the parent class's post-initialization method for additional validation
+        - Sets the capacity_resource to resource
 
         Raises
         ------
         ValueError
             If 'produces', 'consumes', or 'capacity_resource' was added
+            If 'flexibility' was set to 'fixed'
             If any of the rate parameters are outside the range [0, 1]
+            If 'max_capacity_profile' is not constant
         """
         # Error if unaccepted attribute was added
         for bad_attr in ("produces", "consumes", "capacity_resource", "transfer_fn"):
@@ -469,9 +477,12 @@ class Storage(Component):
                     "Please remove keyword argument."
                 )
 
-        super().__post_init__()
-        if self.capacity_resource is None:
-            self.capacity_resource = self.resource
+        # Error if flexibility was set to fixed
+        if self.flexibility == "fixed":
+            raise ValueError(
+                f"Attribute 'flexibility' was set to 'fixed' on Storage {self.name}. "
+                "Storage components must be flexible."
+            )
 
         # Error if parameters are outside [0, 1]
         for attr in ("rte", "max_charge_rate", "max_discharge_rate", "initial_stored"):
@@ -480,3 +491,15 @@ class Storage(Component):
                 raise ValueError(
                     f"Storage {self.name}: '{attr}'={val} is outside the range [0, 1].",
                 )
+
+        super().__post_init__()
+
+        # Error if max_capacity_profile is not constant
+        if not np.all(self.max_capacity_profile == self.max_capacity_profile[0]):
+            raise ValueError(
+                f"Non-constant max_capacity_profile was added to storage {self.name}. "
+                "Storage components must have constant max_capacity_profile values."
+            )
+
+        # Set capacity_resource
+        self.capacity_resource = self.resource
