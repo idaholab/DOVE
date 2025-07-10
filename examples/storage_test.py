@@ -55,7 +55,7 @@ if __name__ == "__main__":
         produces=[elec],
         max_capacity_profile=np.full(len(linear_price), 90),
         capacity_resource=steam,
-        transfer_fn=dc.RatioTransfer(steam, elec, 0.5),
+        transfer_fn=dc.RatioTransfer({steam: 1.0}, {elec: 0.5}),
     )
 
     # A Sink can only consume one resource. These components typically represent
