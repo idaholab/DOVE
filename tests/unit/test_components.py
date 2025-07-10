@@ -194,7 +194,7 @@ def test_converter_bad_ramp_values_raise(bad_kwargs, msg_substr):
         "max_capacity_profile": [1.0],
         "consumes": [r1],
         "produces": [r2],
-        "transfer_fn": RatioTransfer(input_res=r1, output_res=r2),
+        "transfer_fn": RatioTransfer(input_resources={r1: 1.0}, output_resources={r2: 1.0}),
     }
     init_kwargs.update(bad_kwargs)
     with pytest.raises(ValueError) as exc:
