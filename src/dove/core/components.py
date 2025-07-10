@@ -258,7 +258,7 @@ class Source(Component):
 
         if self.transfer_fn is None:
             res = produces
-            self.transfer_fn = RatioTransfer(input_res=res, output_res=res, ratio=1.0)
+            self.transfer_fn = RatioTransfer(input_resources={}, output_resources={res: 1.0})
 
 
 @dataclass
@@ -311,7 +311,7 @@ class Sink(Component):
 
         if self.transfer_fn is None:
             res = consumes
-            self.transfer_fn = RatioTransfer(input_res=res, output_res=res, ratio=1.0)
+            self.transfer_fn = RatioTransfer(input_resources={res: 1.0}, output_resources={})
 
 
 @dataclass
@@ -470,7 +470,7 @@ class Storage(Component):
             If 'max_capacity_profile' is not constant
         """
         # Error if unaccepted attribute was added
-        for bad_attr in ("produces", "consumes", "capacity_resource"):
+        for bad_attr in ("produces", "consumes", "capacity_resource", "transfer_fn"):
             if getattr(self, bad_attr):
                 raise ValueError(
                     f"Unaccepted keyword argument '{bad_attr}' provided to Storage {self.name}. "

@@ -40,7 +40,9 @@ def generic_system_setup():
             "produces": [electricity],
             "max_capacity_profile": np.full(times, 100),
             "capacity_resource": steam,
-            "transfer_fn": dc.RatioTransfer(input_res=steam, output_res=electricity, ratio=0.5),
+            "transfer_fn": dc.RatioTransfer(
+                input_resources={steam: 1.0}, output_resources={electricity: 0.5}
+            ),
         }
         if converter_cfs:
             conv_init_kwargs.update({"cashflows": converter_cfs})
