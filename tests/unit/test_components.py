@@ -115,7 +115,7 @@ def test_source_defaults_transfer_function():
     assert src.capacity_resource is r
     tf = src.transfer_fn
     assert isinstance(tf, RatioTransfer)
-    assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
+    assert tf.input_resources == {} and tf.output_resources == {r: 1.0}
 
 
 @pytest.mark.unit()
@@ -151,7 +151,7 @@ def test_sink_defaults_transfer_function():
     assert sink.capacity_resource is r
     tf = sink.transfer_fn
     assert isinstance(tf, RatioTransfer)
-    assert tf.input_res is r and tf.output_res is r and tf.ratio == 1.0
+    assert tf.input_resources == {r: 1.0} and tf.output_resources == {}
 
 
 @pytest.mark.unit()
@@ -187,7 +187,7 @@ def test_converter_same_resource_sets_capacity_and_warns():
             max_capacity_profile=[15.0],
             consumes=[r],
             produces=[r],
-            transfer_fn=RatioTransfer(input_res=r, output_res=r),
+            transfer_fn=RatioTransfer(input_resources={r: 1.0}, output_resources={r: 1.0}),
         )
     assert conv.capacity_resource is r
 
@@ -199,7 +199,9 @@ def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn
     r2 = Resource(name="out_res")
     init_kwargs = {"name": "amb", "max_capacity_profile": [5.0], "consumes": [r1], "produces": [r2]}
     if has_transfer_fn:
-        init_kwargs.update({"transfer_fn": RatioTransfer(input_res=r1, output_res=r2)})
+        init_kwargs.update(
+            {"transfer_fn": RatioTransfer(input_resources={r1: 1.0}, output_resources={r2: 1.0})}
+        )
     # missing transfer_fn and ambiguous resources
     with pytest.raises(ValueError) as exc:
         Converter(**init_kwargs)
