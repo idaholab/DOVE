@@ -12,8 +12,7 @@ or economic transformations such as energy conversion, efficiency losses, or
 material transformations.
 
 The module defines two main transfer function types:
-- RatioTransfer: Simple linear relationship between one input and one output (e.g., efficiency)
-- MultiRatioTransfer: Linear relationship between multiple inputs and outputs
+- RatioTransfer: Simple linear relationship between input and output resources (e.g., efficiency)
 - PolynomialTransfer: More complex non-linear relationship described by polynomial terms
 
 These transfer functions can be used to model various energy conversion processes
@@ -29,109 +28,22 @@ from typing import TYPE_CHECKING, TypeAlias
 if TYPE_CHECKING:
     from . import Resource
 
-TransferFunc: TypeAlias = "RatioTransfer | MultiRatioTransfer | PolynomialTransfer"
-
-
-@dataclass
-class RatioTransfer:
-    """
-    A transfer class that enforces a ratio relationship between input and output resources.
-
-    This class models the conversion of one resource to another with a specified ratio.
-    For example, it could represent energy conversion efficiency or material transformation.
-
-    Parameters
-    ----------
-    input_res : Resource
-        The input resource object.
-    output_res : Resource
-        The output resource object.
-    ratio : float, default=1.0
-        The conversion ratio from input to output.
-        A ratio of 1.0 means the output equals the input.
-        A ratio of 0.9 means 90% of input becomes output (10% loss).
-        A ratio > 1.0 means the output is amplified relative to input.
-
-    Examples
-    --------
-    Create a transfer that converts electricity to heat with 95% efficiency:
-
-    >>> transfer = RatioTransfer(
-            input_res=Resource("electricity"),
-            output_res=Resource("heat"),
-            ratio=0.95
-        )
-
-    Later, after component instantiation, the transfer can be used to evaluate a
-    constraint with dispatch activity values:
-
-    >>> transfer(inputs={"electricity": 100}, outputs={"heat": 95})
-    [95, 95]
-
-    Since these values are equal, the constraint should be satisfied.
-    """
-
-    input_res: Resource
-    output_res: Resource
-    ratio: float = 1.0
-
-    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> list[float]:
-        """
-        Provide values for a constraint that enforces the output to be a fixed ratio of the input.
-
-        This method handles three cases:
-        1. Both input and output resources exist: enforce output == ratio * input
-        2. Only output resource exists (Source case): skip constraint as it's dispatched 1:1
-        3. Only input resource exists (Sink case): skip constraint as it's dispatched 1:1
-
-        Parameters
-        ----------
-        inputs : dict[str, float]
-            Dictionary mapping resource names to their input flow values.
-        outputs : dict[str, float]
-            Dictionary mapping resource names to their output flow values.
-
-        Returns
-        -------
-        list[float]
-            A list of values that must be equal for the transfer constraint to be satisfied.
-
-        Raises
-        ------
-        ValueError
-            If neither input nor output resource is found in the provided dictionaries.
-        """
-        has_input = self.input_res.name in inputs
-        has_output = self.output_res.name in outputs
-
-        if has_input and has_output:
-            return [outputs[self.output_res.name], self.ratio * inputs[self.input_res.name]]
-
-        elif has_output and not has_input:
-            # Source: output = output (tautology)
-            return []
-
-        elif has_input and not has_output:
-            # Sink: input = input (tautology)
-            return []
-
-        else:
-            raise ValueError(
-                f"RatioTransfer could not find either input '{self.input_res}' "
-                f"or output '{self.output_res}' in the provided dispatch variables."
-            )
+TransferFunc: TypeAlias = "RatioTransfer | PolynomialTransfer"
 
 
 @dataclass()
-class MultiRatioTransfer:
+class RatioTransfer:
     """
     A transfer class that enforces ratio relationships between multiple input and output resources.
 
-    This class models the conversion of one or more resources to one or more other resources with
-    specified ratios. For example, it could represent energy conversion with multiple required
-    inputs or material transformation that involves relevant waste products. This class is intended
-    to be used to enforce relationships between input and output quantities as well as ratios between
-    multiple different inputs and ratios between multiple different outputs.
+    This class models the conversion of one or more resources to one or more other resources
+    according to specified ratios between each. For example, it could represent energy conversion
+    with less than 100% efficiency and multiple required inputs or material transformation that
+    involves relevant waste products. This class is intended to be used to enforce relationships
+    between input and output quantities as well as ratios between multiple different inputs and
+    ratios between multiple different outputs. This is comparable to a chemical balance
+    relationship, where A, B, C, and D are constant floats:
+        A(input_resource_1) + B(input_resource_2) -> C(output_resource_1) + D(output_resource_2)
 
     Parameters
     ----------
@@ -145,10 +57,26 @@ class MultiRatioTransfer:
 
     Examples
     --------
+    Create a transfer that converts heat to electricity at 90% efficiency (assuming "heat" and
+    "electricity" are both Resource instances and are both in MW):
+
+    >>> transfer = RatioTransfer(
+            input_resources={heat: 1.0},
+            output_resources={electricity: 0.9},
+        )
+
+    Later, after component instantiation, the transfer can be used to evaluate a
+    constraint with dispatch activity values:
+
+    >>> transfer(inputs={"heat": 200}, outputs={"electricity": 180})
+    [200, 200]
+
+    Since these values are all equal, the constraint should be satisfied.
+
     Create a transfer that converts 1.8 units of heat and 1.0 units of electricity to 0.5 units of
     hydrogen (assuming "heat", "electricity", and "hydrogen" are all Resource instances):
 
-    >>> transfer = MultiRatioTransfer(
+    >>> transfer = RatioTransfer(
             input_resources={heat: 1.8, electricity: 1.0},
             output_resources={hydrogen: 0.5},
         )
@@ -192,14 +120,14 @@ class MultiRatioTransfer:
         for input_res in self.input_resources:
             if input_res.name not in inputs:
                 raise ValueError(
-                    f"MultiRatioTransfer: Input resource '{input_res.name}' "
+                    f"RatioTransfer: Input resource '{input_res.name}' "
                     "not found in the provided dispatch variable for inputs"
                 )
 
         for output_res in self.output_resources:
             if output_res.name not in outputs:
                 raise ValueError(
-                    f"MultiRatioTransfer: Output resource '{output_res.name}' "
+                    f"RatioTransfer: Output resource '{output_res.name}' "
                     "not found in the provided dispatch variable for outputs"
                 )
 
