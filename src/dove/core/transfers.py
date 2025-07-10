@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 TransferFunc: TypeAlias = "RatioTransfer | PolynomialTransfer"
 
 
-@dataclass
+@dataclass()
 class RatioTransfer:
     """
     A transfer class that enforces ratio relationships between multiple input and output resources.
