@@ -54,14 +54,16 @@ class Component(ABC):
     ----------
     name : str
         Unique identifier for the component.
-    max_capacity_profile : TimeDependent
-        Time-dependent maximum operational capacity of the component.
+    installed_capacity : float
+        Nameplate capacity of the component.
+    capacity_factor : TimeDependent
+        Fraction of the installed_capacity that is available to dispatch, by timestep.
     consumes : list[Resource]
         Resources consumed by this component.
     produces : list[Resource]
         Resources produced by this component.
-    min_capacity_profile : TimeDependent
-        Time-dependent minimum operational capacity; defaults to 0.0 for every timestep.
+    min_profile : TimeDependent
+        Time-dependent minimum allowable activity; defaults to 0.0 for every timestep.
     capacity_resource : Resource | None
         The resource that defines capacity, if any.
     flexibility : Literal["flex", "fixed"]
@@ -78,10 +80,11 @@ class Component(ABC):
     """
 
     name: str
-    max_capacity_profile: TimeDependent
+    installed_capacity: float
+    capacity_factor: TimeDependent = field(default_factory=list)
     consumes: list[Resource] = field(default_factory=list)
     produces: list[Resource] = field(default_factory=list)
-    min_capacity_profile: TimeDependent = field(default_factory=list)
+    min_profile: TimeDependent = field(default_factory=list)
     capacity_resource: Resource | None = None
     flexibility: Literal["flex", "fixed"] = "flex"
     cashflows: list[CashFlow] = field(default_factory=list)
@@ -102,33 +105,52 @@ class Component(ABC):
         Validate and process the component's attributes after initialization.
 
         This method performs various checks and conversions to ensure the component is properly configured:
-        1. Converts max_capacity_profile to a numpy array of floats
-        2. Validates max_capacity_profile values
-        3. Checks that flexibility is either 'flex' or 'fixed'
-        4. Warns if fixed flexibility and min_capacity_profile were both set by the user
-        5. Sets min_capacity_profile equal to max_capacity_profile if flexibility is fixed
-        6. Populates min_capacity_profile if necessary
-        7. Converts min_capacity_profile to a numpy array of floats if necessary
-        8. Validates min_capacity_profile values
-        9. Verifies all resources are Resource instances
-        10. Ensures capacity_resource is in either consumes or produces
-        11. Calls _validate_cashflows to validate cashflows
+        1. Converts capacity_factor and min_profile to numpy arrays of floats
+        2. Checks that installed_capacity is positive
+        3. Validates capacity_factor values
+        4. Validates min_profile values
+        5. Checks that flexibility is either 'flex' or 'fixed'
+        6. Warns if fixed flexibility and min_profile were both set by the user
+        7. Verifies all resources are Resource instances
+        8. Ensures capacity_resource is in either consumes or produces
+        9. Checks that all cashflows are CashFlow instances
 
         Raises
         ------
         ValueError
             If any validation check fails
         TypeError
-            If resources is not a list of Resource instances
+            If resources or cashflows contains elements of the wrong type
         UserWarning
-            If min_capacity_profile and fixed flexibility were both explicitly specified for a component
+            If min_profile and fixed flexibility were both explicitly specified for a component
         """
-        # convert max_capacity_profile
-        self.max_capacity_profile = np.asarray(self.max_capacity_profile, float).ravel()
+        # convert capacity_factor and min_profile
+        self.capacity_factor = np.asarray(self.capacity_factor, float).ravel()
+        self.min_profile = np.asarray(self.min_profile, float).ravel()
 
-        # validate max_capacity_profile
-        if (self.max_capacity_profile < 0).any():
-            raise ValueError(f"{self.name}: max_capacity_profile contains negative values")
+        # validate installed_capacity
+        if self.installed_capacity < 0:
+            raise ValueError(
+                f"{self.name}: installed_capacity (={self.installed_capacity}) cannot be negative"
+            )
+
+        # validate capacity_factor
+        for t, cap_factor_val in enumerate(self.capacity_factor):
+            if cap_factor_val < 0 or cap_factor_val > 1:
+                raise ValueError(
+                    f"{self.name}: capacity_factor value at timestep {t} "
+                    f"({cap_factor_val}) is not between 0 and 1"
+                )
+
+        # validate min_profile
+        for t, min_val in enumerate(self.min_profile):
+            max_val = self.capacity_at_timestep(t)
+            if not (0 <= min_val <= max_val):
+                raise ValueError(
+                    f"{self.name}: min_profile value at timestep {t} is not between 0 and the "
+                    f"component's maximum operational capacity at that timestep "
+                    f"({min_val} is not in  [0, {max_val}])"
+                )
 
         # flexibility
         if self.flexibility not in ("flex", "fixed"):
@@ -136,38 +158,13 @@ class Component(ABC):
                 f"{self.name}: flexibility must be 'flex' or 'fixed', got {self.flexibility}"
             )
 
-        if self.flexibility == "fixed":
-            if len(self.min_capacity_profile) > 0:
-                warnings.warn(
-                    f"{self.name}: both min_capacity_profile and fixed flexibility were specified. "
-                    "Overriding min_capacity_profile in order to fix profile at max_capacity_profile",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            self.min_capacity_profile = self.max_capacity_profile
-
-        if len(self.min_capacity_profile) < 1:
-            # set default min_capacity_profile
-            self.min_capacity_profile = np.full(len(self.max_capacity_profile), 0.0)
-        else:
-            # convert min_capacity_profile
-            self.min_capacity_profile = np.asarray(self.min_capacity_profile, float).ravel()
-
-            # validate min_capacity_profile
-            if len(self.min_capacity_profile) != len(self.max_capacity_profile):
-                raise ValueError(
-                    f"{self.name}: length of min_capacity_profile does not equal length of max_capacity_profile"
-                    f"({len(self.min_capacity_profile)} != {len(self.max_capacity_profile)})"
-                )
-
-            for min_cap_value, max_cap_value in zip(
-                self.min_capacity_profile, self.max_capacity_profile, strict=True
-            ):
-                if not (0 <= min_cap_value <= max_cap_value):
-                    raise ValueError(
-                        f"{self.name}: each value in min_capacity_profile must be in "
-                        f"[0, <max_capacity_profile value>] ({min_cap_value} is not in [0, {max_cap_value}])"
-                    )
+        if self.flexibility == "fixed" and len(self.min_profile) > 0:
+            warnings.warn(
+                f"{self.name}: both min_profile and fixed flexibility were specified. "
+                "Ignoring min_profile in order to fix the component's dispatch.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         # resources
         if not all(isinstance(res, Resource) for res in self.produces + self.consumes):
@@ -183,29 +180,19 @@ class Component(ABC):
                 )
 
         # cashflows
-        self._validate_cashflows()
+        if not all(isinstance(cf, CashFlow) for cf in self.cashflows):
+            raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
 
-    def _validate_cashflows(self) -> None:
-        """
-        Validate cashflows and expand cashflow price_profiles if not provided by the user.
+    def capacity_at_timestep(self, t: int) -> float:
+        """The maximum operational capacity at the provided time index t"""
+        if len(self.capacity_factor) > 0:
+            return self.installed_capacity * self.capacity_factor[t]
+        else:
+            return self.installed_capacity
 
-        Raises
-        ------
-        TypeError:
-            If cashflows contains elements that are not CashFlow instances
-        ValueError:
-            If any cashflow's price_profile is a different length from the component's capacity profile length
-        """
-        for cf in self.cashflows:
-            if not isinstance(cf, CashFlow):
-                raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
-            if len(cf.price_profile) < 1:
-                cf.price_profile = np.full(len(self.max_capacity_profile), cf.alpha)
-            elif len(cf.price_profile) != len(self.max_capacity_profile):
-                raise ValueError(
-                    f"{self.name}: {cf.name}: cashflow price_profile length "
-                    "does not match component profile length!"
-                )
+    def minimum_at_timestep(self, t: int) -> float:
+        """The minimum operational capacity at the provided time index t"""
+        return self.min_profile[t] if len(self.min_profile) > 0 else 0.0
 
 
 @dataclass
@@ -274,6 +261,8 @@ class Sink(Component):
     ----------
     name : str
         The unique identifier for this sink component.
+    demand_profile : TimeDependent
+        The maximum amount that this sink can consume, by timestep.
     consumes : Resource
         The resource type this sink consumes.
     **kwargs : Any
@@ -290,12 +279,18 @@ class Sink(Component):
     using the consumed resource as both input and mocked output.
     """
 
-    def __init__(self, name: str, consumes: Resource, **kwargs: Any) -> None:
-        if "produces" in kwargs:
-            raise ValueError(
-                f"{name}: Keyword argument 'produces' was specified for a Sink, but sinks cannot produce."
-                "Please remove keyword argument."
-            )
+    def __init__(
+        self, name: str, demand_profile: TimeDependent, consumes: Resource, **kwargs: Any
+    ) -> None:
+        self.demand_profile = demand_profile
+
+        bad_kwargs = ["installed_capacity", "produces"]
+        for bad_kwarg in bad_kwargs:
+            if bad_kwarg in kwargs:
+                raise ValueError(
+                    f"{name}: Keyword argument '{bad_kwarg}' was specified, but is "
+                    "not accepted for a Sink. Please remove keyword argument."
+                )
 
         if "capacity_resource" in kwargs:
             if kwargs["capacity_resource"] == consumes:
@@ -307,11 +302,27 @@ class Sink(Component):
                     f"'capacity_resource' to {consumes} explicitly, or remove it, and it will be set implicitly."
                 )
 
-        super().__init__(name=name, consumes=[consumes], capacity_resource=consumes, **kwargs)
+        super().__init__(
+            name=name,
+            installed_capacity=0,  # TODO: How to do this better?
+            consumes=[consumes],
+            capacity_resource=consumes,
+            **kwargs,
+        )
 
         if self.transfer_fn is None:
             res = consumes
             self.transfer_fn = RatioTransfer(input_res=res, output_res=res, ratio=1.0)
+
+    def capacity_at_timestep(self, t: int) -> float:
+        """
+        Returns the maximum amount that the sink can consume at the given time index t.
+        Overload of Component.capacity_at_timestep.
+        """
+        if len(self.capacity_factor) > 0:
+            return self.demand_profile[t] * self.capacity_factor[t]
+        else:
+            return self.demand_profile[t]
 
 
 @dataclass
@@ -326,7 +337,7 @@ class Converter(Component):
     ----------
     ramp_limit : float
         Maximum rate of change for the component's capacity
-        utilization between timesteps as a percent of capacity.
+        utilization between timesteps as a fraction of installed capacity.
         Must be a value between 0 and 1. Default is 1.0 (no limit).
     ramp_freq : int
         Frequency at which ramp limitations are applied.
@@ -418,13 +429,13 @@ class Storage(Component):
     rte : float
         Round-trip efficiency, between 0 and 1. Defaults to 1.0.
     max_charge_rate : float
-        Maximum charge rate as a fraction of capacity per time period,
-        between 0 and 1. Defaults to 1.0.
+        Maximum charge rate as a fraction of installed capacity
+        per time period, between 0 and 1. Defaults to 1.0.
     max_discharge_rate : float
-        Maximum discharge rate as a fraction of capacity per time period,
-        between 0 and 1. Defaults to 1.0.
+        Maximum discharge rate as a fraction of installed capacity
+        per time period, between 0 and 1. Defaults to 1.0.
     initial_stored : float
-        Initial stored amount as a fraction of capacity,
+        Initial stored amount as a fraction of installed capacity,
         between 0 and 1. Defaults to 0.0.
     periodic_level : bool
         If True, storage level at the end of the simulation
@@ -467,7 +478,6 @@ class Storage(Component):
             If 'produces', 'consumes', or 'capacity_resource' was added
             If 'flexibility' was set to 'fixed'
             If any of the rate parameters are outside the range [0, 1]
-            If 'max_capacity_profile' is not constant
         """
         # Error if unaccepted attribute was added
         for bad_attr in ("produces", "consumes", "capacity_resource"):
@@ -493,13 +503,6 @@ class Storage(Component):
                 )
 
         super().__post_init__()
-
-        # Error if max_capacity_profile is not constant
-        if not np.all(self.max_capacity_profile == self.max_capacity_profile[0]):
-            raise ValueError(
-                f"Non-constant max_capacity_profile was added to storage {self.name}. "
-                "Storage components must have constant max_capacity_profile values."
-            )
 
         # Set capacity_resource
         self.capacity_resource = self.resource

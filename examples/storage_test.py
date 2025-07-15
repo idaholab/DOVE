@@ -26,13 +26,12 @@ if __name__ == "__main__":
 
     # A Source doesn't consume any resources and produces a singular resource.
     # Notice how `flexibility` is set on this component. A fixed flexibility
-    # indicates that the component will produce `steam` at max_capacity for each time step.
-    # This is also the reason why `profile` is not set for this component.
+    # indicates that the component will produce `steam` at installed_capacity for each time step.
     # There are also no cashflows associated with producing steam from the "steamer."
     steamer = dc.Source(
         name="steamer",
         produces=steam,
-        max_capacity_profile=np.full(len(linear_price), 100),
+        installed_capacity=100,
         flexibility="fixed",
     )
 
@@ -42,18 +41,17 @@ if __name__ == "__main__":
     steam_storage = dc.Storage(
         name="steam_storage",
         resource=steam,
-        max_capacity_profile=np.full(len(linear_price), 100),
+        installed_capacity=100,
         rte=0.9,
     )
 
-    # A Converter can consume and produce multiple resources. If a Converter produces
-    # resources that are different from what it consumes, `transfer_terms` must be defined
-    # so the resource knows how to convert resources to contribute to the system.
+    # A Converter can consume and produce multiple resources. The mathematical relationship
+    # governing this conversion is specified in the `transfer_fn`.
     gen = dc.Converter(
         name="generator",
         consumes=[steam],
         produces=[elec],
-        max_capacity_profile=np.full(len(linear_price), 90),
+        installed_capacity=90,
         capacity_resource=steam,
         transfer_fn=dc.RatioTransfer(steam, elec, 0.5),
     )
@@ -65,21 +63,21 @@ if __name__ == "__main__":
     market_linear = dc.Sink(
         name="market_linear",
         consumes=elec,
-        max_capacity_profile=np.full(len(linear_price), 2),
+        demand_profile=[2] * len(linear_price),
         cashflows=[dc.Revenue("esales", price_profile=linear_price)],  # Time Varying Revenue
     )
 
     market_spike = dc.Sink(
         name="market_spike",
         consumes=elec,
-        max_capacity_profile=np.full(len(linear_price), 40),
+        demand_profile=[40] * len(linear_price),
         cashflows=[dc.Revenue("esales", price_profile=spike_price)],  # Time Varying Revenue
     )
 
     steam_offload = dc.Sink(
         name="steam_offload",
         consumes=steam,
-        max_capacity_profile=np.full(len(linear_price), 100),
+        demand_profile=[100] * len(linear_price),
         cashflows=[dc.Revenue("steam_offload", alpha=0.01)],  # Constant Revenue
     )
 
@@ -88,8 +86,8 @@ if __name__ == "__main__":
     ############################
     components = [steamer, steam_storage, gen, market_linear, market_spike, steam_offload]
     resources = [elec, steam]
-    time_index = np.arange(0, len(linear_price))
-    sys = dc.System(components, resources, time_index)
+    dispatch_window = np.arange(0, len(linear_price))
+    sys = dc.System(components, resources, dispatch_window)
     results = sys.solve()
 
     print(results)
