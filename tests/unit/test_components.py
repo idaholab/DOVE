@@ -203,33 +203,43 @@ def test_converter_bad_ramp_values_raise(bad_kwargs, msg_substr):
 
 
 @pytest.mark.unit()
-def test_converter_same_resource_sets_capacity_and_warns():
+@pytest.mark.parametrize(
+    "required_kwarg, msg_substr",
+    [
+        ("capacity_resource", "'capacity_resource' was not provided"),
+        ("transfer_fn", "'transfer_fn' was not provided"),
+    ],
+)
+def test_converter_missing_required_kwarg_raises(required_kwarg, msg_substr):
+    r1 = Resource(name="r1")
+    r2 = Resource(name="r2")
+    init_kwargs = {
+        "name": "conv",
+        "max_capacity_profile": [1.0],
+        "consumes": [r1],
+        "produces": [r2],
+        "capacity_resource": r1,
+        "transfer_fn": RatioTransfer(input_resources={r1: 1.0}, output_resources={r2: 1.0}),
+    }
+    del init_kwargs[required_kwarg]
+    with pytest.raises(ValueError) as exc:
+        Converter(**init_kwargs)
+    assert msg_substr in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_converter_same_resource_raises():
     r = Resource(name="electricity")
-    with pytest.warns(UserWarning):
-        conv = Converter(
+    with pytest.raises(ValueError) as exc:
+        Converter(
             name="conv",
             max_capacity_profile=[15.0],
             consumes=[r],
             produces=[r],
+            capacity_resource=r,
             transfer_fn=RatioTransfer(input_resources={r: 1.0}, output_resources={r: 1.0}),
         )
-    assert conv.capacity_resource is r
-
-
-@pytest.mark.unit()
-@pytest.mark.parametrize("has_transfer_fn", [True, False])
-def test_converter_ambiguous_capacity_resource_requires_explicit(has_transfer_fn):
-    r1 = Resource(name="in_res")
-    r2 = Resource(name="out_res")
-    init_kwargs = {"name": "amb", "max_capacity_profile": [5.0], "consumes": [r1], "produces": [r2]}
-    if has_transfer_fn:
-        init_kwargs.update(
-            {"transfer_fn": RatioTransfer(input_resources={r1: 1.0}, output_resources={r2: 1.0})}
-        )
-    # missing transfer_fn and ambiguous resources
-    with pytest.raises(ValueError) as exc:
-        Converter(**init_kwargs)
-    assert "ambiguous capacity_resource" in str(exc.value)
+    assert "Resource 'electricity' found in both" in str(exc.value)
 
 
 @pytest.mark.unit()

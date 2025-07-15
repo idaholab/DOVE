@@ -320,7 +320,7 @@ class Converter(Component):
     A Component subclass that converts resources from one type to another.
 
     The Converter class represents components that consume one set of resources and
-    produce another, potentially different set of resources.
+    produce another, different set of resources.
 
     Parameters
     ----------
@@ -336,12 +336,8 @@ class Converter(Component):
 
     Notes
     -----
-    - A Converter requires a 'capacity_resource' to determine its capacity limits.
-    - If not specified, the capacity_resource will be automatically determined:
-      - If the component consumes and produces the same resource, that resource is used.
-      - Otherwise, capacity_resource must be explicitly specified.
-    - When resources differ between input and output, a transfer_fn is required to
-      define the conversion relationship.
+    - A Converter requires an explicitly specified 'capacity_resource', which is
+      the resource to which the capacity limits refer.
     """
 
     ramp_limit: float = 1.0
@@ -353,17 +349,13 @@ class Converter(Component):
 
         This method calls the parent class's post-initialization and then:
         1. Validates ramp_limit and ramp_freq values
-        2. If no capacity_resource was provided, attempts to determine one:
-           - If the same resource is consumed and produced, uses that resource
-           - Otherwise raises an error indicating ambiguity
-        3. Warns or raises errors if capacity_resource is ambiguous
+        2. Raises error if capacity_resource or transfer_fn was not explicitly provided
+        3. Raises error if any resource is both an input and an output
 
         Raises
         ------
         ValueError
-            If capacity_resource is ambiguous or missing when required
-        UserWarning
-            If capacity_resource was not specified but could be determined automatically
+            If capacity_resource was not explicitly provided
         """
         super().__post_init__()
         if not (0.0 <= self.ramp_limit <= 1.0):
@@ -375,31 +367,19 @@ class Converter(Component):
                 f"Converter {self.name}: 'ramp_freq'={self.ramp_freq} must be positive"
             )
 
-        # If no capacity_resource was provided, pick one or error out
-        if self.capacity_resource is None and self.consumes and self.produces:
-            in_res = self.consumes[0]
-            out_res = self.produces[0]
-            if in_res is out_res:
-                # unambiguous: same resource on both sides
-                self.capacity_resource = in_res
-                warnings.warn(
-                    f"Converter {self.name}: capacity_resource not specified, "
-                    f"using common resource '{in_res.name}'.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            else:
-                # ambiguous capacity_resource
-                if self.transfer_fn is None:
-                    raise ValueError(
-                        f"Converter {self.name}: ambiguous capacity_resource (consumes {self.consumes_by_name} "
-                        f"and produces {self.produces_by_name}) and missing transfer_fn; "
-                        "please specify capacity_resource and transfer_fn explicitly."
-                    )
+        for required_kwarg in ["capacity_resource", "transfer_fn"]:
+            if not getattr(self, required_kwarg, None):
                 raise ValueError(
-                    f"Converter {self.name}: ambiguous capacity_resource (consumes {self.consumes_by_name} "
-                    f"and produces {self.produces_by_name}); "
-                    "please specify capacity_resource explicitly."
+                    f"Converter {self.name}: Required keyword argument '{required_kwarg}' "
+                    f"was not provided. Please specify '{required_kwarg}'."
+                )
+
+        for res in self.consumes:
+            if res in self.produces:
+                raise ValueError(
+                    f"Converter {self.name}: Resource '{res.name}' found in both 'consumes' and "
+                    "'produces'. This is not yet supported. Please ensure consumed and produced "
+                    "resources are distinct."
                 )
 
 
