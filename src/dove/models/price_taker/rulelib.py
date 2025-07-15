@@ -29,7 +29,6 @@ a 'system' attribute containing component and resource information.
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pyomo.environ as pyo  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
@@ -81,20 +80,21 @@ def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
         b.transfer_constr = pyo.Constraint(range(len(tf_requirements)), rule=transfer_rule)
 
 
-def max_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
+def capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
-    Creates a constraint rule for limiting resource flow up to component's max capacity at the given timestep.
+    Creates a constraint rule for limiting resource flow according to the component's capacity.
 
-    The function creates a Pyomo rule expression that constrains the flow of the
-    capacity resource for a given component at a specific time period to be less than
-    or equal to the maximum capacity of that component at the given timestep.
+    The function creates a pyomo rule expression that constrains the flow of the capacity resource
+    for a given component at a specific time period. If the component's flexibility is 'fixed', the
+    flow must be equal to the operational capacity of that component at the given timestep. If the
+    flexibility is 'flex', the flow must be less than or equal to the capacity at that timestep.
 
     Parameters
     ----------
     m : pyo.ConcreteModel
         The Pyomo model containing the system components and variables.
     cname : str
-        The name of the component for which the max capacity constraint is being defined.
+        The name of the component for which the capacity constraint is being defined.
     t : int
         The time step for which the constraint applies.
 
@@ -106,19 +106,22 @@ def max_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expressio
 
     Notes
     -----
-    This function assumes that the component has a defined capacity_resource attribute
-    and a time-dependent max_capacity_profile. These values should already been validated.
+    This function assumes that the component has a defined capacity_resource attribute.
+    This value should already have been validated.
     """
     comp = m.system.comp_map[cname]
-    return m.flow[cname, comp.capacity_resource.name, t] <= comp.max_capacity_profile[t]
+    if comp.flexibility == "fixed":
+        return m.flow[cname, comp.capacity_resource.name, t] == comp.capacity_at_timestep(t)
+    else:
+        return m.flow[cname, comp.capacity_resource.name, t] <= comp.capacity_at_timestep(t)
 
 
-def min_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
+def minimum_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
-    Generate a constraint that enforces minimum capacity for a component at a given timestep.
+    Generate a constraint that enforces minimum activity for a component at a given timestep.
 
-    This function creates a pyomo expression that constrains the flow of a
-    component to be greater than or equal to its minimum capacity at the given timestep.
+    This function creates a pyomo rule expression that constrains the flow of a flexible
+    component to be greater than or equal to its minimum activity at the given timestep.
 
     Parameters
     ----------
@@ -132,13 +135,13 @@ def min_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expressio
     Returns
     -------
     pyo.Expression
-        A pyomo expression representing the minimum capacity constraint.
-
-    Notes:
-    Assumes that min_capacity_profile is a time-dependent attribute of the component.
+        A pyomo expression representing the minimum activity constraint.
     """
     comp = m.system.comp_map[cname]
-    return m.flow[cname, comp.capacity_resource.name, t] >= comp.min_capacity_profile[t]
+    if comp.flexibility == "fixed":
+        return pyo.Constraint.Skip
+
+    return m.flow[cname, comp.capacity_resource.name, t] >= comp.minimum_at_timestep(t)
 
 
 def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
@@ -164,7 +167,7 @@ def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
     if not hasattr(comp, "ramp_limit") or t == m.T.first():
         return pyo.Constraint.Skip
     res = comp.capacity_resource.name
-    max_allowed_ramp = comp.ramp_limit * np.max(comp.max_capacity_profile)
+    max_allowed_ramp = comp.ramp_limit * comp.installed_capacity
     return m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)] <= max_allowed_ramp
 
 
@@ -191,7 +194,7 @@ def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
     if not hasattr(comp, "ramp_limit") or t == m.T.first():
         return pyo.Constraint.Skip
     res = comp.capacity_resource.name
-    max_allowed_ramp = comp.ramp_limit * np.max(comp.max_capacity_profile)
+    max_allowed_ramp = comp.ramp_limit * comp.installed_capacity
     return m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t] <= max_allowed_ramp
 
 
@@ -269,7 +272,7 @@ def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint
     comp = system.comp_map[cname]
     if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
         return pyo.Constraint.Skip
-    return m.ramp_up[cname, t] <= comp.max_capacity_profile[t] * m.ramp_up_bin[cname, t]
+    return m.ramp_up[cname, t] <= comp.capacity_at_timestep(t) * m.ramp_up_bin[cname, t]
 
 
 def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
@@ -294,7 +297,7 @@ def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constrai
     comp = system.comp_map[cname]
     if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
         return pyo.Constraint.Skip
-    return m.ramp_down[cname, t] <= comp.max_capacity_profile[t] * m.ramp_down_bin[cname, t]
+    return m.ramp_down[cname, t] <= comp.capacity_at_timestep(t) * m.ramp_down_bin[cname, t]
 
 
 def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
@@ -352,7 +355,7 @@ def steady_state_upper_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
         return pyo.Constraint.Skip
 
     # If steady_bin is 1, then flow difference must be <= 0
-    M = 2 * comp.max_capacity_profile[t]
+    M = 2 * comp.installed_capacity
     return m.ramp_up[cname, t] <= M * (1 - m.steady_bin[cname, t])
 
 
@@ -380,7 +383,7 @@ def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
         return pyo.Constraint.Skip
 
     # If steady_bin is 1, then flow difference must be >= 0
-    M = 2 * comp.max_capacity_profile[t]
+    M = 2 * comp.installed_capacity
     return m.ramp_down[cname, t] >= -M * (1 - m.steady_bin[cname, t])
 
 
@@ -483,7 +486,7 @@ def storage_balance_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expres
     """
     comp = m.system.comp_map[sname]
     if t == m.T.first():
-        soc_prev = comp.initial_stored * np.max(comp.max_capacity_profile)
+        soc_prev = comp.initial_stored * comp.installed_capacity
     else:
         soc_prev = m.soc[sname, m.T.prev(t)]
     return m.soc[sname, t] == soc_prev + (
@@ -515,7 +518,7 @@ def charge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expressio
         or equal to the maximum charging rate (as a proportion of maximum capacity)
     """
     comp: Storage = m.system.comp_map[sname]
-    return m.charge[sname, t] <= comp.max_charge_rate * np.max(comp.max_capacity_profile)
+    return m.charge[sname, t] <= comp.max_charge_rate * comp.installed_capacity
 
 
 def discharge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
@@ -538,7 +541,7 @@ def discharge_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expres
         discharge rate times the maximum capacity of the storage component at the given timestep
     """
     comp: Storage = m.system.comp_map[sname]
-    return m.discharge[sname, t] <= comp.max_discharge_rate * np.max(comp.max_capacity_profile)
+    return m.discharge[sname, t] <= comp.max_discharge_rate * comp.installed_capacity
 
 
 def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
@@ -561,7 +564,7 @@ def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
         A Pyomo expression that limits SOC to the storage component's maximum capacity at the given timestep
     """
     comp: Storage = m.system.comp_map[sname]
-    return m.soc[sname, t] <= comp.max_capacity_profile[t]
+    return m.soc[sname, t] <= comp.capacity_at_timestep(t)
 
 
 def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Constraint:
@@ -588,7 +591,7 @@ def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Constraint:
         return pyo.Constraint.Skip
 
     # Enforce SOC at the final time step equals the initial SOC
-    return m.soc[sname, m.T.last()] == comp.initial_stored * np.max(comp.max_capacity_profile)
+    return m.soc[sname, m.T.last()] == comp.initial_stored * comp.installed_capacity
 
 
 def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
@@ -625,5 +628,5 @@ def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
         for cf in comp.cashflows:
             for t in m.T:
                 dispatch = m.flow[comp.name, rname, t]
-                total += cf.sign * cf.price_profile[t] * ((dispatch / cf.dprime) ** cf.scalex)
+                total += cf.evaluate(t, dispatch)
     return total

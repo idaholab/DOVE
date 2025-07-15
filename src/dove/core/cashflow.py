@@ -76,6 +76,16 @@ class CashFlow(ABC):
         if len(self.price_profile) > 0:
             self.price_profile = np.multiply(self.alpha, self.price_profile)
 
+    def evaluate(self, t: int, dispatch: float) -> float:
+        """
+        Returns the cashflow's dollar value at the given timestep t, provided a dispatch quantity.
+        Recall that a positive value indicates a revenue and a negative value indicates a cost.
+        """
+        value = self.sign * self.alpha * ((dispatch / self.dprime) ** self.scalex)
+        if len(self.price_profile) > 0:
+            value *= self.price_profile[t]
+        return value
+
 
 @dataclass
 class Cost(CashFlow):
