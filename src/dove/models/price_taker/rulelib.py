@@ -40,13 +40,10 @@ def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
     """
     Sets up a block that handles resource transfer for components.
 
-    The function creates a Pyomo Block that is specific to a non-storage component. It finds the
-    flow information for this component at the given timestep and provides this data to the
-    component's transfer function, which returns a list of values. This function creates a variable
-    on the block called transfer_size. A constraint is also created on the block that forces each
-    value in the list from the transfer function to equal the transfer_size. Effectively, every
-    value in the list from the transfer function is forced to be equal, which establishes the
-    desired relationship between the inputs and outputs for the component.
+    The function populates the contents a Pyomo Block, given a specific component and time index.
+    It finds the flow information for this component at the given timestep and provides this data
+    to the component's transfer function, which returns a list of pyomo Expressions. A constraint
+    is created on the block that enforces each of these expressions as rules.
 
     Parameters
     ----------
@@ -73,19 +70,15 @@ def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
     input_res_quantities = {r.name: m.flow[cname, r.name, t] for r in comp.consumes}
     output_res_quantities = {r.name: m.flow[cname, r.name, t] for r in comp.produces}
 
-    # Apply transfer function to get list of values that should be equal
-    tf_values = comp.transfer_fn(input_res_quantities, output_res_quantities)
+    # Apply transfer function to get list of requirements (pyomo Expressions)
+    tf_requirements = comp.transfer_fn(input_res_quantities, output_res_quantities)
 
-    MIN_VALUES = 2
-    if len(tf_values) >= MIN_VALUES:  # If resource transfer is applicable
-        # Create necessary variable
-        b.transfer_size = pyo.Var(within=pyo.NonNegativeReals)
+    if tf_requirements:
+        # Create constraint to enforce all of the requirements of the transfer function
+        def transfer_rule(b: pyo.Block, i: int) -> pyo.Expression:  # noqa: ARG001
+            return tf_requirements[i]
 
-        # Create constraint to force equality of all returned values
-        def transfer_rule(b: pyo.Block, i: int) -> pyo.Expression:
-            return tf_values[i] == b.transfer_size
-
-        b.transfer_constr = pyo.Constraint(range(len(tf_values)), rule=transfer_rule)
+        b.transfer_constr = pyo.Constraint(range(len(tf_requirements)), rule=transfer_rule)
 
 
 def max_capacity_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:

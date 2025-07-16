@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
+    import pyomo.environ as pyo
+
     from . import Resource
 
 TransferFunc: TypeAlias = "RatioTransfer | PolynomialTransfer"
@@ -69,12 +71,23 @@ class RatioTransfer:
     constraint with dispatch activity values:
 
     >>> transfer(inputs={"heat": 200}, outputs={"electricity": 180})
-    [200, 200]
+    [True]
 
-    Since these values are all equal, the constraint should be satisfied.
+    This means that the constraint for which this transfer can be used should be satisfied. This
+    new transfer function can be added to a Component such as a Converter:
+
+    >>> converter = Converter(
+            name="converter",
+            consumes=[heat],
+            produces=[electricity],
+            capacity_resource=electricity,
+            max_capacity_profile=[100],
+            transfer_fn=transfer,
+        )
 
     Create a transfer that converts 1.8 units of heat and 1.0 units of electricity to 0.5 units of
-    hydrogen (assuming "heat", "electricity", and "hydrogen" are all Resource instances):
+    hydrogen. Note that these are fictional values. Assume "heat", "electricity", and "hydrogen"
+    are all Resource instances:
 
     >>> transfer = RatioTransfer(
             input_resources={heat: 1.8, electricity: 1.0},
@@ -85,20 +98,24 @@ class RatioTransfer:
     constraint with dispatch activity values:
 
     >>> transfer(inputs={"heat": 180, "electricity": 100}, outputs={"hydrogen": 50})
-    [100, 100, 100]
-
-    Since these values are all equal, the constraint should be satisfied.
+    [True]
     """
 
     input_resources: dict[Resource, float]
     output_resources: dict[Resource, float]
 
-    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> list[float]:
+    def __call__(
+        self, inputs: dict[str, float], outputs: dict[str, float]
+    ) -> list[bool] | list[pyo.Expression]:
         """
-        Provide values for inputs and outputs adjusted by the respective required ratios for each.
+        Provide a list of whether various equality requirements between resources are met.
 
-        This function returns a list of input and output quantities, adjusted by (divided by) the
-        ratios provided.
+        This function returns a list of booleans (or a list of pyomo Expressions, if it is being
+        used in a pyomo Constraint). These booleans refer to whether the ratio relationship
+        specified at instantiation is being respected across the set of input and output resources.
+        Effectively, if all the values in the list are True, then the ratios are being respected.
+        The length of the list is:
+            # of input resources + # of output resources - 1
 
         Parameters
         ----------
@@ -109,8 +126,9 @@ class RatioTransfer:
 
         Returns
         -------
-        list[float]
-            A list of values that must be equal for the transfer constraint to be satisfied.
+        list[bool] | list[pyo.Expression]
+            A list of booleans or equality espressions that must all be true if the transfer
+            relationship is being respected by all the inputs and outputs.
 
         Raises
         ------
@@ -135,7 +153,13 @@ class RatioTransfer:
         weighted_outputs = [
             outputs[res.name] / ratio for res, ratio in self.output_resources.items()
         ]
-        return weighted_inputs + weighted_outputs
+        weighted_values = weighted_inputs + weighted_outputs
+
+        MIN_VALUES = 2
+        if len(weighted_values) < MIN_VALUES:
+            return []  # There are no requirements in order to satisfy this transfer function
+
+        return [weighted_values[0] == val for val in weighted_values[1:]]
 
 
 @dataclass
@@ -174,13 +198,15 @@ class PolynomialTransfer:
 
     terms: list[tuple[float, dict[Resource, int]]]
 
-    def __call__(self, inputs: dict[str, float], outputs: dict[str, float]) -> list[float]:
+    def __call__(
+        self, inputs: dict[str, float], outputs: dict[str, float]
+    ) -> list[bool] | list[pyo.Expression]:
         """
-        Provide values for a constraint that relates inputs to outputs for this transfer function.
+        Calculate an expression that relates inputs to outputs for this transfer function.
 
-        The function provides values for an equality constraint such that the sum of all outputs
-        equals the evaluated transfer function based on inputs. The transfer function is evaluated
-        by computing each term (coefficient times product of input variables raised to their
+        The function provides an equality expression such that the sum of all outputs equals the
+        evaluated transfer function based on inputs. The transfer function is evaluated by
+        computing each term (coefficient times product of input variables raised to their
         exponents) and summing them.
 
         Parameters
@@ -192,8 +218,9 @@ class PolynomialTransfer:
 
         Returns
         -------
-        list(float)
-            A list of values that must be equal for the transfer constraint to be satisfied.
+        list[bool] | list[pyo.Expression]
+            A list containing a single boolean or expression that refers to whether the transfer
+            relationship is being respected.
         """
         total_output = sum(outputs.values())
         expr = 0.0
@@ -202,4 +229,4 @@ class PolynomialTransfer:
             for res, exp in input_exponents.items():
                 term *= inputs[res.name] ** exp
             expr += term
-        return [total_output, expr]
+        return [total_output == expr]

@@ -60,7 +60,9 @@ def create_test_system(with_ramping=True):
         produces=[electricity],
         max_capacity_profile=np.full(len(hours), BOP_CAPACITY),
         capacity_resource=electricity,
-        transfer_fn=RatioTransfer({steam: 1.0}, {electricity: 0.333}),
+        transfer_fn=RatioTransfer(
+            input_resources={steam: 1.0}, output_resources={electricity: 0.333}
+        ),
     )
 
     # Apply ramping constraints if requested

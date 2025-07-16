@@ -37,7 +37,7 @@ if __name__ == "__main__":
         produces=[work],
         capacity_resource=funding,
         max_capacity_profile=[100],
-        transfer_fn=dc.RatioTransfer({funding: 1.0}, {work: 0.25}),
+        transfer_fn=dc.RatioTransfer(input_resources={funding: 1.0}, output_resources={work: 0.25}),
     )
 
     balance_ratio_2 = dc.Converter(
@@ -46,7 +46,9 @@ if __name__ == "__main__":
         produces=[funding, work],
         max_capacity_profile=[100],
         capacity_resource=collaboration,
-        transfer_fn=dc.RatioTransfer({collaboration: 1.0}, {funding: 0.2, work: 0.1}),
+        transfer_fn=dc.RatioTransfer(
+            input_resources={collaboration: 1.0}, output_resources={funding: 0.2, work: 0.1}
+        ),
     )
 
     quadratic = dc.Converter(

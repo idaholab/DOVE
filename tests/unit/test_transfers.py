@@ -16,8 +16,9 @@ def test_ratio_transfer_enforces_ratio_true():
     inputs = {"in_res": 4.0}
     outputs = {"out_res": 10.0}
     # 10.0 == 2.5 * 4.0
-    result_vals = rt(inputs, outputs)
-    assert all(val == result_vals[0] for val in result_vals[1:])
+    result_reqs = rt(inputs, outputs)
+    assert len(result_reqs) == 1
+    assert result_reqs[0] is True
 
 
 @pytest.mark.unit()
@@ -28,8 +29,9 @@ def test_ratio_transfer_enforces_ratio_false():
     inputs = {"in_res": 2.0}
     outputs = {"out_res": 5.9}
     # 5.9 != 3.0 * 2.0
-    result_vals = rt(inputs, outputs)
-    assert not all(val == result_vals[0] for val in result_vals[1:])
+    result_reqs = rt(inputs, outputs)
+    assert len(result_reqs) == 1
+    assert result_reqs[0] is False
 
 
 @pytest.mark.unit()
@@ -70,8 +72,9 @@ def test_polynomial_transfer_single_term():
     pt = PolynomialTransfer(terms=[(2.0, {x: 2})])
     inputs = {"x": 3.0}
     outputs = {"y": 18.0}  # total_output = 18.0
-    result_vals = pt(inputs, outputs)
-    assert all(val == result_vals[0] for val in result_vals[1:])
+    result_reqs = pt(inputs, outputs)
+    assert len(result_reqs) == 1
+    assert result_reqs[0] is True
 
 
 @pytest.mark.unit()
@@ -87,8 +90,9 @@ def test_polynomial_transfer_multiple_terms():
     inputs = {"x": 2.0, "z": 5.0}
     # expected = 1*(2*5) + 3*(2**2) = 10 + 12 = 22
     outputs = {"out1": 10.0, "out2": 12.0}
-    result_vals = pt(inputs, outputs)
-    assert all(val == result_vals[0] for val in result_vals[1:])
+    result_reqs = pt(inputs, outputs)
+    assert len(result_reqs) == 1
+    assert result_reqs[0] is True
 
 
 @pytest.mark.unit()
@@ -97,8 +101,9 @@ def test_polynomial_transfer_empty_terms_zero_output():
     pt = PolynomialTransfer(terms=[])
     inputs = {"a": 100.0}
     outputs = {"o1": 0.0, "o2": 0.0}
-    result_vals = pt(inputs, outputs)
-    assert all(val == result_vals[0] for val in result_vals[1:])
+    result_reqs = pt(inputs, outputs)
+    assert len(result_reqs) == 1
+    assert result_reqs[0] is True
 
 
 @pytest.mark.unit()
@@ -108,5 +113,6 @@ def test_polynomial_transfer_mismatch_raises_false():
     pt = PolynomialTransfer(terms=[(5.0, {x: 1})])
     inputs = {"x": 2.0}
     outputs = {"y": 8.0}  # expected 5*2 = 10
-    result_vals = pt(inputs, outputs)
-    assert not all(val == result_vals[0] for val in result_vals[1:])
+    result_reqs = pt(inputs, outputs)
+    assert len(result_reqs) == 1
+    assert result_reqs[0] is False

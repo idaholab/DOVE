@@ -196,17 +196,44 @@ def test_add_transfer_block(builder_setup):
 
     assert set(b.keys()) == set(expected_keys)
 
-    # Check that the correct variable and constraint have been added to the block
-    # It's hard to test more than this without solving the model
+    # Set up required vars for input
+    # Recall that for the converter, input == output/0.5
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam",       0): 0.0,
+            ("steam_to_elec_converter", "electricity", 0): 1.0,  # Out > 0.5 * In -> constr fails
+
+            ("steam_to_elec_converter", "steam",       1): 2.0,
+            ("steam_to_elec_converter", "electricity", 1): 1.0,  # Out == 0.5 * In -> constr satisfied
+
+            ("steam_to_elec_converter", "steam",       2): 1.0,
+            ("steam_to_elec_converter", "electricity", 2): 0.0,  # Out < 0.5 * In -> constr fails
+        }
+    )  # fmt: skip
+
+    # Expected results
+    expected_transfer_result = {
+        ("steam_to_elec_converter", 0): [False],
+        ("steam_to_elec_converter", 1): [True],
+        ("steam_to_elec_converter", 2): [False],
+    }
+
+    # Check that the correct constraint has been added to the block
     for cname, time in expected_keys:
-        transfer_size = getattr(b[cname, time], "transfer_size", None)
         transfer_constr = getattr(b[cname, time], "transfer_constr", None)
+
+        # Constraint should only be created if the component deals with multiple resources
         if cname == "steam_to_elec_converter":
-            # Var and Constraint should only be created if the transfer function has >=2 terms
-            assert isinstance(transfer_size, pyo.Var)
-            assert isinstance(transfer_constr, pyo.Constraint)
+            # Verify constraint
+            assert transfer_constr is not None
+            assert set(transfer_constr.keys()) == {0}  # Only one requirement for this transfer
+            assert transfer_constr[0].equality
+
+            satisfies_bounds = (
+                transfer_constr[0].lb <= transfer_constr[0].body() <= transfer_constr[0].ub
+            )
+            assert satisfies_bounds == expected_transfer_result[(cname, time)][0]
         else:
-            assert transfer_size is None
             assert transfer_constr is None
 
 
@@ -224,7 +251,7 @@ def add_constraints_setup(builder_setup):
 @pytest.fixture()
 def check_constraint():
     def _check_constraint(
-        parent: pyo.ConcreteModel | pyo.Block,
+        model: pyo.ConcreteModel,
         constr_name: str,
         is_equality_constr: bool,
         expected_result: dict,
@@ -245,7 +272,7 @@ def check_constraint():
             A dict with keys that are tuples that mirror the expected keys of the constraint (or bins for the
             constraint to populate) and values that are bools with the expected feasibility of the constraint.
         """
-        actual_constr = getattr(parent, constr_name, None)
+        actual_constr = getattr(model, constr_name, None)
 
         assert actual_constr is not None
         assert set(actual_constr.keys()) == set(expected_result.keys())

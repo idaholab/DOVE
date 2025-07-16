@@ -201,8 +201,7 @@ class PriceTakerBuilder(BaseModelBuilder):
 
     def _add_transfer_block(self) -> None:
         """
-        Add a block to the optimization model to handle variables
-        and constraints related to resource transfer.
+        Add a block to the optimization model to handle constraints related to resource transfer.
         """
         m = self.model
         m.transfer = pyo.Block(m.NON_STORAGE, m.T, rule=prl.transfer_block_rule)
