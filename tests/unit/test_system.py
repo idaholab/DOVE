@@ -97,7 +97,7 @@ def test_system_setup(initialize_and_populate_system):
         consumes=[r_w],
         produces=[r_e],
         capacity_resource=r_w,
-        transfer_fn=dc.RatioTransfer(input_res=r_w, output_res=r_e, ratio=1.0),
+        transfer_fn=dc.RatioTransfer(input_resources={r_w: 1.0}, output_resources={r_e: 1.0}),
         cashflows=[dc.Cost(name="conv_cf", alpha=2)],
     )
     storage = dc.Storage(

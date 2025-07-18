@@ -84,6 +84,7 @@ class PriceTakerBuilder(BaseModelBuilder):
 
         self._add_sets()
         self._add_variables()
+        self._add_transfer_block()
         self._add_constraints()
         self._add_objective()
 
@@ -198,6 +199,13 @@ class PriceTakerBuilder(BaseModelBuilder):
             m.ramp_down_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
             m.steady_bin = pyo.Var(m.NON_STORAGE, m.T, within=pyo.Binary)
 
+    def _add_transfer_block(self) -> None:
+        """
+        Add a block to the optimization model to handle constraints related to resource transfer.
+        """
+        m = self.model
+        m.transfer = pyo.Block(m.NON_STORAGE, m.T, rule=prl.transfer_block_rule)
+
     def _add_constraints(self) -> None:
         """
         Add constraints to the optimization model.
@@ -215,7 +223,6 @@ class PriceTakerBuilder(BaseModelBuilder):
         """
         m = self.model
 
-        m.transfer = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.transfer_rule)
         m.max_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.max_capacity_rule)
         m.min_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.min_capacity_rule)
 
