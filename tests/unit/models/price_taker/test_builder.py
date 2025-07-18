@@ -43,7 +43,7 @@ def create_example_system():
         capacity_resource=steam,
         ramp_freq=2,
         ramp_limit=0.4,
-        transfer_fn=dc.RatioTransfer(input_res=steam, output_res=elec, ratio=0.5),
+        transfer_fn=dc.RatioTransfer(input_resources={steam: 1.0}, output_resources={elec: 0.5}),
     )
 
     elec_sink = dc.Sink(
@@ -171,6 +171,72 @@ def test_add_variables(builder_setup):
     assert actual_steady_bin_keys == expected_ramp_keys
 
 
+@pytest.mark.unit()
+def test_add_transfer_block(builder_setup):
+    builder_setup._add_sets()
+    builder_setup._add_variables()
+    builder_setup._add_transfer_block()  # Method under test
+
+    m = builder_setup.model
+    b = getattr(m, "transfer", None)
+    assert b is not None
+
+    # Check that the keys are correct
+    expected_keys = [
+        ("steam_source", 0),
+        ("steam_source", 1),
+        ("steam_source", 2),
+        ("steam_to_elec_converter", 0),
+        ("steam_to_elec_converter", 1),
+        ("steam_to_elec_converter", 2),
+        ("elec_sink", 0),
+        ("elec_sink", 1),
+        ("elec_sink", 2),
+    ]
+
+    assert set(b.keys()) == set(expected_keys)
+
+    # Set up required vars for input
+    # Recall that for the converter, input == output/0.5
+    m.flow.set_values(
+        {
+            ("steam_to_elec_converter", "steam",       0): 0.0,
+            ("steam_to_elec_converter", "electricity", 0): 1.0,  # Out > 0.5 * In -> constr fails
+
+            ("steam_to_elec_converter", "steam",       1): 2.0,
+            ("steam_to_elec_converter", "electricity", 1): 1.0,  # Out == 0.5 * In -> constr satisfied
+
+            ("steam_to_elec_converter", "steam",       2): 1.0,
+            ("steam_to_elec_converter", "electricity", 2): 0.0,  # Out < 0.5 * In -> constr fails
+        }
+    )  # fmt: skip
+
+    # Expected results
+    expected_transfer_result = {
+        ("steam_to_elec_converter", 0): [False],
+        ("steam_to_elec_converter", 1): [True],
+        ("steam_to_elec_converter", 2): [False],
+    }
+
+    # Check that the correct constraint has been added to the block
+    for cname, time in expected_keys:
+        transfer_constr = getattr(b[cname, time], "transfer_constr", None)
+
+        # Constraint should only be created if the component deals with multiple resources
+        if cname == "steam_to_elec_converter":
+            # Verify constraint
+            assert transfer_constr is not None
+            assert set(transfer_constr.keys()) == {0}  # Only one requirement for this transfer
+            assert transfer_constr[0].equality
+
+            satisfies_bounds = (
+                transfer_constr[0].lb <= transfer_constr[0].body() <= transfer_constr[0].ub
+            )
+            assert satisfies_bounds == expected_transfer_result[(cname, time)][0]
+        else:
+            assert transfer_constr is None
+
+
 @pytest.fixture()
 def add_constraints_setup(builder_setup):
     # Add sets and variables to builder so the constraints can use them
@@ -185,11 +251,14 @@ def add_constraints_setup(builder_setup):
 @pytest.fixture()
 def check_constraint():
     def _check_constraint(
-        model: pyo.ConcreteModel, constr_name: str, is_equality_constr: bool, expected_result: dict
+        model: pyo.ConcreteModel,
+        constr_name: str,
+        is_equality_constr: bool,
+        expected_result: dict,
     ) -> None:
         """
         Ensure constraint is correct by checking that it exists, that the keys are correct,
-        that it is is of the type (equality/inequality) expected, and that it is satisfied when expected.
+        that it is of the type (equality/inequality) expected, and that it is satisfied when expected.
 
         Parameters
         ----------
@@ -226,37 +295,6 @@ def check_constraint():
             assert (satisfies_lb and satisfies_ub) == value
 
     return _check_constraint
-
-
-@pytest.mark.unit()
-def test_add_constraints_adds_transfer_constraint(add_constraints_setup, check_constraint):
-    m = add_constraints_setup.model
-    ### Transfer constraint
-
-    # Set up required vars for input
-    # Recall that for the converter, ratio_transfer ratio == 0.5
-    m.flow.set_values(
-        {
-            ("steam_to_elec_converter", "steam",       0): 0.0,
-            ("steam_to_elec_converter", "electricity", 0): 1.0,  # Out > 0.5 * In -> constr fails
-
-            ("steam_to_elec_converter", "steam",       1): 2.0,
-            ("steam_to_elec_converter", "electricity", 1): 1.0,  # Out == 0.5 * In -> constr satisfied
-
-            ("steam_to_elec_converter", "steam",       2): 1.0,
-            ("steam_to_elec_converter", "electricity", 2): 0.0,  # Out < 0.5 * In -> constr fails
-        }
-    )  # fmt: skip
-
-    # Expected results
-    expected_transfer_result = {
-        ("steam_to_elec_converter", 0): False,
-        ("steam_to_elec_converter", 1): True,
-        ("steam_to_elec_converter", 2): False,
-    }
-
-    # Verify constraint
-    check_constraint(m, "transfer", True, expected_transfer_result)
 
 
 @pytest.mark.unit()
@@ -917,7 +955,6 @@ def test_build(create_example_system):
 
     # Check that constraints were added
     expected_constr_names = [
-        "transfer",
         "max_capacity",
         "min_capacity",
         "resource_balance",
