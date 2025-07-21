@@ -7,6 +7,7 @@ import dove.core as dc
 if __name__ == "__main__":
     funding = dc.Resource("funding")
     labor = dc.Resource("labor")
+    collaboration = dc.Resource("collaboration")
     work = dc.Resource("work")
 
     funding_source = dc.Source(
@@ -23,13 +24,31 @@ if __name__ == "__main__":
         flexibility="fixed",
     )
 
-    balance_ratio = dc.Converter(
-        name="BalanceRatio",
+    collaboration_source = dc.Source(
+        name="CollaborationSource",
+        produces=collaboration,
+        installed_capacity=100,
+        flexibility="fixed",
+    )
+
+    balance_ratio_1 = dc.Converter(
+        name="BalanceRatio1",
         consumes=[funding],
         produces=[work],
         capacity_resource=funding,
         installed_capacity=100,
-        transfer_fn=dc.RatioTransfer(funding, work, 0.25),
+        transfer_fn=dc.RatioTransfer(input_resources={funding: 1.0}, output_resources={work: 0.25}),
+    )
+
+    balance_ratio_2 = dc.Converter(
+        name="BalanceRatio2",
+        consumes=[collaboration],
+        produces=[funding, work],
+        installed_capacity=100,
+        capacity_resource=collaboration,
+        transfer_fn=dc.RatioTransfer(
+            input_resources={collaboration: 1.0}, output_resources={funding: 0.2, work: 0.1}
+        ),
     )
 
     quadratic = dc.Converter(
@@ -72,13 +91,14 @@ if __name__ == "__main__":
         components=[
             funding_source,
             labor_source,
-            balance_ratio,
+            balance_ratio_1,
+            balance_ratio_2,
             quadratic,
             work_sink,
             funding_sink,
             labor_sink,
         ],
-        resources=[funding, labor, work],
+        resources=[funding, labor, collaboration, work],
     )
     results = sys.solve(solver="ipopt")
     print(results)

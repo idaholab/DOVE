@@ -53,7 +53,7 @@ if __name__ == "__main__":
         produces=[elec],
         installed_capacity=90,
         capacity_resource=steam,
-        transfer_fn=dc.RatioTransfer(steam, elec, 0.5),
+        transfer_fn=dc.RatioTransfer(input_resources={steam: 1.0}, output_resources={elec: 0.5}),
     )
 
     # A Sink can only consume one resource. These components typically represent
