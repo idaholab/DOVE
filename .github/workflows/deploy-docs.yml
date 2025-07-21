@@ -36,14 +36,14 @@ jobs:
 
       - name: setup pages
         uses: actions/configure-pages@v5
-        if: ${{ github.repository == 'idaholab/DOVE' && github.ref_type == 'tag' }}
+        if: ${{ github.repository == 'caleb-sitton-inl/DOVE' }} #&& github.ref_type == 'tag' }}
 
       - name: upload artifact
         uses: actions/upload-pages-artifact@v3
-        if: ${{ github.repository == 'idaholab/DOVE' && github.ref_type == 'tag' }}
+        if: ${{ github.repository == 'caleb-sitton-inl/DOVE' }} #&& github.ref_type == 'tag' }}
         with:
           path: "/tmp/dovedocs"
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-        if: ${{ github.repository == 'idaholab/DOVE' && github.ref_type == 'tag' }}
+        if: ${{ github.repository == 'caleb-sitton-inl/DOVE' }} #&& github.ref_type == 'tag' }}
