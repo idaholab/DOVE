@@ -16,9 +16,9 @@ pip install dove-inl
 DOVE may be downloaded from source according to the procedure outlined below. If you would like to contribute to DOVE, please refer to the [Developers](#developers) section as you follow these instructions. If you are not interested in contributing but would still like access to the source code, these instructions are sufficient.
 
 First, ensure that the necessary prerequisites are installed on your system:
-- Python 3.11+ ([Download Python](https://www.python.org/downloads/))
-- Git ([Download Git](https://git-scm.com/downloads))
-- uv ([Install uv](https://docs.astral.sh/uv/getting-started/installation/))
+- **Python 3.11+** ([Download Python](https://www.python.org/downloads/))
+- **Git** ([Download Git](https://git-scm.com/downloads))
+- **uv** ([Install uv](https://docs.astral.sh/uv/getting-started/installation/))
 
 Now navigate into the desired folder and clone the repository from github:
 ```
@@ -89,18 +89,24 @@ This script can be run in the uv environment and will print the dispatch results
 0                     3.0                             3.0  ...                       -3.0        8.9
 1                     3.0                             3.0  ...                       -5.9        8.9
 ```
-> Note that the formatting for this output will differ based on the size of the terminal window. To view the complete results, run the script and open the "simple_demo.csv" file.
+
+Here are the formatted results from this script:
+
+|    |   nuclear_steam_produces |   generator_electricity_produces |   generator_steam_consumes |   wind_electricity_produces |   battery_SOC |   battery_charge |   battery_discharge |   grid_electricity_consumes |   objective |
+|-------------:|-------------------------:|---------------------------------:|---------------------------:|----------------------------:|--------------:|-----------------:|--------------------:|----------------------------:|------------:|
+|            0 |                        3 |                                3 |                         -3 |                           1 |      0.948683 |                1 |                 0   |                        -3   |         8.9 |
+|            1 |                        3 |                                3 |                         -3 |                           2 |      0        |                0 |                 0.9 |                        -5.9 |         8.9 |
 
 # Developers
 Before installing DOVE, developers must install the following prerequisites in addition to those listed in the [Install from Source](#install-from-source) section:
-- pre-commit (Framework for managing Git hooks)
-- An IDE or text editor with Python support (e.g., VSCode, PyCharm)
+- **pre-commit** (Framework for managing Git hooks)
+- **An IDE or text editor** with Python support (e.g., VSCode, PyCharm)
 
 Some tools frequently used by developers include:
-- Git (for a variety of applications related to source control)
-- uv (for environment and dependency management)
-- pytest (for writing and running tests)
-- ruff (for linting and formatting)
-- commitizen (for versioning and standardized commits)
+- **Git** (for a variety of applications related to source control)
+- **uv** (for environment and dependency management)
+- **pytest** (for writing and running tests)
+- **ruff** (for linting and formatting)
+- **commitizen** (for versioning and standardized commits)
 
 More extensive reference information for developers can be found at https://idaholab.github.io/DOVE/references/developer.html.
