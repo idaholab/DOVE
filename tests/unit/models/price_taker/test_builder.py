@@ -32,12 +32,12 @@ def create_example_system():
     steam_source = dc.Source(
         name="steam_source",
         produces=steam,
-        max_capacity_profile=[2.0, 2.0, 2.0],
+        installed_capacity=2.0,
     )
 
     steam_to_elec_converter = dc.Converter(
         name="steam_to_elec_converter",
-        max_capacity_profile=[1.0, 1.0, 1.0],
+        installed_capacity=1.0,
         consumes=[steam],
         produces=[elec],
         capacity_resource=steam,
@@ -49,15 +49,15 @@ def create_example_system():
     elec_sink = dc.Sink(
         name="elec_sink",
         consumes=elec,
-        max_capacity_profile=[1.0, 1.0, 1.0],
-        min_capacity_profile=[0.5, 0.5, 0.5],
+        demand_profile=[1.0, 1.0, 1.0],
+        min_profile=[0.5, 0.5, 0.5],
     )
 
     # Storage
     steam_storage = dc.Storage(
         name="steam_storage",
         resource=steam,
-        max_capacity_profile=[1.0, 1.0, 1.0],
+        installed_capacity=1.0,
         initial_stored=0.5,
         periodic_level=True,
     )
@@ -67,7 +67,7 @@ def create_example_system():
         resource=elec,
         max_charge_rate=0.5,
         max_discharge_rate=0.25,
-        max_capacity_profile=[2.0, 2.0, 2.0],
+        installed_capacity=2.0,
         initial_stored=0.2,
         periodic_level=False,
     )
@@ -75,10 +75,10 @@ def create_example_system():
     components = [steam_source, steam_to_elec_converter, elec_sink, steam_storage, elec_storage]
 
     ### Set up times
-    time_index = [0, 1, 2]
+    dispatch_window = [0, 1, 2]
 
     ### Create and return system
-    sys = dc.System(components, resources, time_index)
+    sys = dc.System(components, resources, dispatch_window)
     return sys
 
 
@@ -113,7 +113,7 @@ def test_add_sets(builder_setup):
     expected_non_storage = sys.non_storage_comp_names
     expected_storage = sys.storage_comp_names
     expected_r = [r.name for r in sys.resources]
-    expected_t = sys.time_index
+    expected_t = sys.dispatch_window
 
     # Convert both actual (tuple) and expected (list) values to the same types and check their values
 
@@ -153,9 +153,9 @@ def test_add_variables(builder_setup):
     sys = builder_setup.system
     res_names = [r.name for r in sys.resources]
 
-    expected_flow_keys = set(product(sys.non_storage_comp_names, res_names, sys.time_index))
-    expected_storage_keys = set(product(sys.storage_comp_names, sys.time_index))
-    expected_ramp_keys = set(product(sys.non_storage_comp_names, sys.time_index))
+    expected_flow_keys = set(product(sys.non_storage_comp_names, res_names, sys.dispatch_window))
+    expected_storage_keys = set(product(sys.storage_comp_names, sys.dispatch_window))
+    expected_ramp_keys = set(product(sys.non_storage_comp_names, sys.dispatch_window))
 
     # Check that sets of keys are as expected
     assert actual_flow_keys == expected_flow_keys
@@ -298,7 +298,7 @@ def check_constraint():
 
 
 @pytest.mark.unit()
-def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, check_constraint):
+def test_add_constraints_adds_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
     # Set up required vars for input
@@ -334,11 +334,11 @@ def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, che
     }
 
     # Verify constraint
-    check_constraint(m, "max_capacity", False, expected_cap_result)
+    check_constraint(m, "capacity", False, expected_cap_result)
 
 
 @pytest.mark.unit()
-def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, check_constraint):
+def test_add_constraints_adds_minimum_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
     # Set up required vars for input
@@ -371,7 +371,7 @@ def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, che
     }
 
     # Verify constraint
-    check_constraint(m, "min_capacity", False, expected_min_cap_result)
+    check_constraint(m, "minimum", False, expected_min_cap_result)
 
 
 @pytest.mark.unit()
@@ -953,10 +953,15 @@ def test_build(create_example_system):
         assert pyo_var is not None
         assert isinstance(pyo_var, pyo.Var)
 
+    # Check that transfer block was added
+    pyo_transfer = getattr(builder.model, "transfer", None)
+    assert pyo_transfer is not None
+    assert isinstance(pyo_transfer, pyo.Block)
+
     # Check that constraints were added
     expected_constr_names = [
-        "max_capacity",
-        "min_capacity",
+        "capacity",
+        "minimum",
         "resource_balance",
         "storage_balance",
         "charge_limit",

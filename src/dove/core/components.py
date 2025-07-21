@@ -186,13 +186,29 @@ class Component(ABC):
     def capacity_at_timestep(self, t: int) -> float:
         """The maximum operational capacity at the provided time index t"""
         if len(self.capacity_factor) > 0:
+            if t > len(self.capacity_factor) - 1:
+                available = (
+                    "[0]"
+                    if len(self.capacity_factor) == 1
+                    else f"[0, {len(self.capacity_factor) - 1}]"
+                )
+                raise IndexError(
+                    f"{self.name}: timestep {t} is outside of range for provided capacity_factor "
+                    f"data (available range is {available})"
+                )
             return self.installed_capacity * self.capacity_factor[t]
-        else:
-            return self.installed_capacity
+        return self.installed_capacity
 
     def minimum_at_timestep(self, t: int) -> float:
         """The minimum operational capacity at the provided time index t"""
-        return self.min_profile[t] if len(self.min_profile) > 0 else 0.0
+        if len(self.min_profile) > 0:
+            if t > len(self.min_profile) - 1:
+                raise IndexError(
+                    f"{self.name}: timestep {t} is outside of range for provided min_profile "
+                    f"data (available range is [0, {len(self.capacity_factor)}])"
+                )
+            return self.min_profile[t]
+        return 0.0
 
 
 @dataclass
@@ -292,6 +308,12 @@ class Sink(Component):
                     "not accepted for a Sink. Please remove keyword argument."
                 )
 
+        for t, demand_val in enumerate(demand_profile):
+            if demand_val < 0:
+                raise ValueError(
+                    f"{name}: demand_profile value at timestep {t} ({demand_val}) is negative"
+                )
+
         if "capacity_resource" in kwargs:
             if kwargs["capacity_resource"] == consumes:
                 del kwargs["capacity_resource"]
@@ -319,10 +341,24 @@ class Sink(Component):
         Returns the maximum amount that the sink can consume at the given time index t.
         Overload of Component.capacity_at_timestep.
         """
+        if t > len(self.demand_profile) - 1:
+            raise IndexError(
+                f"{self.name}: timestep {t} is outside of range for provided demand_profile "
+                f"data (available range is [0, {len(self.demand_profile)}])"
+            )
         if len(self.capacity_factor) > 0:
+            if t > len(self.capacity_factor) - 1:
+                available = (
+                    "[0]"
+                    if len(self.capacity_factor) == 1
+                    else f"[0, {len(self.capacity_factor) - 1}]"
+                )
+                raise IndexError(
+                    f"{self.name}: timestep {t} is outside of range for provided capacity_factor "
+                    f"data (available range is {available})"
+                )
             return self.demand_profile[t] * self.capacity_factor[t]
-        else:
-            return self.demand_profile[t]
+        return self.demand_profile[t]
 
 
 @dataclass

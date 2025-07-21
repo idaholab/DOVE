@@ -54,7 +54,7 @@ class System:
         dispatch_window: list[int] | None = None,
     ) -> None:
         """
-        Initialize a System instance.
+        Initialize a System instance and validate it.
 
         Parameters
         ----------
@@ -147,7 +147,6 @@ class System:
 
         Checks that:
         - Component names are unique
-        - Resources are of type Resource
         - Resource names are unique
         - Time series data has been provided that covers the dispatch_window
         """
@@ -156,18 +155,13 @@ class System:
         if len(component_names) != len(set(component_names)):
             raise ValueError("Component names must be unique!")
 
-        # Check the types of the resources
-        for res in self.resources:
-            if not isinstance(res, Resource):
-                raise TypeError(f"Type of {res} is not Resource.")
-
         # Check for unique resource names
         resource_names = [res.name for res in self.resources]
         if len(resource_names) != len(set(resource_names)):
             raise ValueError("Resource names must be unique!")
 
         # Check that the necessary time series data is available
-        min_length = max(self.dispatch_window)
+        min_length = max(self.dispatch_window) + 1
         for comp in self.components:
             time_series = {"capacity_factor": comp.capacity_factor, "min_profile": comp.min_profile}
             time_series.update(

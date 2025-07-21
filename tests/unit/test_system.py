@@ -56,9 +56,9 @@ def test_system_initialization_empty():
 @pytest.mark.unit()
 def test_system_summary(capsys):
     r = dc.Resource(name="res")
-    src = dc.Source(name="src", max_capacity_profile=[4.0], produces=r)
-    sink = dc.Sink(name="sink", max_capacity_profile=[2.0], consumes=r)
-    storage = dc.Storage(name="storage", max_capacity_profile=[1.0], resource=r)
+    src = dc.Source(name="src", installed_capacity=4.0, produces=r)
+    sink = dc.Sink(name="sink", demand_profile=[2.0], consumes=r)
+    storage = dc.Storage(name="storage", installed_capacity=1.0, resource=r)
     sys = dc.System(components=[src, sink, storage], resources=[r])
 
     sys.summary()  # Pytest will automatically capture stdout
@@ -81,19 +81,19 @@ def test_system_setup(initialize_and_populate_system):
 
     src = dc.Source(
         name="src",
-        max_capacity_profile=[10.0, 10.0, 10.0],
+        installed_capacity=10.0,
         produces=r_w,
         cashflows=[dc.Cost(name="src_cf", alpha=2)],
     )
     sink = dc.Sink(
         name="sink",
-        max_capacity_profile=[5.0, 5.0, 5.0],
+        demand_profile=[3.0, 3.0, 3.0],
         consumes=r_e,
         cashflows=[dc.Cost(name="sink_cf", alpha=2)],
     )
     conv = dc.Converter(
         name="conv",
-        max_capacity_profile=[8.0, 8.0, 8.0],
+        installed_capacity=8.0,
         consumes=[r_w],
         produces=[r_e],
         capacity_resource=r_w,
@@ -102,7 +102,7 @@ def test_system_setup(initialize_and_populate_system):
     )
     storage = dc.Storage(
         name="storage",
-        max_capacity_profile=[2.0, 2.0, 2.0],
+        installed_capacity=2.0,
         resource=r_e,
         cashflows=[dc.Cost(name="storage_cf", alpha=2)],
     )
@@ -114,7 +114,7 @@ def test_system_setup(initialize_and_populate_system):
     sys = initialize_and_populate_system(
         components=[src, sink, conv, storage],
         resources=[r_w, r_e],
-        time_index=[1, 2, 4],
+        dispatch_window=[1, 2, 4],
     )
 
     # Check component list
@@ -143,54 +143,73 @@ def test_system_setup(initialize_and_populate_system):
     assert sys.res_map["water"] is r_w
     assert sys.res_map["electricity"] is r_e
 
-    # Check time index
-    assert sys.time_index == [1, 2, 4]
-
-
-@pytest.mark.unit()
-def test_adding_non_resource_to_resources_raises_error(initialize_and_populate_system):
-    r1 = dc.Resource(name="r1")
-    c = dc.Source(name="c1", produces=r1, max_capacity_profile=[1.0])
-    with pytest.raises(TypeError):
-        initialize_and_populate_system(
-            resources=[r1, "r2"],
-            components=[c],  # r2 is a string, not a Resource
-        )
+    # Check dispatch window
+    assert sys.dispatch_window == [1, 2, 4]
 
 
 @pytest.mark.unit()
 def test_adding_duplicate_component_name_raises_error(initialize_and_populate_system):
     r = dc.Resource(name="res")
-    c1 = dc.Source(name="c", produces=r, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
-    c2 = dc.Source(name="c", produces=r, max_capacity_profile=[2.0], min_capacity_profile=[0.0])
-    with pytest.raises(ValueError):
-        initialize_and_populate_system(resources=[r], components=[c1, c2])
+    c1 = dc.Source(name="c", produces=r, installed_capacity=1.0, min_profile=[0.0])
+    c2 = dc.Source(name="c", produces=r, installed_capacity=2.0, min_profile=[0.0])
+    with pytest.raises(ValueError) as exc:
+        sys = initialize_and_populate_system(resources=[r], components=[c1, c2])
+        sys.solve("price_taker")
+    assert "Component names must be unique" in str(exc.value)
 
 
 @pytest.mark.unit()
 def test_adding_duplicate_resource_name_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="res")
     r2 = dc.Resource(name="res")
-    c1 = dc.Source(name="c1", produces=r1, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
-    c2 = dc.Source(name="c2", produces=r2, max_capacity_profile=[2.0], min_capacity_profile=[0.0])
-    with pytest.raises(ValueError):
-        initialize_and_populate_system(resources=[r1, r2], components=[c1, c2])
+    c1 = dc.Source(name="c1", produces=r1, installed_capacity=1.0, min_profile=[0.0])
+    c2 = dc.Source(name="c2", produces=r2, installed_capacity=2.0, min_profile=[0.0])
+    with pytest.raises(ValueError) as exc:
+        sys = initialize_and_populate_system(resources=[r1, r2], components=[c1, c2])
+        sys.solve("price_taker")
+    assert "Resource names must be unique" in str(exc.value)
 
 
 @pytest.mark.unit()
-def test_inconsistent_comp_profile_length_raises_error(initialize_and_populate_system):
+def test_insufficient_component_cap_factor_data_raises_error():
     r = dc.Resource(name="res")
-    c = dc.Source(name="c", produces=r, max_capacity_profile=[1.0], min_capacity_profile=[0.0])
+    c = dc.Source(name="source", produces=r, installed_capacity=1.0, capacity_factor=[0.9])
     with pytest.raises(ValueError) as exc:
-        initialize_and_populate_system(resources=[r], components=[c], time_index=[1, 2])
-    assert "capacity profile length that does not match" in str(exc.value)
+        sys = dc.System(components=[c], resources=[r], dispatch_window=[0, 1])
+        sys.solve("price_taker")
+    assert "capacity_factor is of insufficient" in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_insufficient_component_min_profile_data_raises_error():
+    r = dc.Resource(name="res")
+    c = dc.Source(name="source", produces=r, installed_capacity=1.0, min_profile=[0.5])
+    with pytest.raises(ValueError) as exc:
+        sys = dc.System(components=[c], resources=[r], dispatch_window=[0, 1])
+        sys.solve("price_taker")
+    assert "min_profile is of insufficient length" in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_insufficient_cashflow_price_profile_data_raises_error():
+    r = dc.Resource(name="res")
+    c = dc.Source(
+        name="source",
+        produces=r,
+        installed_capacity=1.0,
+        cashflows=[dc.Cost(name="cost", price_profile=[1.0])],
+    )
+    with pytest.raises(ValueError) as exc:
+        sys = dc.System(components=[c], resources=[r], dispatch_window=[0, 1])
+        sys.solve("price_taker")
+    assert "price_profile is of insufficient length" in str(exc.value)
 
 
 @pytest.mark.unit()
 def test_solve_with_unknown_model_type_raises_error():
     r = dc.Resource(name="res")
-    src = dc.Source(name="src", produces=r, max_capacity_profile=[1.0])
-    sink = dc.Sink(name="sink", consumes=r, max_capacity_profile=[1.0])
+    src = dc.Source(name="src", produces=r, installed_capacity=1.0)
+    sink = dc.Sink(name="sink", consumes=r, demand_profile=[1.0])
     sys = dc.System(components=[src, sink], resources=[r])
 
     with pytest.raises(ValueError):
