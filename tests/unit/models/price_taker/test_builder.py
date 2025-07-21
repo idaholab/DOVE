@@ -51,6 +51,10 @@ def create_example_system():
         consumes=elec,
         demand_profile=[1.0, 1.0, 1.0],
         min_profile=[0.5, 0.5, 0.5],
+        cashflows=[
+            dc.Revenue(name="sales", price_profile=[3.0, 0.0, 1.0]),
+            dc.Cost(name="incidental", alpha=1.0),
+        ],
     )
 
     # Storage
@@ -997,7 +1001,7 @@ def test_extract_results(create_example_system):
     # Set up flow
     m.flow.set_values(
         {
-            ("elec_sink", "electricity", 0): 0.5,
+            ("elec_sink", "electricity", 0): 0.9,
             ("elec_sink", "electricity", 1): 0.5,
             ("elec_sink", "electricity", 2): 0.5,
             ("elec_sink", "steam", 0): None,
@@ -1006,9 +1010,9 @@ def test_extract_results(create_example_system):
             ("steam_source", "electricity", 0): None,
             ("steam_source", "electricity", 1): None,
             ("steam_source", "electricity", 2): None,
-            ("steam_source", "steam", 0): 1.0,
-            ("steam_source", "steam", 1): 1.5,
-            ("steam_source", "steam", 2): 1.0,
+            ("steam_source", "steam", 0): 0.5,
+            ("steam_source", "steam", 1): 1.0,
+            ("steam_source", "steam", 2): 1.5,
             ("steam_to_elec_converter", "electricity", 0): 0.5,
             ("steam_to_elec_converter", "electricity", 1): 0.5,
             ("steam_to_elec_converter", "electricity", 2): 0.5,
@@ -1024,8 +1028,8 @@ def test_extract_results(create_example_system):
             ("elec_storage", 0): 0.0,
             ("elec_storage", 1): 0.0,
             ("elec_storage", 2): 0.0,
-            ("steam_storage", 0): 0.5,
-            ("steam_storage", 1): 1.0,
+            ("steam_storage", 0): 0.0,
+            ("steam_storage", 1): 0.0,
             ("steam_storage", 2): 0.5,
         }
     )
@@ -1033,12 +1037,12 @@ def test_extract_results(create_example_system):
     # Set up charge, discharge, and soc
     m.discharge.set_values(
         {
-            ("elec_storage", 0): 0.0,
+            ("elec_storage", 0): 0.4,
             ("elec_storage", 1): 0.0,
             ("elec_storage", 2): 0.0,
             ("steam_storage", 0): 0.5,
-            ("steam_storage", 1): 0.5,
-            ("steam_storage", 2): 0.5,
+            ("steam_storage", 1): 0.0,
+            ("steam_storage", 2): 0.0,
         }
     )
 
@@ -1048,12 +1052,12 @@ def test_extract_results(create_example_system):
             ("elec_storage", 1): 0.0,
             ("elec_storage", 2): 0.0,
             ("steam_storage", 0): 0.0,
-            ("steam_storage", 1): 0.5,
+            ("steam_storage", 1): 0.0,
             ("steam_storage", 2): 0.5,
         }
     )
 
-    m.objective.set_value(0.0)
+    m.objective.set_value(1.3)
 
     # Call the method under test
     actual_data = builder.extract_results()
@@ -1062,18 +1066,19 @@ def test_extract_results(create_example_system):
 
     expected_data = pd.DataFrame(
         {
-            "steam_source_steam_produces": [1.0, 1.5, 1.0],
+            "steam_source_steam_produces": [0.5, 1.0, 1.5],
             "steam_to_elec_converter_electricity_produces": [0.5, 0.5, 0.5],
             "steam_to_elec_converter_steam_consumes": [-1.0, -1.0, -1.0],
-            "elec_sink_electricity_consumes": [-0.5, -0.5, -0.5],
-            "steam_storage_SOC": [0.0, 0.5, 0.5],
-            "steam_storage_charge": [0.5, 1.0, 0.5],
-            "steam_storage_discharge": [0.5, 0.5, 0.5],
+            "elec_sink_electricity_consumes": [-0.9, -0.5, -0.5],
+            "steam_storage_SOC": [0.0, 0.0, 0.5],
+            "steam_storage_charge": [0.0, 0.0, 0.5],
+            "steam_storage_discharge": [0.5, 0.0, 0.0],
             "elec_storage_SOC": [0.0, 0.0, 0.0],
             "elec_storage_charge": [-0.0, 0.0, 0.0],
-            "elec_storage_discharge": [0.0, 0.0, 0.0],
-            "objective": [0.0, 0.0, 0.0],
+            "elec_storage_discharge": [0.4, 0.0, 0.0],
+            "net_cashflow": [1.8, -0.5, 0.0],
+            "objective": [1.3, 1.3, 1.3],
         }
     )
 
-    assert actual_data.equals(expected_data)
+    pd.testing.assert_frame_equal(actual_data, expected_data, check_like=True)

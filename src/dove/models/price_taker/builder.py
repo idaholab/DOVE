@@ -126,6 +126,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         m = self.model
         data = {}
         T = self.system.dispatch_window
+        net_cashflow = [0.0] * len(T)
         for comp in self.system.components:
             for res in comp.produces + comp.consumes:
                 # Since everything is defined as positive flow, we need to flip the sign
@@ -139,6 +140,14 @@ class PriceTakerBuilder(BaseModelBuilder):
                 data[f"{comp.name}_SOC"] = [pyo.value(m.soc[comp.name, t]) for t in T]
                 data[f"{comp.name}_charge"] = [pyo.value(m.charge[comp.name, t]) for t in T]
                 data[f"{comp.name}_discharge"] = [pyo.value(m.discharge[comp.name, t]) for t in T]
+
+            for cf in comp.cashflows:
+                for t in T:
+                    net_cashflow[t] += cf.evaluate(
+                        t, pyo.value(m.flow[comp.name, comp.capacity_resource.name, t])
+                    )
+
+        data["net_cashflow"] = net_cashflow
         data["objective"] = [pyo.value(m.objective)]
         return pd.DataFrame(data, index=T)
 

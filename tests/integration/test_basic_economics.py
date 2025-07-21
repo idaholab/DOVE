@@ -101,6 +101,7 @@ def test_with_no_cfs(generic_system_setup):
             "elec_storage_charge": [0.0],
             "elec_storage_discharge": [0.0],
             "elec_sink_electricity_consumes": [-25.0],
+            "net_cashflow": [0.0],
             "objective": [0],
         }
     )
@@ -131,6 +132,7 @@ def test_with_costs_only(generic_system_setup):
             "elec_storage_charge": [20.0, 20.0, 20.0, 20.0],
             "elec_storage_discharge": [18.0, 18, 16.0, 20.0],
             "elec_sink_electricity_consumes": [-23.0, -23.0, -21.0, -25.0],
+            "net_cashflow": [-73.0, -73.0, -71.0, -75.0],
             "objective": [-292.0, -292.0, -292.0, -292.0],
         }
     )
@@ -160,6 +162,7 @@ def test_with_revenues_only(generic_system_setup):
             "elec_storage_charge": [2.222222, 20.0, 0.0, 0.0],
             "elec_storage_discharge": [0.0, 0.0, 20.0, 0.0],
             "elec_sink_electricity_consumes": [-47.777778, -30.0, -70.0, -50.0],
+            "net_cashflow": [47.777778, 30.0, 210.0, 50.0],
             "objective": [337.777778, 337.777778, 337.777778, 337.777778],
         }
     )
@@ -215,6 +218,7 @@ def test_cashflow_combos(generic_system_setup):
             "elec_storage_charge": [20.0, 0.0, 0.0, 0.0],
             "elec_storage_discharge": [0.0, 18.0, 0.0, 0.0],
             "elec_sink_electricity_consumes": [-50.0, -88.0, -70.0, -70.0],
+            "net_cashflow": [160.0, 1244.0, 330.0, 425.0],
             "objective": [2159.0, 2159.0, 2159.0, 2159.0],
         }
     )
