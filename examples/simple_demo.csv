@@ -1,0 +1,3 @@
+,nuclear_steam_produces,generator_electricity_produces,generator_steam_consumes,wind_electricity_produces,battery_SOC,battery_charge,battery_discharge,grid_electricity_consumes,objective
+0,3.0,3.0,-3.0,1.0,0.9486833,1.0,0.0,-3.0,8.9
+1,3.0,3.0,-3.0,2.0,0.0,0.0,0.9,-5.9,8.9

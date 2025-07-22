@@ -40,9 +40,9 @@ uv run pytest
 
 # Quick-Start
 Once DOVE has been installed, it can be used as a python library. DOVE contains three main types of objects: Resources, Components, and Systems.
-- Resources refer to quantities that can be produced, consumed, converterted, and stored. Examples are electricity, heat, hydrogen, etc.
-- Components are objects that perform actions on resources. Four types of Components are available in DOVE. Sources produce a specified resource; Sinks consume a specified resource; Converters change one or more resource into one or more other resources; and Storage components store resources across multiple timesteps.
-- The System contains all the Resources and Components and is responsible for solving the optimization problem. Systems also take an argument to specify the time window over which the optimization should run.
+- **Resources** refer to quantities that can be produced, consumed, converterted, and stored. Examples are electricity, heat, hydrogen, etc.
+- **Components** are objects that perform actions on resources. Four types of Components are available in DOVE. Sources produce a specified resource; Sinks consume a specified resource; Converters change one or more resource into one or more other resources; and Storage components store resources across multiple timesteps.
+- **Systems** contain a set of Resources and Components and are responsible for solving the optimization problem. Systems also take an argument to specify the time window over which the optimization should run. Usually only one system is created for each dispatch problem.
 
 Consider a simple energy system with a nuclear power plant and generator, wind turbines, and battery storage, connected to a grid. The resource flow for this system is shown below:
 
