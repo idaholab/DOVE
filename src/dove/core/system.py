@@ -113,11 +113,6 @@ class System:
         -------
         Self
             The system instance for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If the component validation fails (via verify method).
         """
         self.components.append(comp)
         self.comp_map[comp.name] = comp
@@ -161,6 +156,7 @@ class System:
             raise ValueError("Resource names must be unique!")
 
         # Check that the necessary time series data is available
+        time_series_errors = ""
         min_length = max(self.dispatch_window) + 1
         for comp in self.components:
             time_series = {"capacity_factor": comp.capacity_factor, "min_profile": comp.min_profile}
@@ -170,11 +166,14 @@ class System:
 
             for ts_name, ts_data in time_series.items():
                 if len(ts_data) > 0 and len(ts_data) < min_length:
-                    raise ValueError(
-                        f"{comp.name}: time series data for {ts_name} is of "
-                        "insufficient length to cover the system's dispatch_window "
-                        f"({len(ts_data)} < {min_length})."
+                    error_msg = (
+                        f"\n{comp.name}: time series data for {ts_name} is of insufficient length "
+                        f"to cover the system's dispatch_window ({len(ts_data)} < {min_length})."
                     )
+                    time_series_errors += error_msg
+
+        if len(time_series_errors) > 0:
+            raise ValueError(time_series_errors)
 
     def build(self) -> None:
         """

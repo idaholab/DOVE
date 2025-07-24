@@ -272,7 +272,7 @@ def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint
     comp = system.comp_map[cname]
     if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
         return pyo.Constraint.Skip
-    return m.ramp_up[cname, t] <= comp.capacity_at_timestep(t) * m.ramp_up_bin[cname, t]
+    return m.ramp_up[cname, t] <= comp.installed_capacity * m.ramp_up_bin[cname, t]
 
 
 def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
@@ -297,7 +297,7 @@ def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constrai
     comp = system.comp_map[cname]
     if not hasattr(comp, "ramp_freq") or comp.ramp_freq == 0 or t == m.T.first():
         return pyo.Constraint.Skip
-    return m.ramp_down[cname, t] <= comp.capacity_at_timestep(t) * m.ramp_down_bin[cname, t]
+    return m.ramp_down[cname, t] <= comp.installed_capacity * m.ramp_down_bin[cname, t]
 
 
 def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:

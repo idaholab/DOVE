@@ -206,6 +206,18 @@ def test_insufficient_cashflow_price_profile_data_raises_error():
 
 
 @pytest.mark.unit()
+def test_multiple_insufficient_time_series():
+    r = dc.Resource(name="res")
+    src = dc.Source(name="src", produces=r, installed_capacity=1.0, capacity_factor=[0.5])
+    sink = dc.Sink(name="sink", consumes=r, installed_capacity=1.0, min_profile=[0.5])
+    with pytest.raises(ValueError) as exc:
+        sys = dc.System(components=[src, sink], resources=[r], dispatch_window=[0, 1])
+        sys.solve("price_taker")
+    assert "capacity_factor is of insufficient length" in str(exc.value)
+    assert "min_profile is of insufficient length" in str(exc.value)
+
+
+@pytest.mark.unit()
 def test_solve_with_unknown_model_type_raises_error():
     r = dc.Resource(name="res")
     src = dc.Source(name="src", produces=r, installed_capacity=1.0)

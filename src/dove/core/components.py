@@ -278,7 +278,7 @@ class Sink(Component):
     name : str
         The unique identifier for this sink component.
     demand_profile : TimeDependent
-        The maximum amount that this sink can consume, by timestep.
+        Optional. The maximum amount that this sink can consume, by timestep.
     consumes : Resource
         The resource type this sink consumes.
     **kwargs : Any
@@ -287,50 +287,77 @@ class Sink(Component):
     Raises
     ------
     ValueError
-        If 'produces' or 'capacity_resource' is found in the kwargs
+        - If 'produces' is found in the kwargs
+        - If 'capacity_resource' was specified as a resource other than that in 'consumes'
+        - If the capacity was not specified properly
 
     Notes
     -----
-    By default a Sink creates a `RatioTransfer` function with a 1:1 ratio
-    using the consumed resource as both input and mocked output.
+    To specify capacity, sinks accept exactly one of the following argument combinations:
+    - time dependent demand_profile AND NOT installed_capacity AND NOT capacity_factor
+    - float installed_capacity AND NOT demand_profile (capacity_factor optional)
+    The former option should be used when a total variable demand is known, like for a grid.
+    The latter option can be used for sinks with constant demand, or it can be used with
+    a time dependent capacity factor to express a variable demand as a ratio of a constant.
     """
 
     def __init__(
-        self, name: str, demand_profile: TimeDependent, consumes: Resource, **kwargs: Any
+        self,
+        name: str,
+        consumes: Resource,
+        demand_profile: TimeDependent | None = None,
+        **kwargs: Any,
     ) -> None:
         self.demand_profile = demand_profile
+        if self.demand_profile is not None:
+            self.demand_profile = np.asarray(self.demand_profile, float).ravel()
 
-        bad_kwargs = ["installed_capacity", "produces"]
-        for bad_kwarg in bad_kwargs:
-            if bad_kwarg in kwargs:
-                raise ValueError(
-                    f"{name}: Keyword argument '{bad_kwarg}' was specified, but is "
-                    "not accepted for a Sink. Please remove keyword argument."
-                )
+        if "produces" in kwargs:
+            raise ValueError(
+                f"{name}: Keyword argument 'produces' was specified, but is "
+                "not accepted for a Sink. Please remove keyword argument."
+            )
 
-        for t, demand_val in enumerate(demand_profile):
-            if demand_val < 0:
-                raise ValueError(
-                    f"{name}: demand_profile value at timestep {t} ({demand_val}) is negative"
-                )
+        if "capacity_resource" in kwargs and kwargs["capacity_resource"] != consumes:
+            raise ValueError(
+                f"{name}: Keyword argument 'capacity_resource' was specified as a different "
+                "resource than the component consumes, which is not permitted for a Sink. "
+                f"Please set 'capacity_resource' to '{consumes}' explicitly, or remove it, and "
+                "it will be set implicitly."
+            )
 
-        if "capacity_resource" in kwargs:
-            if kwargs["capacity_resource"] == consumes:
-                del kwargs["capacity_resource"]
-            else:
-                raise ValueError(
-                    f"{name}: Keyword argument 'capacity_resource' was specified as a different resource "
-                    "than the component consumes, which is not permitted for a Sink. Please set "
-                    f"'capacity_resource' to {consumes} explicitly, or remove it, and it will be set implicitly."
-                )
+        if "installed_capacity" not in kwargs and demand_profile is None:
+            raise ValueError(
+                f"{name}: Insufficient capacity information provided. Please provide "
+                "(1) a demand_profile only, (2) an installed_capacity only, OR "
+                "(3) an installed_capacity with a capacity_factor."
+            )
 
-        super().__init__(
-            name=name,
-            installed_capacity=0,  # TODO: How to do this better?
-            consumes=[consumes],
-            capacity_resource=consumes,
-            **kwargs,
-        )
+        comp_init_kwargs = {"name": name, "consumes": [consumes], "capacity_resource": consumes}
+        comp_init_kwargs.update(kwargs)
+
+        if demand_profile is not None:
+            bad_kwargs = ["installed_capacity", "capacity_factor"]
+            for bad_kwarg in bad_kwargs:
+                if bad_kwarg in kwargs:
+                    raise ValueError(
+                        f"{name}: Keyword arguments 'demand_profile' and '{bad_kwarg}' were both "
+                        "specified. This combination is not currently accepted for Sinks. Please "
+                        "provide (1) a demand_profile only, (2) an installed_capacity only, OR "
+                        "(3) an installed_capacity with a capacity_factor."
+                    )
+
+            for t, demand_val in enumerate(demand_profile):
+                if demand_val < 0:
+                    raise ValueError(
+                        f"{name}: demand_profile value at timestep {t} ({demand_val}) is negative"
+                    )
+
+            # installed_capacity should never be needed in the model if demand_profile is
+            # provided, but it's still required by the Component, so we'll give it a value
+            comp_init_kwargs.update({"installed_capacity": np.max(demand_profile)})
+
+        super().__init__(**comp_init_kwargs)
 
         if self.transfer_fn is None:
             res = consumes
@@ -339,25 +366,17 @@ class Sink(Component):
     def capacity_at_timestep(self, t: int) -> float:
         """
         Returns the maximum amount that the sink can consume at the given time index t.
-        Overload of Component.capacity_at_timestep.
+        Overload of Component.capacity_at_timestep that incorporates demand profile.
         """
+        if self.demand_profile is None:
+            return super().capacity_at_timestep(t)
+
         if t > len(self.demand_profile) - 1:
             raise IndexError(
                 f"{self.name}: timestep {t} is outside of range for provided demand_profile "
                 f"data (available range is [0, {len(self.demand_profile)}])"
             )
-        if len(self.capacity_factor) > 0:
-            if t > len(self.capacity_factor) - 1:
-                available = (
-                    "[0]"
-                    if len(self.capacity_factor) == 1
-                    else f"[0, {len(self.capacity_factor) - 1}]"
-                )
-                raise IndexError(
-                    f"{self.name}: timestep {t} is outside of range for provided capacity_factor "
-                    f"data (available range is {available})"
-                )
-            return self.demand_profile[t] * self.capacity_factor[t]
+
         return self.demand_profile[t]
 
 

@@ -166,18 +166,7 @@ def test_sink_defaults_transfer_function():
 
 
 @pytest.mark.unit()
-def test_sink_capacity_getter_with_cap_factor():
-    r = Resource(name="res")
-    sink = Sink(name="sink", consumes=r, demand_profile=[4.0, 3.0, 2.0], capacity_factor=[0.0, 0.5])
-    assert sink.capacity_at_timestep(0) == 0.0
-    assert sink.capacity_at_timestep(1) == 1.5
-    with pytest.raises(IndexError) as exc:
-        sink.capacity_at_timestep(2)
-    assert "outside of range for provided capacity_factor data" in str(exc.value)
-
-
-@pytest.mark.unit()
-def test_sink_capacity_getter_without_cap_factor():
+def test_sink_capacity_getter_with_demand_profile():
     r = Resource(name="res")
     sink = Sink(name="sink", consumes=r, demand_profile=[4.0, 3.0])
     assert sink.capacity_at_timestep(0) == 4.0
@@ -188,10 +177,29 @@ def test_sink_capacity_getter_without_cap_factor():
 
 
 @pytest.mark.unit()
+def test_sink_capacity_getter_with_installed_cap():
+    r = Resource(name="res")
+    sink = Sink(name="sink", consumes=r, installed_capacity=4.0, capacity_factor=[0, 0.5])
+    assert sink.capacity_at_timestep(0) == 0.0
+    assert sink.capacity_at_timestep(1) == 2.0
+    with pytest.raises(IndexError) as exc:
+        sink.capacity_at_timestep(2)
+    assert "outside of range for provided capacity_factor data" in str(exc.value)
+
+
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
-        ({"installed_capacity": 3.0}, "installed_capacity"),
+        (
+            {"installed_capacity": 3.0, "demand_profile": [3.0]},
+            "'demand_profile' and 'installed_capacity'",
+        ),
+        (
+            {"demand_profile": [4.0], "capacity_factor": [0.8]},
+            "'demand_profile' and 'capacity_factor'",
+        ),
+        ({}, "Insufficient capacity information"),
         ({"produces": Resource(name="res")}, "produces"),
         ({"capacity_resource": Resource(name="res")}, "capacity_resource"),
         ({"demand_profile": [-5.0]}, "demand_profile"),
@@ -199,7 +207,7 @@ def test_sink_capacity_getter_without_cap_factor():
 )
 def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
     r = Resource(name="sink_bad")
-    init_kwargs = {"name": "sink_bad", "consumes": r, "demand_profile": [5.0]}
+    init_kwargs = {"name": "sink_bad", "consumes": r}
     init_kwargs.update(bad_kwargs)
     with pytest.raises(ValueError) as exc:
         Sink(**init_kwargs)
