@@ -72,10 +72,6 @@ class CashFlow(ABC):
         # Convert price_profile
         self.price_profile = np.asarray(self.price_profile, float).ravel()
 
-        # Scale price profile by alpha
-        if len(self.price_profile) > 0:
-            self.price_profile = np.multiply(self.alpha, self.price_profile)
-
     def evaluate(self, t: int, dispatch: float) -> float:
         """
         Returns the cashflow's dollar value at the given timestep t, provided a dispatch quantity.
@@ -83,6 +79,15 @@ class CashFlow(ABC):
         """
         value = self.sign * self.alpha * ((dispatch / self.dprime) ** self.scalex)
         if len(self.price_profile) > 0:
+            if t > len(self.price_profile) - 1:
+                available = (
+                    "[0]" if len(self.price_profile) == 1 else f"[0, {len(self.price_profile) - 1}]"
+                )
+                raise IndexError(
+                    f"{self.name}: timestep {t} is outside of range for provided price_profile "
+                    f"data (available range is {available})"
+                )
+
             value *= self.price_profile[t]
         return value
 

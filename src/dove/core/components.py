@@ -372,9 +372,12 @@ class Sink(Component):
             return super().capacity_at_timestep(t)
 
         if t > len(self.demand_profile) - 1:
+            available = (
+                "[0]" if len(self.demand_profile) == 1 else f"[0, {len(self.demand_profile) - 1}]"
+            )
             raise IndexError(
                 f"{self.name}: timestep {t} is outside of range for provided demand_profile "
-                f"data (available range is [0, {len(self.demand_profile)}])"
+                f"data (available range is {available})"
             )
 
         return self.demand_profile[t]
