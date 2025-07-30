@@ -50,7 +50,7 @@ def create_example_system():
         name="elec_sink",
         consumes=elec,
         demand_profile=[1.0, 1.0, 1.0],
-        min_profile=[0.5, 0.5, 0.5],
+        min_demand_profile=[0.5, 0.5, 0.5],
         cashflows=[
             dc.Revenue(name="sales", price_profile=[3.0, 0.0, 1.0]),
             dc.Cost(name="incidental", alpha=1.0),

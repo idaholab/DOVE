@@ -150,8 +150,8 @@ def test_system_setup(initialize_and_populate_system):
 @pytest.mark.unit()
 def test_adding_duplicate_component_name_raises_error(initialize_and_populate_system):
     r = dc.Resource(name="res")
-    c1 = dc.Source(name="c", produces=r, installed_capacity=1.0, min_profile=[0.0])
-    c2 = dc.Source(name="c", produces=r, installed_capacity=2.0, min_profile=[0.0])
+    c1 = dc.Source(name="c", produces=r, installed_capacity=1.0, min_capacity_factor=[0.0])
+    c2 = dc.Source(name="c", produces=r, installed_capacity=2.0, min_capacity_factor=[0.0])
     with pytest.raises(ValueError) as exc:
         sys = initialize_and_populate_system(resources=[r], components=[c1, c2])
         sys.solve("price_taker")
@@ -162,8 +162,8 @@ def test_adding_duplicate_component_name_raises_error(initialize_and_populate_sy
 def test_adding_duplicate_resource_name_raises_error(initialize_and_populate_system):
     r1 = dc.Resource(name="res")
     r2 = dc.Resource(name="res")
-    c1 = dc.Source(name="c1", produces=r1, installed_capacity=1.0, min_profile=[0.0])
-    c2 = dc.Source(name="c2", produces=r2, installed_capacity=2.0, min_profile=[0.0])
+    c1 = dc.Source(name="c1", produces=r1, installed_capacity=1.0, min_capacity_factor=[0.0])
+    c2 = dc.Source(name="c2", produces=r2, installed_capacity=2.0, min_capacity_factor=[0.0])
     with pytest.raises(ValueError) as exc:
         sys = initialize_and_populate_system(resources=[r1, r2], components=[c1, c2])
         sys.solve("price_taker")
@@ -171,50 +171,38 @@ def test_adding_duplicate_resource_name_raises_error(initialize_and_populate_sys
 
 
 @pytest.mark.unit()
-def test_insufficient_component_cap_factor_data_raises_error():
+@pytest.mark.parametrize(
+    "kwargs, ts_name",
+    [
+        ({"installed_capacity": 1.0, "capacity_factor": [0.9]}, "capacity_factor"),
+        ({"installed_capacity": 1.0, "min_capacity_factor": [0.5]}, "min_capacity_factor"),
+        (
+            {"installed_capacity": 1.0, "cashflows": [dc.Cost(name="cost", price_profile=[1.0])]},
+            "price_profile",
+        ),
+        ({"demand_profile": [1.0]}, "demand_profile"),
+        ({"demand_profile": [2.0, 2.0], "min_demand_profile": [1.0]}, "min_demand_profile"),
+    ],
+)
+def test_insufficient_time_series_data_raises_error(kwargs, ts_name):
     r = dc.Resource(name="res")
-    c = dc.Source(name="source", produces=r, installed_capacity=1.0, capacity_factor=[0.9])
+    c = dc.Sink(name="sink", consumes=r, **kwargs)
     with pytest.raises(ValueError) as exc:
         sys = dc.System(components=[c], resources=[r], dispatch_window=[0, 1])
         sys.solve("price_taker")
-    assert "capacity_factor is of insufficient" in str(exc.value)
-
-
-@pytest.mark.unit()
-def test_insufficient_component_min_profile_data_raises_error():
-    r = dc.Resource(name="res")
-    c = dc.Source(name="source", produces=r, installed_capacity=1.0, min_profile=[0.5])
-    with pytest.raises(ValueError) as exc:
-        sys = dc.System(components=[c], resources=[r], dispatch_window=[0, 1])
-        sys.solve("price_taker")
-    assert "min_profile is of insufficient length" in str(exc.value)
-
-
-@pytest.mark.unit()
-def test_insufficient_cashflow_price_profile_data_raises_error():
-    r = dc.Resource(name="res")
-    c = dc.Source(
-        name="source",
-        produces=r,
-        installed_capacity=1.0,
-        cashflows=[dc.Cost(name="cost", price_profile=[1.0])],
-    )
-    with pytest.raises(ValueError) as exc:
-        sys = dc.System(components=[c], resources=[r], dispatch_window=[0, 1])
-        sys.solve("price_taker")
-    assert "price_profile is of insufficient length" in str(exc.value)
+    assert f"{ts_name} is of insufficient length" in str(exc.value)
 
 
 @pytest.mark.unit()
 def test_multiple_insufficient_time_series():
     r = dc.Resource(name="res")
     src = dc.Source(name="src", produces=r, installed_capacity=1.0, capacity_factor=[0.5])
-    sink = dc.Sink(name="sink", consumes=r, installed_capacity=1.0, min_profile=[0.5])
+    sink = dc.Sink(name="sink", consumes=r, installed_capacity=1.0, min_capacity_factor=[0.5])
     with pytest.raises(ValueError) as exc:
         sys = dc.System(components=[src, sink], resources=[r], dispatch_window=[0, 1])
         sys.solve("price_taker")
     assert "capacity_factor is of insufficient length" in str(exc.value)
-    assert "min_profile is of insufficient length" in str(exc.value)
+    assert "min_capacity_factor is of insufficient length" in str(exc.value)
 
 
 @pytest.mark.unit()

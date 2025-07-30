@@ -1,6 +1,6 @@
 # Copyright 2024, Battelle Energy Alliance, LLC
 # ALL RIGHTS RESERVED
-""" """
+"""This example demonstrates how to use capacity factors for Components."""
 
 import numpy as np
 
@@ -9,6 +9,7 @@ import dove.core as dc
 if __name__ == "__main__":
     elec = dc.Resource("electricity")
 
+    # This is a capacity factor time series, which is accepted directly
     wind_cap_fac_ts = np.array(
         [
             7.55000000e-10,
@@ -35,11 +36,49 @@ if __name__ == "__main__":
         ]
     )
 
+    # This is a real capacity time series, which must be normalized
+    solar_generation_ts = np.array(
+        [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.82579345,
+            4.01695425,
+            6.77281572,
+            8.79473751,
+            9.86361303,
+            9.86361303,
+            8.79473751,
+            6.77281572,
+            4.01695425,
+            0.82579345,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ]
+    )
+
+    # Normalize solar capacity time series
+    solar_installed_capacity = np.max(solar_generation_ts)
+    solar_cap_fac_ts = solar_generation_ts / solar_installed_capacity  # Elementwise division
+
     wind = dc.Source(
         name="wind",
         produces=elec,
         installed_capacity=10,
         capacity_factor=wind_cap_fac_ts,
+    )
+
+    solar = dc.Source(
+        name="solar",
+        produces=elec,
+        installed_capacity=solar_installed_capacity,
+        capacity_factor=solar_cap_fac_ts,
     )
 
     npp = dc.Source(
@@ -52,7 +91,7 @@ if __name__ == "__main__":
     grid = dc.Sink(
         name="grid",
         consumes=elec,
-        demand_profile=[35] * len(wind_cap_fac_ts),
+        demand_profile=[40] * len(wind_cap_fac_ts),
         flexibility="fixed",
         cashflows=[dc.Revenue("e_sales", alpha=50e3)],
     )
@@ -72,7 +111,7 @@ if __name__ == "__main__":
     )
 
     sys = dc.System(
-        components=[wind, npp, grid, importelec, exportelec],
+        components=[wind, solar, npp, grid, importelec, exportelec],
         resources=[elec],
         dispatch_window=np.arange(0, len(wind_cap_fac_ts)),
     )

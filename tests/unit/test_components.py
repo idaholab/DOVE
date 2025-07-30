@@ -22,14 +22,14 @@ def test_component_basic_properties():
         name="comp",
         installed_capacity=5.0,
         capacity_factor=[1.0, 0.8],
-        min_profile=[1.0, 2.0],
+        min_capacity_factor=[0.2, 0.4],
     )
     # capacities and profile
     assert comp.installed_capacity == 5.0
     assert isinstance(comp.capacity_factor, np.ndarray)
     assert comp.capacity_factor.tolist() == [1.0, 0.8]
-    assert isinstance(comp.min_profile, np.ndarray)
-    assert comp.min_profile.tolist() == [1.0, 2.0]
+    assert isinstance(comp.min_capacity_factor, np.ndarray)
+    assert comp.min_capacity_factor.tolist() == [0.2, 0.4]
     # empty consumes/produces
     assert comp.consumes_by_name == []
     assert comp.produces_by_name == []
@@ -64,11 +64,11 @@ def test_component_minimum_getter_bad_timestep():
     comp = Component(
         name="comp",
         installed_capacity=5.0,
-        min_profile=[1.0, 1.0, 2.0],
+        min_capacity_factor=[0.2, 0.2, 0.4],
     )
     with pytest.raises(IndexError) as exc:
         comp.minimum_at_timestep(4)
-    assert "outside of range for provided min_profile data" in str(exc.value)
+    assert "outside of range for provided min_capacity_factor data" in str(exc.value)
 
 
 @pytest.mark.unit()
@@ -79,12 +79,12 @@ def test_component_minimum_getter_bad_timestep():
         ({"consumes": ["res"]}, TypeError, "all resources must be Resource"),
         ({"installed_capacity": -1.0}, ValueError, "cannot be negative"),
         (
-            {"installed_capacity": 10.0, "capacity_factor": [0.1], "min_profile": [2.0]},
+            {"installed_capacity": 10.0, "capacity_factor": [0.1], "min_capacity_factor": [0.2]},
             ValueError,
-            "min_profile value at timestep",
+            "minimum activity value at timestep",
         ),
         ({"capacity_factor": [1.2]}, ValueError, "capacity_factor value at timestep"),
-        ({"min_profile": [-1.0]}, ValueError, "min_profile value at timestep"),
+        ({"min_capacity_factor": [1.2]}, ValueError, "min_capacity_factor value at timestep"),
         ({"flexibility": "invalid"}, ValueError, "flexibility must be"),
         ({"cashflows": [object()]}, TypeError, "all cashflows must be CashFlow"),
     ],
@@ -106,13 +106,13 @@ def test_component_capacity_resource_not_in_consumes_or_produces():
 
 
 @pytest.mark.unit()
-def test_min_capacity_profile_and_fixed_flexibility_specified_warns():
+def test_min_capacity_factor_and_fixed_flexibility_specified_warns():
     with pytest.warns(UserWarning):
         Component(
             name="c",
             installed_capacity=4.0,
             capacity_factor=[0.5, 0.75],
-            min_profile=[1.0, 1.0],
+            min_capacity_factor=[0.25, 0.25],
             flexibility="fixed",
         )
 
@@ -188,6 +188,27 @@ def test_sink_capacity_getter_with_installed_cap():
 
 
 @pytest.mark.unit()
+def test_sink_minimum_getter_with_min_demand_profile():
+    r = Resource(name="res")
+    sink = Sink(name="sink", consumes=r, demand_profile=[4.0], min_demand_profile=[2.0])
+    assert sink.minimum_at_timestep(0) == 2.0
+    with pytest.raises(IndexError) as exc:
+        sink.minimum_at_timestep(1)
+    assert "outside of range for provided min_demand_profile data" in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_sink_minimum_getter_with_min_cap_factor():
+    r = Resource(name="res")
+    sink = Sink(name="sink", consumes=r, installed_capacity=4.0, min_capacity_factor=[0, 0.25])
+    assert sink.minimum_at_timestep(0) == 0.0
+    assert sink.minimum_at_timestep(1) == 1.0
+    with pytest.raises(IndexError) as exc:
+        sink.minimum_at_timestep(2)
+    assert "outside of range for provided min_capacity_factor data" in str(exc.value)
+
+
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
@@ -203,6 +224,15 @@ def test_sink_capacity_getter_with_installed_cap():
         ({"produces": Resource(name="res")}, "produces"),
         ({"capacity_resource": Resource(name="res")}, "capacity_resource"),
         ({"demand_profile": [-5.0]}, "demand_profile"),
+        ({"min_capacity_factor": [0.1], "demand_profile": [4.0]}, "min_capacity_factor"),
+        (
+            {"min_capacity_factor": [0.1], "min_demand_profile": [1.0], "installed_capacity": 2.0},
+            "'min_capacity_factor' and 'min_demand_profile'",
+        ),
+        (
+            {"demand_profile": [1.0], "min_demand_profile": [1.2]},
+            "minimum activity value at timestep",
+        ),
     ],
 )
 def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
@@ -212,6 +242,15 @@ def test_sink_invalid_parameters_raise(bad_kwargs, msg_substr):
     with pytest.raises(ValueError) as exc:
         Sink(**init_kwargs)
     assert msg_substr in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_sink_min_demand_profile_and_fixed_flexibility_warns():
+    r = Resource(name="res")
+    with pytest.warns(UserWarning):
+        Sink(
+            name="sink", consumes=r, demand_profile=[3], min_demand_profile=[1], flexibility="fixed"
+        )
 
 
 @pytest.mark.unit()

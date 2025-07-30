@@ -62,8 +62,8 @@ class Component(ABC):
         Resources consumed by this component.
     produces : list[Resource]
         Resources produced by this component.
-    min_profile : TimeDependent
-        Time-dependent minimum allowable activity; defaults to 0.0 for every timestep.
+    min_capacity_factor : TimeDependent
+        Minimum allowable activity as a fraction of installed_capacity; defaults to 0.0 for every timestep.
     capacity_resource : Resource | None
         The resource that defines capacity, if any.
     flexibility : Literal["flex", "fixed"]
@@ -84,7 +84,7 @@ class Component(ABC):
     capacity_factor: TimeDependent = field(default_factory=list)
     consumes: list[Resource] = field(default_factory=list)
     produces: list[Resource] = field(default_factory=list)
-    min_profile: TimeDependent = field(default_factory=list)
+    min_capacity_factor: TimeDependent = field(default_factory=list)
     capacity_resource: Resource | None = None
     flexibility: Literal["flex", "fixed"] = "flex"
     cashflows: list[CashFlow] = field(default_factory=list)
@@ -105,15 +105,16 @@ class Component(ABC):
         Validate and process the component's attributes after initialization.
 
         This method performs various checks and conversions to ensure the component is properly configured:
-        1. Converts capacity_factor and min_profile to numpy arrays of floats
+        1. Converts capacity_factor and min_capacity_factor to numpy arrays of floats
         2. Checks that installed_capacity is positive
         3. Validates capacity_factor values
-        4. Validates min_profile values
+        4. Validates min_capacity_factor values
         5. Checks that flexibility is either 'flex' or 'fixed'
-        6. Warns if fixed flexibility and min_profile were both set by the user
+        6. Warns if fixed flexibility and min_capacity_factor were both set by the user
         7. Verifies all resources are Resource instances
         8. Ensures capacity_resource is in either consumes or produces
         9. Checks that all cashflows are CashFlow instances
+        10. Checks that the minimum activity of the component is less than the capacity by timestep
 
         Raises
         ------
@@ -122,48 +123,18 @@ class Component(ABC):
         TypeError
             If resources or cashflows contains elements of the wrong type
         UserWarning
-            If min_profile and fixed flexibility were both explicitly specified for a component
+            If min_capacity_factor and fixed flexibility were both specified for a component
         """
-        # convert capacity_factor and min_profile
+        # convert capacity_factor and min_capacity_factor
         self.capacity_factor = np.asarray(self.capacity_factor, float).ravel()
-        self.min_profile = np.asarray(self.min_profile, float).ravel()
+        self.min_capacity_factor = np.asarray(self.min_capacity_factor, float).ravel()
 
-        # validate installed_capacity
-        if self.installed_capacity < 0:
-            raise ValueError(
-                f"{self.name}: installed_capacity (={self.installed_capacity}) cannot be negative"
-            )
-
-        # validate capacity_factor
-        for t, cap_factor_val in enumerate(self.capacity_factor):
-            if cap_factor_val < 0 or cap_factor_val > 1:
-                raise ValueError(
-                    f"{self.name}: capacity_factor value at timestep {t} "
-                    f"({cap_factor_val}) is not between 0 and 1"
-                )
-
-        # validate min_profile
-        for t, min_val in enumerate(self.min_profile):
-            max_val = self.capacity_at_timestep(t)
-            if not (0 <= min_val <= max_val):
-                raise ValueError(
-                    f"{self.name}: min_profile value at timestep {t} is not between 0 and the "
-                    f"component's maximum operational capacity at that timestep "
-                    f"({min_val} is not in  [0, {max_val}])"
-                )
+        self._validate_caps_and_mins()
 
         # flexibility
         if self.flexibility not in ("flex", "fixed"):
             raise ValueError(
                 f"{self.name}: flexibility must be 'flex' or 'fixed', got {self.flexibility}"
-            )
-
-        if self.flexibility == "fixed" and len(self.min_profile) > 0:
-            warnings.warn(
-                f"{self.name}: both min_profile and fixed flexibility were specified. "
-                "Ignoring min_profile in order to fix the component's dispatch.",
-                UserWarning,
-                stacklevel=2,
             )
 
         # resources
@@ -183,6 +154,51 @@ class Component(ABC):
         if not all(isinstance(cf, CashFlow) for cf in self.cashflows):
             raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
 
+    def _validate_caps_and_mins(self) -> None:
+        """Performs validation checks related to capacity and minimums."""
+        # validate installed_capacity
+        if self.installed_capacity < 0:
+            raise ValueError(
+                f"{self.name}: installed_capacity (={self.installed_capacity}) cannot be negative"
+            )
+
+        # validate capacity_factor
+        for t, cap_factor_val in enumerate(self.capacity_factor):
+            if cap_factor_val < 0 or cap_factor_val > 1:
+                raise ValueError(
+                    f"{self.name}: capacity_factor value at timestep {t} "
+                    f"({cap_factor_val}) is not between 0 and 1"
+                )
+
+        # validate min_capacity_factor
+        for t, min_val in enumerate(self.min_capacity_factor):
+            if min_val < 0 or min_val > 1:
+                raise ValueError(
+                    f"{self.name}: min_capacity_factor value at "
+                    f"timestep {t} ({min_val}) is not between 0 and 1"
+                )
+
+        if self.flexibility == "fixed" and len(self.min_capacity_factor) > 0:
+            warnings.warn(
+                f"{self.name}: both min_capacity_factor and fixed flexibility were specified. "
+                "Ignoring min_capacity_factor in order to fix the component's dispatch.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        # minimum less than capacity
+        for t in range(len(self.min_capacity_factor)):
+            try:
+                if self.minimum_at_timestep(t) > self.capacity_at_timestep(t):
+                    raise ValueError(
+                        f"{self.name} minimum activity value at timestep {t} "
+                        "is greater than capacity at that timestep "
+                        f"({self.minimum_at_timestep(t)} > {self.capacity_at_timestep(t)})."
+                    )
+            except IndexError:
+                # There's no more capacity data against which to check
+                break
+
     def capacity_at_timestep(self, t: int) -> float:
         """The maximum operational capacity at the provided time index t"""
         if len(self.capacity_factor) > 0:
@@ -201,13 +217,18 @@ class Component(ABC):
 
     def minimum_at_timestep(self, t: int) -> float:
         """The minimum operational capacity at the provided time index t"""
-        if len(self.min_profile) > 0:
-            if t > len(self.min_profile) - 1:
-                raise IndexError(
-                    f"{self.name}: timestep {t} is outside of range for provided min_profile "
-                    f"data (available range is [0, {len(self.capacity_factor)}])"
+        if len(self.min_capacity_factor) > 0:
+            if t > len(self.min_capacity_factor) - 1:
+                available = (
+                    "[0]"
+                    if len(self.min_capacity_factor) == 1
+                    else f"[0, {len(self.min_capacity_factor) - 1}]"
                 )
-            return self.min_profile[t]
+                raise IndexError(
+                    f"{self.name}: timestep {t} is outside of range for provided "
+                    f"min_capacity_factor data (available range is {available})"
+                )
+            return self.installed_capacity * self.min_capacity_factor[t]
         return 0.0
 
 
@@ -279,6 +300,8 @@ class Sink(Component):
         The unique identifier for this sink component.
     demand_profile : TimeDependent
         Optional. The maximum amount that this sink can consume, by timestep.
+    min_demand_profile : TimeDependent
+        Optional. The minimum amount that this sink must consume, by timestep.
     consumes : Resource
         The resource type this sink consumes.
     **kwargs : Any
@@ -290,6 +313,9 @@ class Sink(Component):
         - If 'produces' is found in the kwargs
         - If 'capacity_resource' was specified as a resource other than that in 'consumes'
         - If the capacity was not specified properly
+        - If the minimum was not specified properly
+    UserWarning
+        - If min_demand_profile and fixed flexibility were both provided
 
     Notes
     -----
@@ -306,11 +332,16 @@ class Sink(Component):
         name: str,
         consumes: Resource,
         demand_profile: TimeDependent | None = None,
+        min_demand_profile: TimeDependent | None = None,
         **kwargs: Any,
     ) -> None:
         self.demand_profile = demand_profile
         if self.demand_profile is not None:
             self.demand_profile = np.asarray(self.demand_profile, float).ravel()
+
+        self.min_demand_profile = min_demand_profile
+        if self.min_demand_profile is not None:
+            self.min_demand_profile = np.asarray(self.min_demand_profile, float).ravel()
 
         if "produces" in kwargs:
             raise ValueError(
@@ -326,33 +357,13 @@ class Sink(Component):
                 "it will be set implicitly."
             )
 
-        if "installed_capacity" not in kwargs and demand_profile is None:
-            raise ValueError(
-                f"{name}: Insufficient capacity information provided. Please provide "
-                "(1) a demand_profile only, (2) an installed_capacity only, OR "
-                "(3) an installed_capacity with a capacity_factor."
-            )
+        self._validate_capacity(name, **kwargs)
+        self._validate_minimum(name, **kwargs)
 
         comp_init_kwargs = {"name": name, "consumes": [consumes], "capacity_resource": consumes}
         comp_init_kwargs.update(kwargs)
 
-        if demand_profile is not None:
-            bad_kwargs = ["installed_capacity", "capacity_factor"]
-            for bad_kwarg in bad_kwargs:
-                if bad_kwarg in kwargs:
-                    raise ValueError(
-                        f"{name}: Keyword arguments 'demand_profile' and '{bad_kwarg}' were both "
-                        "specified. This combination is not currently accepted for Sinks. Please "
-                        "provide (1) a demand_profile only, (2) an installed_capacity only, OR "
-                        "(3) an installed_capacity with a capacity_factor."
-                    )
-
-            for t, demand_val in enumerate(demand_profile):
-                if demand_val < 0:
-                    raise ValueError(
-                        f"{name}: demand_profile value at timestep {t} ({demand_val}) is negative"
-                    )
-
+        if self.demand_profile is not None:
             # installed_capacity should never be needed in the model if demand_profile is
             # provided, but it's still required by the Component, so we'll give it a value
             comp_init_kwargs.update({"installed_capacity": np.max(demand_profile)})
@@ -362,6 +373,74 @@ class Sink(Component):
         if self.transfer_fn is None:
             res = consumes
             self.transfer_fn = RatioTransfer(input_resources={res: 1.0}, output_resources={})
+
+    def _validate_capacity(self, name: str, **kwargs: Any) -> None:
+        """
+        Performs validation checks related to the capacity of the Sink.
+        """
+        if "installed_capacity" not in kwargs and self.demand_profile is None:
+            raise ValueError(
+                f"{name}: Insufficient capacity information provided. Please provide "
+                "(1) a demand_profile only, (2) an installed_capacity only, OR "
+                "(3) an installed_capacity with a capacity_factor."
+            )
+
+        if self.demand_profile is not None:
+            bad_kwargs = ["installed_capacity", "capacity_factor"]
+            for bad_kwarg in bad_kwargs:
+                if bad_kwarg in kwargs:
+                    raise ValueError(
+                        f"{name}: Keyword arguments 'demand_profile' and '{bad_kwarg}' were "
+                        "both specified. This combination is not currently accepted for Sinks. "
+                        "Please provide (1) a demand_profile only, (2) an installed_capacity only, "
+                        "OR (3) an installed_capacity with a capacity_factor."
+                    )
+
+            for t, demand_val in enumerate(self.demand_profile):
+                if demand_val < 0:
+                    raise ValueError(
+                        f"{name}: demand_profile value at timestep {t} ({demand_val}) is negative"
+                    )
+
+    def _validate_minimum(self, name: str, **kwargs: Any) -> None:
+        """
+        Performs validation checks related to the minimum activity of the Sink.
+        """
+        if "min_capacity_factor" in kwargs and self.min_demand_profile is not None:
+            raise ValueError(
+                f"{name}: Keyword arguments were provided for both 'min_capacity_factor' "
+                "and 'min_demand_profile'. If using demand_profile for capacity, please use "
+                "min_demand_profile. If using installed_capacity, min_capacity_factor is "
+                "preferred."
+            )
+
+        if "min_capacity_factor" in kwargs and self.demand_profile is not None:
+            raise ValueError(
+                f"{name}: Keyword argument for 'min_capacity_factor' was provided along "
+                "with a demand_profile. Please use 'min_demand_profile' for minimums on sinks "
+                "with demand_profile specified."
+            )
+
+        if self.min_demand_profile is not None and kwargs.get("flexibility") == "fixed":
+            warnings.warn(
+                f"{name}: both min_demand_profile and fixed flexibility were specified. "
+                "Ignoring min_demand_profile in order to fix the component's dispatch.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if self.min_demand_profile is not None:
+            for t in range(len(self.min_demand_profile)):
+                try:
+                    if self.minimum_at_timestep(t) > self.capacity_at_timestep(t):
+                        raise ValueError(
+                            f"{name} minimum activity value at timestep {t} "
+                            "is greater than capacity at that timestep "
+                            f"({self.minimum_at_timestep(t)} > {self.capacity_at_timestep(t)})."
+                        )
+                except IndexError:
+                    # There's no more capacity data against which to check
+                    break
 
     def capacity_at_timestep(self, t: int) -> float:
         """
@@ -381,6 +460,27 @@ class Sink(Component):
             )
 
         return self.demand_profile[t]
+
+    def minimum_at_timestep(self, t: int) -> float:
+        """
+        Returns the minimum amount that the sink must consume at the given time index t.
+        Overload of Component.minimum_at_timestep that incorporates min_demand_profile.
+        """
+        if self.min_demand_profile is None:
+            return super().minimum_at_timestep(t)
+
+        if t > len(self.min_demand_profile) - 1:
+            available = (
+                "[0]"
+                if len(self.min_demand_profile) == 1
+                else f"[0, {len(self.min_demand_profile) - 1}]"
+            )
+            raise IndexError(
+                f"{self.name}: timestep {t} is outside of range for provided min_demand_profile "
+                f"data (available range is {available})"
+            )
+
+        return self.min_demand_profile[t]
 
 
 @dataclass

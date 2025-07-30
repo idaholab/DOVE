@@ -28,7 +28,7 @@ def generic_system_setup():
             "name": "steam_source",
             "produces": steam,
             "installed_capacity": 100,
-            "min_profile": np.full(times, 50),  # Force the system to do something at least
+            "min_capacity_factor": np.full(times, 0.5),  # Force the system to do something at least
         }
         if source_cfs:
             src_init_kwargs.update({"cashflows": source_cfs})
@@ -200,7 +200,7 @@ def test_cashflow_combos(generic_system_setup):
             name="elec_source",
             produces=sys.res_map["electricity"],
             installed_capacity=20,
-            min_profile=np.full(times, 10),
+            min_capacity_factor=np.full(times, 0.5),
             cashflows=[source2_fuel_cost, source2_revenue],
         )
     )

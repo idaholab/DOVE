@@ -159,7 +159,14 @@ class System:
         time_series_errors = ""
         min_length = max(self.dispatch_window) + 1
         for comp in self.components:
-            time_series = {"capacity_factor": comp.capacity_factor, "min_profile": comp.min_profile}
+            time_series = {
+                "capacity_factor": comp.capacity_factor,
+                "min_capacity_factor": comp.min_capacity_factor,
+            }
+            if getattr(comp, "demand_profile", None) is not None:
+                time_series.update({"demand_profile": comp.demand_profile})
+            if getattr(comp, "min_demand_profile", None) is not None:
+                time_series.update({"min_demand_profile": comp.min_demand_profile})
             time_series.update(
                 {f"{cf.name} price_profile": cf.price_profile for cf in comp.cashflows}
             )
