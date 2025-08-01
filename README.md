@@ -1,4 +1,5 @@
-TODO: Logo here?
+<img src="./docs/source/assets/DOVE_light_mode.png" width="600">
+
 # Dispatch Optimization Variable Engine (DOVE)
 [![tests](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml)
 
@@ -13,7 +14,7 @@ pip install dove-inl
 ```
 
 ### Install from Source
-DOVE may be downloaded from source according to the procedure outlined below. If you would like to contribute to DOVE, please refer to the [Developers](#developers) section as you follow these instructions. If you are not interested in contributing but would still like access to the source code, these instructions are sufficient.
+DOVE may be downloaded from source according to the procedure outlined below. If you would like to contribute to DOVE, please refer to the [Developer Reference](https://idaholab.github.io/DOVE/references/developer.html) documentation page as you follow these instructions. If you are not interested in contributing but would still like access to the source code, these instructions are sufficient.
 
 First, ensure that the necessary prerequisites are installed on your system:
 - **Python 3.11+** ([Download Python](https://www.python.org/downloads/))
@@ -39,14 +40,14 @@ uv run pytest
 ```
 
 # Quick-Start
-Once DOVE has been installed, it can be used as a python library. DOVE contains three main types of objects: Resources, Components, and Systems.
+Once DOVE has been installed, it can be used as a library in a python script. DOVE contains three main types of objects: Resources, Components, and Systems.
 - **Resources** refer to quantities that can be produced, consumed, converterted, and stored. Examples are electricity, heat, hydrogen, etc.
 - **Components** are objects that perform actions on resources. Four types of Components are available in DOVE. Sources produce a specified resource; Sinks consume a specified resource; Converters change one or more resource into one or more other resources; and Storage components store resources across multiple timesteps.
-- **Systems** contain a set of Resources and Components and are responsible for solving the optimization problem. Systems also take an argument to specify the time window over which the optimization should run. Usually only one system is created for each dispatch problem.
+- **Systems** contain sets of Resources and Components and are responsible for solving the optimization problem. Systems also take an argument to specify the time window over which the optimization should run. Usually only one system is created for each dispatch problem.
 
 Consider a simple energy system with a nuclear power plant and generator, wind turbines, and battery storage, connected to a grid. The resource flow for this system is shown below:
 
-![Energy Flow Diagram](./images/energy_flow_diagram_minimal.png)
+<img src="./docs/source/assets/energy_flow_diagram_minimal.png" width="800">
 
 Dispatch for this system can be economically optimized using DOVE in a python script:
 
