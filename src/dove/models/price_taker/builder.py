@@ -125,7 +125,8 @@ class PriceTakerBuilder(BaseModelBuilder):
         """
         m = self.model
         data = {}
-        T = self.system.time_index
+        T = self.system.dispatch_window
+        net_cashflow = [0.0] * len(T)
         for comp in self.system.components:
             for res in comp.produces + comp.consumes:
                 # Since everything is defined as positive flow, we need to flip the sign
@@ -139,6 +140,14 @@ class PriceTakerBuilder(BaseModelBuilder):
                 data[f"{comp.name}_SOC"] = [pyo.value(m.soc[comp.name, t]) for t in T]
                 data[f"{comp.name}_charge"] = [pyo.value(m.charge[comp.name, t]) for t in T]
                 data[f"{comp.name}_discharge"] = [pyo.value(m.discharge[comp.name, t]) for t in T]
+
+            for cf in comp.cashflows:
+                for t in T:
+                    net_cashflow[t] += cf.evaluate(
+                        t, pyo.value(m.flow[comp.name, comp.capacity_resource.name, t])
+                    )
+
+        data["net_cashflow"] = net_cashflow
         data["objective"] = [pyo.value(m.objective)]
         return pd.DataFrame(data, index=T)
 
@@ -158,7 +167,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         self.model.NON_STORAGE = pyo.Set(initialize=non_storage_comp_names)
         self.model.STORAGE = pyo.Set(initialize=storage_comp_names)
         self.model.R = pyo.Set(initialize=[r.name for r in self.system.resources])
-        self.model.T = pyo.Set(initialize=self.system.time_index, ordered=True)
+        self.model.T = pyo.Set(initialize=self.system.dispatch_window, ordered=True)
 
     def _add_variables(self) -> None:
         """
@@ -212,8 +221,8 @@ class PriceTakerBuilder(BaseModelBuilder):
 
         Adds various constraints including:
         - Resource transfer constraints
-        - Maximum capacity constraints
-        - Minimum capacity constraints
+        - Capacity constraints
+        - Minimum constraints
         - Resource balance constraints
         - Storage balance constraints
         - Charging/discharging limits
@@ -223,8 +232,8 @@ class PriceTakerBuilder(BaseModelBuilder):
         """
         m = self.model
 
-        m.max_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.max_capacity_rule)
-        m.min_capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.min_capacity_rule)
+        m.capacity = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.capacity_rule)
+        m.minimum = pyo.Constraint(m.NON_STORAGE, m.T, rule=prl.minimum_rule)
 
         m.resource_balance = pyo.Constraint(m.R, m.T, rule=prl.balance_rule)
 
