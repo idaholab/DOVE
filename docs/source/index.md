@@ -38,6 +38,9 @@ user-guide/examples.md
 
 ### 📖 References
 
+* <project:./api/dove.rst>
+* <project:./references/developer.md>
+
 
 ```{toctree}
 :hidden:

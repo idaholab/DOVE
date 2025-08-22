@@ -60,4 +60,9 @@ html_theme_options = {
     "use_repository_button": True,
     "show_navbar_depth": 1,
     "show_toc_level": 2,
+    "logo": {
+      "image_light": "assets/DOVE_light_mode.png",
+      "image_dark": "assets/DOVE_dark_mode.png",
+    }
+
 }

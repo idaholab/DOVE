@@ -37,7 +37,9 @@ Use `uv` to synchronize your environment with the project's lockfile:
 uv sync --all-packages
 ```
 
-> **Note:** This command installs both runtime and development dependencies as specified in your `pyproject.toml` and `uv.lock` files.
+```{note}
+   This command installs both runtime and development dependencies as specified in your `pyproject.toml` and `uv.lock` files.
+```
 
 ---
 
@@ -49,10 +51,14 @@ Set up Git hooks to enforce code quality checks automatically:
 pre-commit install --install-hooks
 ```
 
-> **Optional:** To run all hooks on all files manually:
-> ```bash
-> pre-commit run --all-files
-> ```
+````{admonition} Optional
+   :class: note
+
+   To run all hooks on all files manually:
+   ```bash
+   pre-commit run --all-files
+   ```
+````
 
 ---
 
@@ -81,8 +87,9 @@ uv run ruff check --fix
 ```bash
 uv run ruff format .
 ```
-> **Note:** Ruff configurations are defined in `pyproject.toml`.
-
+```{note}
+Ruff configurations are defined in `pyproject.toml`.
+```
 ### 3. Run Tests with Pytest
 
 - **Execute all tests:**

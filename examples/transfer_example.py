@@ -31,6 +31,13 @@ if __name__ == "__main__":
         flexibility="fixed",
     )
 
+    collaboration_source = dc.Source(
+        name="CollaborationSource",
+        produces=collaboration,
+        installed_capacity=100,
+        flexibility="fixed",
+    )
+
     balance_ratio_1 = dc.Converter(
         name="BalanceRatio1",
         consumes=[funding],

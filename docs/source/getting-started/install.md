@@ -1,7 +1,6 @@
 # Installation
 
-```{admonition} Coming Soon!
-:class: warning
-
-This part of the documentation is currently under construction.
+```{include} ../../../README.md
+:start-after: Installation
+:end-before: Quick-Start
 ```
