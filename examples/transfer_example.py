@@ -13,21 +13,21 @@ if __name__ == "__main__":
     funding_source = dc.Source(
         name="FundingSource",
         produces=funding,
-        max_capacity_profile=[200],
+        installed_capacity=200,
         flexibility="fixed",
     )
 
     labor_source = dc.Source(
         name="LaborSource",
         produces=labor,
-        max_capacity_profile=[500],
+        installed_capacity=500,
         flexibility="fixed",
     )
 
     collaboration_source = dc.Source(
         name="CollaborationSource",
         produces=collaboration,
-        max_capacity_profile=[100],
+        installed_capacity=100,
         flexibility="fixed",
     )
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
         consumes=[funding],
         produces=[work],
         capacity_resource=funding,
-        max_capacity_profile=[100],
+        installed_capacity=100,
         transfer_fn=dc.RatioTransfer(input_resources={funding: 1.0}, output_resources={work: 0.25}),
     )
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         name="BalanceRatio2",
         consumes=[collaboration],
         produces=[funding, work],
-        max_capacity_profile=[100],
+        installed_capacity=100,
         capacity_resource=collaboration,
         transfer_fn=dc.RatioTransfer(
             input_resources={collaboration: 1.0}, output_resources={funding: 0.2, work: 0.1}
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         consumes=[funding, labor],
         produces=[work],
         capacity_resource=funding,
-        max_capacity_profile=[100],
+        installed_capacity=100,
         transfer_fn=dc.PolynomialTransfer(
             [
                 (0.9, {funding: 1}),
@@ -69,21 +69,21 @@ if __name__ == "__main__":
     work_sink = dc.Sink(
         name="Milestones",
         consumes=work,
-        max_capacity_profile=[6e3],
+        demand_profile=[6e3],
         cashflows=[dc.Revenue("proposals", alpha=1.0)],
     )
 
     funding_sink = dc.Sink(
         name="Outsource",
         consumes=funding,
-        max_capacity_profile=[150],
+        demand_profile=[150],
         cashflows=[dc.Cost("contracts", alpha=1.0)],
     )
 
     labor_sink = dc.Sink(
         name="BusyWork",
         consumes=labor,
-        max_capacity_profile=[500],
+        demand_profile=[500],
         cashflows=[dc.Cost("other_work", alpha=1.0)],
     )
 

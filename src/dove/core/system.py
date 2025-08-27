@@ -51,10 +51,10 @@ class System:
         self,
         components: list[Component] | None = None,
         resources: list[Resource] | None = None,
-        time_index: list[int] | None = None,
+        dispatch_window: list[int] | None = None,
     ) -> None:
         """
-        Initialize a System instance.
+        Initialize a System instance and validate it.
 
         Parameters
         ----------
@@ -62,17 +62,14 @@ class System:
             The components to include in the system. If None, an empty list is used.
         resources : list[Resource] | None, optional
             The resources to include in the system. If None, an empty list is used.
-        time_index : list[int] | None, optional
-            The time periods for simulation. If None, [0] is used.
+        dispatch_window : list[int] | None, optional
+            The time indices for simulation. If None, [0] is used.
         """
         self.components: list[Component] = [] if components is None else components
-        self.verify_components_definition()
         self.resources: list[Resource] = [] if resources is None else resources
-        self.verify_resources_definition()
-        self.time_index = [0] if time_index is None else time_index
+        self.dispatch_window = [0] if dispatch_window is None else dispatch_window
         self.comp_map: dict[str, Component] = {comp.name: comp for comp in self.components}
         self.res_map: dict[str, Resource] = {res.name: res for res in self.resources}
-        self.verify_time_series()
 
     @property
     def non_storage_comp_names(self) -> list[str]:
@@ -99,71 +96,9 @@ class System:
             "storage_components": self.storage_comp_names,
             "num_resources": len(self.resources),
             "resource_names": [r.name for r in self.resources],
-            "time_horizon": len(self.time_index),
+            "dispatch_window_length": len(self.dispatch_window),
         }
         print(info)
-
-    def verify_components_definition(self) -> None:
-        """
-        Verify that components are valid.
-
-        Checks for:
-        - Uniqueness of component names
-
-        Raises
-        ------
-        ValueError
-            If component names are not unique
-        """
-        # Check for unique component names
-        component_names = [comp.name for comp in self.components]
-        if len(component_names) != len(set(component_names)):
-            raise ValueError("Component names must be unique!")
-
-    def verify_resources_definition(self) -> None:
-        """
-        Verify that resources are valid.
-
-        Checks for:
-        - Type of resources
-        - Uniqueness of resource names
-
-        Raises
-        ------
-        TypeError
-            If any resource is not of type Resource
-        ValueError
-            If resource names are not unique
-        """
-        # Check the types of the resources
-        for res in self.resources:
-            if not isinstance(res, Resource):
-                raise TypeError(f"Type of {res} is not Resource.")
-
-        # Check for unique resource names
-        resource_names = [res.name for res in self.resources]
-        if len(resource_names) != len(set(resource_names)):
-            raise ValueError("Resource names must be unique!")
-
-    def verify_time_series(self) -> None:
-        """
-        Verify the integrity of the system's time series.
-
-        Checks for:
-        - Consistency of time series lengths with the system time index
-
-        Raises
-        ------
-        ValueError
-            If component capacity profile length doesn't match time index length
-        """
-        # Check that time index length matches component capacity profiles
-        for comp in self.components:
-            if len(comp.max_capacity_profile) != len(self.time_index):
-                raise ValueError(
-                    f"Component '{comp.name}' has a capacity profile length "
-                    "that does not match the time index length!"
-                )
 
     def add_component(self, comp: Component) -> Self:
         """
@@ -178,15 +113,8 @@ class System:
         -------
         Self
             The system instance for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If the component validation fails (via verify method).
         """
         self.components.append(comp)
-        self.verify_components_definition()
-        self.verify_time_series()
         self.comp_map[comp.name] = comp
         return self
 
@@ -205,9 +133,54 @@ class System:
             The system instance for method chaining.
         """
         self.resources.append(res)
-        self.verify_resources_definition()
         self.res_map[res.name] = res
         return self
+
+    def _validate(self) -> None:
+        """
+        Validate the system.
+
+        Checks that:
+        - Component names are unique
+        - Resource names are unique
+        - Time series data has been provided that covers the dispatch_window
+        """
+        # Check for unique component names
+        component_names = [comp.name for comp in self.components]
+        if len(component_names) != len(set(component_names)):
+            raise ValueError("Component names must be unique!")
+
+        # Check for unique resource names
+        resource_names = [res.name for res in self.resources]
+        if len(resource_names) != len(set(resource_names)):
+            raise ValueError("Resource names must be unique!")
+
+        # Check that the necessary time series data is available
+        time_series_errors = ""
+        min_length = max(self.dispatch_window) + 1
+        for comp in self.components:
+            time_series = {
+                "capacity_factor": comp.capacity_factor,
+                "min_capacity_factor": comp.min_capacity_factor,
+            }
+            if getattr(comp, "demand_profile", None) is not None:
+                time_series.update({"demand_profile": comp.demand_profile})
+            if getattr(comp, "min_demand_profile", None) is not None:
+                time_series.update({"min_demand_profile": comp.min_demand_profile})
+            time_series.update(
+                {f"{cf.name} price_profile": cf.price_profile for cf in comp.cashflows}
+            )
+
+            for ts_name, ts_data in time_series.items():
+                if len(ts_data) > 0 and len(ts_data) < min_length:
+                    error_msg = (
+                        f"\n{comp.name}: time series data for {ts_name} is of insufficient length "
+                        f"to cover the system's dispatch_window ({len(ts_data)} < {min_length})."
+                    )
+                    time_series_errors += error_msg
+
+        if len(time_series_errors) > 0:
+            raise ValueError(time_series_errors)
 
     def build(self) -> None:
         """
@@ -226,7 +199,7 @@ class System:
 
     def solve(self, model_type: str = "price_taker", **kw: dict[str, Any]) -> Any:
         """
-        Solve the system optimization problem.
+        Validate the final system and solve the system optimization problem.
 
         Parameters
         ----------
@@ -245,6 +218,8 @@ class System:
         ValueError
             If the specified model_type is not registered.
         """
+        self._validate()
+
         try:
             builder_cls = BUILDER_REGISTRY[model_type]
         except KeyError as err:

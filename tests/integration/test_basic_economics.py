@@ -27,8 +27,8 @@ def generic_system_setup():
         src_init_kwargs = {
             "name": "steam_source",
             "produces": steam,
-            "max_capacity_profile": np.full(times, 100),
-            "min_capacity_profile": np.full(times, 50),  # Force the system to do something at least
+            "installed_capacity": 100,
+            "min_capacity_factor": np.full(times, 0.5),  # Force the system to do something at least
         }
         if source_cfs:
             src_init_kwargs.update({"cashflows": source_cfs})
@@ -38,7 +38,7 @@ def generic_system_setup():
             "name": "steam_to_elec_converter",
             "consumes": [steam],
             "produces": [electricity],
-            "max_capacity_profile": np.full(times, 100),
+            "installed_capacity": 100,
             "capacity_resource": steam,
             "transfer_fn": dc.RatioTransfer(
                 input_resources={steam: 1.0}, output_resources={electricity: 0.5}
@@ -51,7 +51,7 @@ def generic_system_setup():
         stor_init_kwargs = {
             "name": "elec_storage",
             "resource": electricity,
-            "max_capacity_profile": np.full(times, 40),
+            "installed_capacity": 40,
             "rte": 0.9,
             "max_charge_rate": 0.5,
             "max_discharge_rate": 0.5,
@@ -63,20 +63,20 @@ def generic_system_setup():
         sink_init_kwargs = {
             "name": "elec_sink",
             "consumes": electricity,
-            "max_capacity_profile": np.full(times, 100),
+            "demand_profile": np.full(times, 100),
         }
         if sink_cfs:
             sink_init_kwargs.update({"cashflows": sink_cfs})
         sink = dc.Sink(**sink_init_kwargs)
 
         # Times
-        time_index = np.arange(0, times)
+        dispatch_window = np.arange(0, times)
 
         # System
         sys = dc.System(
             components=[source, converter, storage, sink],
             resources=[steam, electricity],
-            time_index=time_index,
+            dispatch_window=dispatch_window,
         )
 
         return sys
@@ -101,6 +101,7 @@ def test_with_no_cfs(generic_system_setup):
             "elec_storage_charge": [0.0],
             "elec_storage_discharge": [0.0],
             "elec_sink_electricity_consumes": [-25.0],
+            "net_cashflow": [0.0],
             "objective": [0],
         }
     )
@@ -131,6 +132,7 @@ def test_with_costs_only(generic_system_setup):
             "elec_storage_charge": [20.0, 20.0, 20.0, 20.0],
             "elec_storage_discharge": [18.0, 18, 16.0, 20.0],
             "elec_sink_electricity_consumes": [-23.0, -23.0, -21.0, -25.0],
+            "net_cashflow": [-73.0, -73.0, -71.0, -75.0],
             "objective": [-292.0, -292.0, -292.0, -292.0],
         }
     )
@@ -160,6 +162,7 @@ def test_with_revenues_only(generic_system_setup):
             "elec_storage_charge": [2.222222, 20.0, 0.0, 0.0],
             "elec_storage_discharge": [0.0, 0.0, 20.0, 0.0],
             "elec_sink_electricity_consumes": [-47.777778, -30.0, -70.0, -50.0],
+            "net_cashflow": [47.777778, 30.0, 210.0, 50.0],
             "objective": [337.777778, 337.777778, 337.777778, 337.777778],
         }
     )
@@ -196,8 +199,8 @@ def test_cashflow_combos(generic_system_setup):
         dc.Source(
             name="elec_source",
             produces=sys.res_map["electricity"],
-            max_capacity_profile=np.full(times, 20),
-            min_capacity_profile=np.full(times, 10),
+            installed_capacity=20,
+            min_capacity_factor=np.full(times, 0.5),
             cashflows=[source2_fuel_cost, source2_revenue],
         )
     )
@@ -215,6 +218,7 @@ def test_cashflow_combos(generic_system_setup):
             "elec_storage_charge": [20.0, 0.0, 0.0, 0.0],
             "elec_storage_discharge": [0.0, 18.0, 0.0, 0.0],
             "elec_sink_electricity_consumes": [-50.0, -88.0, -70.0, -70.0],
+            "net_cashflow": [160.0, 1244.0, 330.0, 425.0],
             "objective": [2159.0, 2159.0, 2159.0, 2159.0],
         }
     )

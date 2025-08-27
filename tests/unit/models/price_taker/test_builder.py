@@ -32,12 +32,12 @@ def create_example_system():
     steam_source = dc.Source(
         name="steam_source",
         produces=steam,
-        max_capacity_profile=[2.0, 2.0, 2.0],
+        installed_capacity=2.0,
     )
 
     steam_to_elec_converter = dc.Converter(
         name="steam_to_elec_converter",
-        max_capacity_profile=[1.0, 1.0, 1.0],
+        installed_capacity=1.0,
         consumes=[steam],
         produces=[elec],
         capacity_resource=steam,
@@ -49,15 +49,19 @@ def create_example_system():
     elec_sink = dc.Sink(
         name="elec_sink",
         consumes=elec,
-        max_capacity_profile=[1.0, 1.0, 1.0],
-        min_capacity_profile=[0.5, 0.5, 0.5],
+        demand_profile=[1.0, 1.0, 1.0],
+        min_demand_profile=[0.5, 0.5, 0.5],
+        cashflows=[
+            dc.Revenue(name="sales", price_profile=[3.0, 0.0, 1.0]),
+            dc.Cost(name="incidental", alpha=1.0),
+        ],
     )
 
     # Storage
     steam_storage = dc.Storage(
         name="steam_storage",
         resource=steam,
-        max_capacity_profile=[1.0, 1.0, 1.0],
+        installed_capacity=1.0,
         initial_stored=0.5,
         periodic_level=True,
     )
@@ -67,7 +71,7 @@ def create_example_system():
         resource=elec,
         max_charge_rate=0.5,
         max_discharge_rate=0.25,
-        max_capacity_profile=[2.0, 2.0, 2.0],
+        installed_capacity=2.0,
         initial_stored=0.2,
         periodic_level=False,
     )
@@ -75,10 +79,10 @@ def create_example_system():
     components = [steam_source, steam_to_elec_converter, elec_sink, steam_storage, elec_storage]
 
     ### Set up times
-    time_index = [0, 1, 2]
+    dispatch_window = [0, 1, 2]
 
     ### Create and return system
-    sys = dc.System(components, resources, time_index)
+    sys = dc.System(components, resources, dispatch_window)
     return sys
 
 
@@ -113,7 +117,7 @@ def test_add_sets(builder_setup):
     expected_non_storage = sys.non_storage_comp_names
     expected_storage = sys.storage_comp_names
     expected_r = [r.name for r in sys.resources]
-    expected_t = sys.time_index
+    expected_t = sys.dispatch_window
 
     # Convert both actual (tuple) and expected (list) values to the same types and check their values
 
@@ -153,9 +157,9 @@ def test_add_variables(builder_setup):
     sys = builder_setup.system
     res_names = [r.name for r in sys.resources]
 
-    expected_flow_keys = set(product(sys.non_storage_comp_names, res_names, sys.time_index))
-    expected_storage_keys = set(product(sys.storage_comp_names, sys.time_index))
-    expected_ramp_keys = set(product(sys.non_storage_comp_names, sys.time_index))
+    expected_flow_keys = set(product(sys.non_storage_comp_names, res_names, sys.dispatch_window))
+    expected_storage_keys = set(product(sys.storage_comp_names, sys.dispatch_window))
+    expected_ramp_keys = set(product(sys.non_storage_comp_names, sys.dispatch_window))
 
     # Check that sets of keys are as expected
     assert actual_flow_keys == expected_flow_keys
@@ -298,7 +302,7 @@ def check_constraint():
 
 
 @pytest.mark.unit()
-def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, check_constraint):
+def test_add_constraints_adds_capacity_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
     # Set up required vars for input
@@ -334,11 +338,11 @@ def test_add_constraints_adds_max_capacity_constraint(add_constraints_setup, che
     }
 
     # Verify constraint
-    check_constraint(m, "max_capacity", False, expected_cap_result)
+    check_constraint(m, "capacity", False, expected_cap_result)
 
 
 @pytest.mark.unit()
-def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, check_constraint):
+def test_add_constraints_adds_minimum_constraint(add_constraints_setup, check_constraint):
     m = add_constraints_setup.model
 
     # Set up required vars for input
@@ -371,7 +375,7 @@ def test_add_constraints_adds_min_capacity_constraint(add_constraints_setup, che
     }
 
     # Verify constraint
-    check_constraint(m, "min_capacity", False, expected_min_cap_result)
+    check_constraint(m, "minimum", False, expected_min_cap_result)
 
 
 @pytest.mark.unit()
@@ -953,10 +957,15 @@ def test_build(create_example_system):
         assert pyo_var is not None
         assert isinstance(pyo_var, pyo.Var)
 
+    # Check that transfer block was added
+    pyo_transfer = getattr(builder.model, "transfer", None)
+    assert pyo_transfer is not None
+    assert isinstance(pyo_transfer, pyo.Block)
+
     # Check that constraints were added
     expected_constr_names = [
-        "max_capacity",
-        "min_capacity",
+        "capacity",
+        "minimum",
         "resource_balance",
         "storage_balance",
         "charge_limit",
@@ -992,7 +1001,7 @@ def test_extract_results(create_example_system):
     # Set up flow
     m.flow.set_values(
         {
-            ("elec_sink", "electricity", 0): 0.5,
+            ("elec_sink", "electricity", 0): 0.9,
             ("elec_sink", "electricity", 1): 0.5,
             ("elec_sink", "electricity", 2): 0.5,
             ("elec_sink", "steam", 0): None,
@@ -1001,9 +1010,9 @@ def test_extract_results(create_example_system):
             ("steam_source", "electricity", 0): None,
             ("steam_source", "electricity", 1): None,
             ("steam_source", "electricity", 2): None,
-            ("steam_source", "steam", 0): 1.0,
-            ("steam_source", "steam", 1): 1.5,
-            ("steam_source", "steam", 2): 1.0,
+            ("steam_source", "steam", 0): 0.5,
+            ("steam_source", "steam", 1): 1.0,
+            ("steam_source", "steam", 2): 1.5,
             ("steam_to_elec_converter", "electricity", 0): 0.5,
             ("steam_to_elec_converter", "electricity", 1): 0.5,
             ("steam_to_elec_converter", "electricity", 2): 0.5,
@@ -1019,8 +1028,8 @@ def test_extract_results(create_example_system):
             ("elec_storage", 0): 0.0,
             ("elec_storage", 1): 0.0,
             ("elec_storage", 2): 0.0,
-            ("steam_storage", 0): 0.5,
-            ("steam_storage", 1): 1.0,
+            ("steam_storage", 0): 0.0,
+            ("steam_storage", 1): 0.0,
             ("steam_storage", 2): 0.5,
         }
     )
@@ -1028,12 +1037,12 @@ def test_extract_results(create_example_system):
     # Set up charge, discharge, and soc
     m.discharge.set_values(
         {
-            ("elec_storage", 0): 0.0,
+            ("elec_storage", 0): 0.4,
             ("elec_storage", 1): 0.0,
             ("elec_storage", 2): 0.0,
             ("steam_storage", 0): 0.5,
-            ("steam_storage", 1): 0.5,
-            ("steam_storage", 2): 0.5,
+            ("steam_storage", 1): 0.0,
+            ("steam_storage", 2): 0.0,
         }
     )
 
@@ -1043,12 +1052,12 @@ def test_extract_results(create_example_system):
             ("elec_storage", 1): 0.0,
             ("elec_storage", 2): 0.0,
             ("steam_storage", 0): 0.0,
-            ("steam_storage", 1): 0.5,
+            ("steam_storage", 1): 0.0,
             ("steam_storage", 2): 0.5,
         }
     )
 
-    m.objective.set_value(0.0)
+    m.objective.set_value(1.3)
 
     # Call the method under test
     actual_data = builder.extract_results()
@@ -1057,18 +1066,19 @@ def test_extract_results(create_example_system):
 
     expected_data = pd.DataFrame(
         {
-            "steam_source_steam_produces": [1.0, 1.5, 1.0],
+            "steam_source_steam_produces": [0.5, 1.0, 1.5],
             "steam_to_elec_converter_electricity_produces": [0.5, 0.5, 0.5],
             "steam_to_elec_converter_steam_consumes": [-1.0, -1.0, -1.0],
-            "elec_sink_electricity_consumes": [-0.5, -0.5, -0.5],
-            "steam_storage_SOC": [0.0, 0.5, 0.5],
-            "steam_storage_charge": [0.5, 1.0, 0.5],
-            "steam_storage_discharge": [0.5, 0.5, 0.5],
+            "elec_sink_electricity_consumes": [-0.9, -0.5, -0.5],
+            "steam_storage_SOC": [0.0, 0.0, 0.5],
+            "steam_storage_charge": [0.0, 0.0, 0.5],
+            "steam_storage_discharge": [0.5, 0.0, 0.0],
             "elec_storage_SOC": [0.0, 0.0, 0.0],
             "elec_storage_charge": [-0.0, 0.0, 0.0],
-            "elec_storage_discharge": [0.0, 0.0, 0.0],
-            "objective": [0.0, 0.0, 0.0],
+            "elec_storage_discharge": [0.4, 0.0, 0.0],
+            "net_cashflow": [1.8, -0.5, 0.0],
+            "objective": [1.3, 1.3, 1.3],
         }
     )
 
-    assert actual_data.equals(expected_data)
+    pd.testing.assert_frame_equal(actual_data, expected_data, check_like=True)
