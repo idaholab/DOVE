@@ -3,18 +3,14 @@
 # Dispatch Optimization Variable Engine (DOVE)
 [![tests](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/idaholab/DOVE/actions/workflows/run-tests.yml)
 
+DOVE is a python library developed at Idaho National Laboratory that performs dispatch optimization for energy systems. Dispatch in this context refers to the time-dependent activity levels of components in an energy system, bounded by constraints such as component capacities or resource conversion ratios. Within these constraints, DOVE applies user-provided economic data to generate an optimally profitable dispatch solution for the system. Especially well-suited for integrated energy system analysis, DOVE is equipped to handle a system involving an arbitrary number of resources with any number of respective resource markets. Its design prioritizes ease of use, and it features intuitive syntax and a pythonic structure while maintaining the flexibility to handle complex scenarios.
+
 # Installation
 
 Regardless of the installation method you select, you must ensure that you have the necessary solver(s) installed on your system in order to use DOVE. DOVE uses Pyomo for optimization and supports any solver supported by your Pyomo version.
 
-### Install Using Pip (Recommended) (TODO: Waiting on PyPI release)
-If you do not need access to the source code for DOVE, the simplest method of installation is to run the following:
-```
-pip install dove-inl
-```
-
-### Install from Source
-DOVE may be downloaded from source according to the procedure outlined below. If you would like to contribute to DOVE, please refer to the [Developer Reference](https://idaholab.github.io/DOVE/references/developer.html) documentation page as you follow these instructions. If you are not interested in contributing but would still like access to the source code, these instructions are sufficient.
+## Install from Source
+If you would like to contribute to DOVE, please refer to the [Developer Reference](https://idaholab.github.io/DOVE/references/developer.html) documentation page. If you are not interested in contributing, these instructions are sufficient.
 
 First, ensure that the necessary prerequisites are installed on your system:
 - **Python 3.11+** ([Download Python](https://www.python.org/downloads/))
@@ -27,23 +23,17 @@ mkdir projects
 cd projects
 git clone https://github.com/idaholab/DOVE.git
 ```
-Next, dependencies can be installed using uv while in the DOVE directory:
-```
-cd DOVE
-uv sync
-```
-> Note that this command also automatically creates an environment located at `DOVE/.venv`, in which the dependencies are installed. Prepending `uv run` to commands while in the DOVE directory will automatically load this environment.
 
-Finally, to verify your installation, run tests:
+Next, the project can be installed using pip:
 ```
-uv run pytest
+pip install DOVE
 ```
 
 # Quick-Start
-Once DOVE has been installed, it can be used as a library in a python script. DOVE contains three main types of objects: Resources, Components, and Systems.
+DOVE contains three main types of objects: Resources, Components, and Systems.
 - **Resources** refer to quantities that can be produced, consumed, converterted, and stored. Examples are electricity, heat, hydrogen, etc.
 - **Components** are objects that perform actions on resources. Four types of Components are available in DOVE. Sources produce a specified resource; Sinks consume a specified resource; Converters change one or more resource into one or more other resources; and Storage components store resources across multiple timesteps.
-- **Systems** contain sets of Resources and Components and are responsible for solving the optimization problem. Systems also take an argument to specify the time window over which the optimization should run. Usually only one system is created for each dispatch problem.
+- **Systems** each contain a set of Resources and a set of Components and are responsible for solving the optimization problem. Systems also take an argument to specify the time window over which the optimization should run. Usually only one system is created for each dispatch problem.
 
 Consider a simple energy system with a nuclear power plant and generator, wind turbines, and battery storage, connected to a grid. The resource flow for this system is shown below:
 
@@ -57,46 +47,50 @@ import dove.core as dc
 steam = dc.Resource(name="steam")
 elec = dc.Resource(name="electricity")
 
-nuclear = dc.Source(name="nuclear", produces=steam, max_capacity_profile=[3, 3])
+nuclear = dc.Source(name="nuclear", produces=steam, installed_capacity=3)
 gen = dc.Converter(
     name="generator",
     consumes=[steam],
     produces=[elec],
     capacity_resource=elec,
-    max_capacity_profile=[3, 3],
-    transfer_fn=dc.RatioTransfer(input_res=steam, output_res=elec, ratio=1.0),
+    installed_capacity=3,
+    transfer_fn=dc.RatioTransfer(input_resources={steam: 1.0}, output_resources={elec: 1.0}),
 )
-wind = dc.Source(name="wind", produces=elec, max_capacity_profile=[1, 2])
-battery = dc.Storage(name="battery", resource=elec, max_capacity_profile=[1, 1], rte=0.9)
+wind = dc.Source(name="wind", produces=elec, installed_capacity=2, capacity_factor=[0.5, 1.0])
+battery = dc.Storage(name="battery", resource=elec, installed_capacity=1, rte=0.9)
 grid = dc.Sink(
     name="grid",
     consumes=elec,
-    max_capacity_profile=[3, 6],
+    demand_profile=[3, 6],
     cashflows=[dc.Revenue(name="elec_sales", alpha=1.0)],
 )
 
 sys = dc.System(
-    components=[nuclear, gen, wind, battery, grid], resources=[steam, elec], time_index=[0, 1]
+    components=[nuclear, gen, wind, battery, grid], resources=[steam, elec], dispatch_window=[0, 1]
 )
 results = sys.solve("price_taker")
 print(results)
 with open("simple_demo.csv", "w") as f:
     f.write(results.to_csv())
 ```
-This script can be run in the uv environment and will print the dispatch results as well as writing them to a csv file called "simple_demo.csv":
+This script will print the dispatch results as well as writing them to a csv file called "simple_demo.csv":
 ```
->>> uv run python examples/simple_demonstration.py
-   nuclear_steam_produces  generator_electricity_produces  ...  grid_electricity_consumes  objective
-0                     3.0                             3.0  ...                       -3.0        8.9
-1                     3.0                             3.0  ...                       -5.9        8.9
+>>> python examples/simple_demonstration.py
+   nuclear_steam_produces  generator_electricity_produces  ...  net_cashflow  objective
+0                     3.0                             3.0  ...           3.0        8.9
+1                     3.0                             3.0  ...           5.9        8.9
+
+[2 rows x 10 columns]
 ```
 
 Here are the formatted results from this script:
 
-|    |   nuclear_steam_produces |   generator_electricity_produces |   generator_steam_consumes |   wind_electricity_produces |   battery_SOC |   battery_charge |   battery_discharge |   grid_electricity_consumes |   objective |
-|-------------:|-------------------------:|---------------------------------:|---------------------------:|----------------------------:|--------------:|-----------------:|--------------------:|----------------------------:|------------:|
-|            0 |                        3 |                                3 |                         -3 |                           1 |      0.948683 |                1 |                 0   |                        -3   |         8.9 |
-|            1 |                        3 |                                3 |                         -3 |                           2 |      0        |                0 |                 0.9 |                        -5.9 |         8.9 |
+|    |   nuclear_steam_produces |   generator_electricity_produces |   generator_steam_consumes |   wind_electricity_produces |   battery_SOC |   battery_charge |   battery_discharge |   grid_electricity_consumes |   net_cashflow |   objective |
+|-------------:|-------------------------:|---------------------------------:|---------------------------:|----------------------------:|--------------:|-----------------:|--------------------:|----------------------------:|---------------:|------------:|
+|            0 |                        3 |                                3 |                         -3 |                           1 |      0.948683 |                1 |                 0   |                        -3   |              3 |         8.9 |
+|            1 |                        3 |                                3 |                         -3 |                           2 |      0        |                0 |                 0.9 |                        -5.9 |            5.9 |         8.9 |
+
+For additional examples, please see the [Examples](https://idaholab.github.io/DOVE/user-guide/examples.html) documentation page.
 
 # Developers
 Before installing DOVE, developers must install the following prerequisites in addition to those listed in the [Install from Source](#install-from-source) section:
@@ -110,4 +104,4 @@ Some tools frequently used by developers include:
 - **ruff** (for linting and formatting)
 - **commitizen** (for versioning and standardized commits)
 
-More extensive reference information for developers can be found at https://idaholab.github.io/DOVE/references/developer.html.
+More extensive reference information for developers can be found on the [Developer Reference](https://idaholab.github.io/DOVE/references/developer.html) documentation page.

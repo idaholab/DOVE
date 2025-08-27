@@ -10,26 +10,26 @@ import dove.core as dc
 steam = dc.Resource(name="steam")
 elec = dc.Resource(name="electricity")
 
-nuclear = dc.Source(name="nuclear", produces=steam, max_capacity_profile=[3, 3])
+nuclear = dc.Source(name="nuclear", produces=steam, installed_capacity=3)
 gen = dc.Converter(
     name="generator",
     consumes=[steam],
     produces=[elec],
     capacity_resource=elec,
-    max_capacity_profile=[3, 3],
-    transfer_fn=dc.RatioTransfer(input_res=steam, output_res=elec, ratio=1.0),
+    installed_capacity=3,
+    transfer_fn=dc.RatioTransfer(input_resources={steam: 1.0}, output_resources={elec: 1.0}),
 )
-wind = dc.Source(name="wind", produces=elec, max_capacity_profile=[1, 2])
-battery = dc.Storage(name="battery", resource=elec, max_capacity_profile=[1, 1], rte=0.9)
+wind = dc.Source(name="wind", produces=elec, installed_capacity=2, capacity_factor=[0.5, 1.0])
+battery = dc.Storage(name="battery", resource=elec, installed_capacity=1, rte=0.9)
 grid = dc.Sink(
     name="grid",
     consumes=elec,
-    max_capacity_profile=[3, 6],
+    demand_profile=[3, 6],
     cashflows=[dc.Revenue(name="elec_sales", alpha=1.0)],
 )
 
 sys = dc.System(
-    components=[nuclear, gen, wind, battery, grid], resources=[steam, elec], time_index=[0, 1]
+    components=[nuclear, gen, wind, battery, grid], resources=[steam, elec], dispatch_window=[0, 1]
 )
 results = sys.solve("price_taker")
 print(results)

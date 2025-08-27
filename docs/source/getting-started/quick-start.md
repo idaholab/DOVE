@@ -17,15 +17,9 @@ Dispatch for this system can be economically optimized using DOVE in a python sc
    :linenos:
 ```
 
-This script can be run in the uv environment and will print the dispatch results as well as writing them to a CSV file called "simple_demo.csv":
-```
->>> uv run python examples/simple_demonstration.py
-   nuclear_steam_produces  ...  objective
-0                     3.0  ...        8.9
-1                     3.0  ...        8.9
-```
-```{note}
-   The formatting for this output will differ based on the size of the terminal window.
+```{include} ../../../README.md
+:start-line: 76
+:end-line: 84
 ```
 
 Here are the formatted, complete results from this script:
