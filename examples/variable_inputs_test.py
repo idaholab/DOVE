@@ -7,7 +7,7 @@ This script demonstrates a case where input time series vary greatly
 
 import numpy as np
 from check_constraints_working import (
-    max_capacity_profile_working,
+    capacity_working,
     max_charge_rate_working,
     max_discharge_rate_working,
     periodic_storage_working,
@@ -53,7 +53,7 @@ def run_test():
     elec_price_profile = np.multiply(elec_demand_profile, scale)
 
     # Super volatile wind profile
-    wind_max_capacity_factor_profile = np.array(
+    wind_capacity_factor_profile = np.array(
         [
             0.75,
             0.00,
@@ -77,7 +77,6 @@ def run_test():
             0.30,
         ]
     )
-    wind_max_capacity_profile = np.multiply(wind_max_capacity_factor_profile, 100)
 
     # Smooth solar profile, but only producing half the time
     solar_capacity_profile = np.array(
@@ -104,6 +103,9 @@ def run_test():
             0,
         ]
     )
+    # Convert data to installed cap and cap factor
+    solar_max_capacity = np.max(solar_capacity_profile)
+    solar_cap_factor_profile = solar_capacity_profile / solar_max_capacity
 
     # Set up resources
     electricity = dc.Resource(name="electricity")
@@ -112,19 +114,21 @@ def run_test():
     wind = dc.Source(
         name="wind",
         produces=electricity,
-        max_capacity_profile=wind_max_capacity_profile,
+        capacity_factor=wind_capacity_factor_profile,
+        installed_capacity=100,
     )
 
     solar = dc.Source(
         name="solar",
         produces=electricity,
-        max_capacity_profile=solar_capacity_profile,
+        installed_capacity=solar_max_capacity,
+        capacity_factor=solar_cap_factor_profile,
     )
 
     smr = dc.Source(
         name="smr",
         produces=steam,
-        max_capacity_profile=np.full(len(elec_demand_profile), 200),
+        installed_capacity=200,
         cashflows=[dc.Cost(name="vom", alpha=2)],
     )
 
@@ -132,11 +136,13 @@ def run_test():
         name="generator",
         consumes=[steam],
         produces=[electricity],
-        max_capacity_profile=np.full(len(elec_demand_profile), 300),
+        installed_capacity=300,
         capacity_resource=steam,
         ramp_limit=0.4,
         ramp_freq=2,
-        transfer_fn=dc.RatioTransfer(input_res=steam, output_res=electricity, ratio=0.9),
+        transfer_fn=dc.RatioTransfer(
+            input_resources={steam: 1.0}, output_resources={electricity: 0.9}
+        ),
     )
 
     steam_storage = dc.Storage(
@@ -145,7 +151,7 @@ def run_test():
         max_charge_rate=0.4,
         max_discharge_rate=0.4,
         rte=0.9,
-        max_capacity_profile=np.full(len(elec_demand_profile), 300),
+        installed_capacity=300,
         initial_stored=0.5,
     )
 
@@ -155,14 +161,14 @@ def run_test():
         max_charge_rate=0.75,
         max_discharge_rate=0.75,
         rte=0.8,
-        max_capacity_profile=np.full(len(elec_demand_profile), 100),
+        installed_capacity=100,
         initial_stored=0.5,
     )
 
     grid = dc.Sink(
         name="grid",
         consumes=electricity,
-        max_capacity_profile=elec_demand_profile,
+        demand_profile=elec_demand_profile,
         flexibility="flex",
         cashflows=[dc.Revenue(name="elec_sales", price_profile=elec_price_profile)],
     )
@@ -170,7 +176,7 @@ def run_test():
     sys = dc.System(
         components=[wind, solar, smr, generator, steam_storage, battery, grid],
         resources=[steam, electricity],
-        time_index=np.arange(0, 20),
+        dispatch_window=np.arange(0, 20),
     )
 
     results = sys.solve("price_taker")
@@ -180,9 +186,9 @@ def run_test():
     print(results)
 
     # Confirm that constraints are not being violated
-    max_capacity_profile_working(sys, results, "smr", "smr_steam_produces")
-    max_capacity_profile_working(sys, results, "battery", "battery_SOC")
-    max_capacity_profile_working(sys, results, "wind", "wind_electricity_produces")
+    capacity_working(sys, results, "smr", "smr_steam_produces")
+    capacity_working(sys, results, "battery", "battery_SOC")
+    capacity_working(sys, results, "wind", "wind_electricity_produces")
 
     ramp_limit_working(sys, results, "generator", "generator_steam_consumes")
     ramp_freq_working(sys, results, "generator", "generator_steam_consumes")

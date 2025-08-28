@@ -5,19 +5,15 @@
 This script demonstrates a case where electricity demand must be satisfied at minimum cost
 """
 
-import numpy as np
 from check_constraints_working import (
+    capacity_working,
     fixed_flexibility_working,
-    max_capacity_profile_working,
-    min_capacity_profile_working,
 )
 
 import dove.core as dc
 
 
 def run_test():
-    time = 6
-
     # Set up resources
     elec_near = dc.Resource(name="elec_near")
     elec_far = dc.Resource(name="elec_far")
@@ -27,21 +23,21 @@ def run_test():
     elec_plant_near = dc.Source(
         name="elec_plant_near",
         produces=elec_near,
-        max_capacity_profile=np.full(time, 100),
+        installed_capacity=100,
         cashflows=[dc.Cost("near_plant_om", price_profile=[4, 4, 8, 12, 8, 12])],
     )
 
     elec_plant_far = dc.Source(
         name="elec_plant_far",
         produces=elec_far,
-        max_capacity_profile=np.full(time, 100),
+        installed_capacity=100,
         cashflows=[dc.Cost("far_plant_om", price_profile=[6, 9, 3, 3, 9, 6])],
     )
 
     elec_plant_farther = dc.Source(
         name="elec_plant_farther",
         produces=elec_farther,
-        max_capacity_profile=np.full(time, 100),
+        installed_capacity=100,
         cashflows=[dc.Cost("farther_plant_om", price_profile=[6, 4, 6, 4, 2, 2])],
     )
 
@@ -50,8 +46,10 @@ def run_test():
         consumes=[elec_far],
         produces=[elec_near],
         capacity_resource=elec_far,
-        max_capacity_profile=np.full(time, 200),
-        transfer_fn=dc.RatioTransfer(input_res=elec_far, output_res=elec_near, ratio=0.75),
+        installed_capacity=200,
+        transfer_fn=dc.RatioTransfer(
+            input_resources={elec_far: 1.0}, output_resources={elec_near: 0.75}
+        ),
     )
 
     transmission_from_farther = dc.Converter(
@@ -59,14 +57,16 @@ def run_test():
         consumes=[elec_farther],
         produces=[elec_near],
         capacity_resource=elec_farther,
-        max_capacity_profile=np.full(time, 200),
-        transfer_fn=dc.RatioTransfer(input_res=elec_farther, output_res=elec_near, ratio=0.5),
+        installed_capacity=200,
+        transfer_fn=dc.RatioTransfer(
+            input_resources={elec_farther: 1.0}, output_resources={elec_near: 0.5}
+        ),
     )
 
     elec_demand = dc.Sink(
         name="elec_demand",
         consumes=elec_near,
-        max_capacity_profile=np.full(time, 120),
+        installed_capacity=120,
         flexibility="fixed",
     )
 
@@ -81,7 +81,7 @@ def run_test():
             elec_demand,
         ],
         resources=[elec_near, elec_far, elec_farther],
-        time_index=list(range(time)),
+        dispatch_window=[0, 1, 2, 3, 4, 5],
     )
     results = sys.solve("price_taker")
 
@@ -90,16 +90,10 @@ def run_test():
     print(results)
 
     # Confirm that constraints are not being violated
-    max_capacity_profile_working(
-        sys, results, "elec_plant_near", "elec_plant_near_elec_near_produces"
-    )
-    max_capacity_profile_working(sys, results, "elec_plant_far", "elec_plant_far_elec_far_produces")
-    max_capacity_profile_working(
-        sys, results, "elec_plant_farther", "elec_plant_farther_elec_farther_produces"
-    )
-    max_capacity_profile_working(sys, results, "elec_demand", "elec_demand_elec_near_consumes")
-    min_capacity_profile_working(sys, results, "elec_demand", "elec_demand_elec_near_consumes")
-    fixed_flexibility_working(sys, "elec_demand")
+    capacity_working(sys, results, "elec_plant_near", "elec_plant_near_elec_near_produces")
+    capacity_working(sys, results, "elec_plant_far", "elec_plant_far_elec_far_produces")
+    capacity_working(sys, results, "elec_plant_farther", "elec_plant_farther_elec_farther_produces")
+    fixed_flexibility_working(sys, results, "elec_demand", "elec_demand_elec_near_consumes")
 
 
 if __name__ == "__main__":

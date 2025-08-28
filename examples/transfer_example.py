@@ -69,21 +69,21 @@ if __name__ == "__main__":
     work_sink = dc.Sink(
         name="Milestones",
         consumes=work,
-        demand_profile=[6e3],
+        installed_capacity=6e3,
         cashflows=[dc.Revenue("proposals", alpha=1.0)],
     )
 
     funding_sink = dc.Sink(
         name="Outsource",
         consumes=funding,
-        demand_profile=[150],
+        installed_capacity=150,
         cashflows=[dc.Cost("contracts", alpha=1.0)],
     )
 
     labor_sink = dc.Sink(
         name="BusyWork",
         consumes=labor,
-        demand_profile=[500],
+        installed_capacity=500,
         cashflows=[dc.Cost("other_work", alpha=1.0)],
     )
 

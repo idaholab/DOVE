@@ -19,7 +19,7 @@ dgen_production = dc.Resource(name="dgen_production")
 ngcc = dc.Component(
     name="ngcc",
     produces=[elec, co2],
-    max_capacity_profile=[3.0, 3.0, 3.0],
+    installed_capacity=3.0,
     capacity_resource=elec,
     transfer_fn=dc.RatioTransfer(input_resources={}, output_resources={elec: 1.0, co2: 2.0}),
     cashflows=[dc.Cost(name="OM_and_fuel", alpha=2.0)],
@@ -29,12 +29,12 @@ ngcc = dc.Component(
 diesel_gen = dc.Source(
     name="diesel_gen",
     produces=dgen_production,
-    max_capacity_profile=[2.0, 2.0, 2.0],
+    installed_capacity=2.0,
     cashflows=[dc.Cost(name="OM_and_fuel", alpha=3.0)],
 )
 dgen_prod_converter = dc.Converter(
     name="dgen_prod_converter",
-    max_capacity_profile=[2.0, 2.0, 2.0],
+    installed_capacity=2.0,
     consumes=[dgen_production],
     produces=[elec, co2],
     capacity_resource=dgen_production,
@@ -45,7 +45,7 @@ dgen_prod_converter = dc.Converter(
 
 nuclear = dc.Source(
     name="nuclear",
-    max_capacity_profile=[4.0, 4.0, 4.0],
+    installed_capacity=4.0,
     produces=elec,
     cashflows=[dc.Cost(name="OM_and_fuel", alpha=2.0)],
 )
@@ -54,7 +54,7 @@ nuclear = dc.Source(
 grid = dc.Sink(
     name="grid",
     consumes=elec,
-    max_capacity_profile=[9.0, 6.0, 8.0],
+    demand_profile=[9.0, 6.0, 8.0],
     cashflows=[dc.Revenue(name="elec_sales", price_profile=[4.0, 4.0, 3.0])],
 )
 
@@ -64,7 +64,7 @@ grid = dc.Sink(
 co2_accumulation = dc.Storage(
     name="co2_accumulation",
     resource=co2,
-    max_capacity_profile=[20.0, 20.0, 20.0],
+    installed_capacity=20.0,
     periodic_level=False,
 )
 
@@ -72,7 +72,7 @@ co2_accumulation = dc.Storage(
 sys = dc.System(
     components=[ngcc, diesel_gen, dgen_prod_converter, nuclear, grid, co2_accumulation],
     resources=[elec, co2, dgen_production],
-    time_index=[0, 1, 2],
+    dispatch_window=[0, 1, 2],
 )
 
 results = sys.solve("price_taker")

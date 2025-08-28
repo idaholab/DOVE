@@ -6,19 +6,13 @@ electricity = dc.Resource(name="electricity")
 # This is not a physical resource. We're just using it as a tracking mechanism
 charging_completed = dc.Resource(name="charging_completed")
 
-### Time series data
-TIME = 4
-max_production = [30.0] * TIME
-max_consumption = [10.0, 20.0, 30.0, 20.0]
-min_consumption = [0.0, 5.0, 10.0, 5.0]
-
 ### Main components
 
 # Example source
 electricity_source = dc.Source(
     name="electricity_source",
     produces=electricity,
-    max_capacity_profile=max_production,
+    installed_capacity=30,
     flexibility="flex",
 )
 
@@ -29,8 +23,9 @@ ev_charging = dc.Converter(
     consumes=[electricity],
     produces=[charging_completed],
     capacity_resource=electricity,
-    max_capacity_profile=max_consumption,
-    min_capacity_profile=min_consumption,
+    installed_capacity=30,
+    capacity_factor=[0.33, 0.67, 1.0, 0.67],
+    min_capacity_factor=[0.0, 0.17, 0.33, 0.17],
     transfer_fn=dc.RatioTransfer(
         input_resources={electricity: 1.0}, output_resources={charging_completed: 1.0}
     ),
@@ -46,7 +41,7 @@ ev_charging = dc.Converter(
 cumulative_charging_tracker = dc.Storage(
     name="cumulative_charging_tracker",
     resource=charging_completed,
-    max_capacity_profile=[50.0] * TIME,  # Can hold up to 50 units of completed charging
+    installed_capacity=50.0,  # Can hold up to 50 units of completed charging
     periodic_level=True,  # Means that it has to discharge everything by the end of the time
     initial_stored=0,
 )
@@ -59,7 +54,7 @@ cumulative_charging_tracker = dc.Storage(
 total_charge_confirmation = dc.Sink(
     name="total_charge_confirmation",
     consumes=charging_completed,
-    max_capacity_profile=[0.0, 0.0, 0.0, 50.0],
+    demand_profile=[0.0, 0.0, 0.0, 50.0],
     flexibility="fixed",
 )
 
@@ -73,7 +68,7 @@ sys = dc.System(
         total_charge_confirmation,
     ],
     resources=[electricity, charging_completed],
-    time_index=list(range(TIME)),
+    dispatch_window=[0, 1, 2, 3],
 )
 
 results = sys.solve("price_taker")

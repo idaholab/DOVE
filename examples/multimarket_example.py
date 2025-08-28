@@ -18,13 +18,13 @@ def run_test():
     potato_farms = dc.Source(
         "potato_farms",
         produces=potatoes,
-        max_capacity_profile=np.full(4, 100),
+        installed_capacity=100,
         flexibility="fixed",
     )
 
     potato_chip_factory = dc.Converter(
         name="potato_chip_factory",
-        max_capacity_profile=np.full(4, 80),
+        installed_capacity=80,
         consumes=[potatoes],
         produces=[potato_chips],
         capacity_resource=potatoes,
@@ -37,14 +37,14 @@ def run_test():
     potato_market = dc.Sink(
         name="potato_market",
         consumes=potatoes,
-        max_capacity_profile=np.full(4, 100),
+        installed_capacity=100,
         cashflows=[dc.Revenue("potato_revenue", price_profile=[1, 2, 3, 4])],
     )
 
     potato_chip_market = dc.Sink(
         name="potato_chip_market",
         consumes=potato_chips,
-        max_capacity_profile=np.full(4, 100),
+        installed_capacity=100,
         cashflows=[dc.Revenue("potato_chip_revenue", alpha=3)],
     )
 
@@ -52,7 +52,7 @@ def run_test():
     sys = dc.System(
         components=[potato_farms, potato_chip_factory, potato_market, potato_chip_market],
         resources=[potatoes, potato_chips],
-        time_index=np.arange(0, 4),
+        dispatch_window=np.arange(0, 4),
     )
 
     # Solution
