@@ -366,9 +366,9 @@ class Sink(Component):
         if self.demand_profile is not None:
             # installed_capacity should never be needed in the model if demand_profile is
             # provided, but it's still required by the Component, so we'll give it a value
-            comp_init_kwargs.update({"installed_capacity": np.max(demand_profile)})
+            comp_init_kwargs.update({"installed_capacity": np.max(demand_profile)})  # type: ignore[arg-type]
 
-        super().__init__(**comp_init_kwargs)
+        super().__init__(**comp_init_kwargs)  # type: ignore[arg-type]
 
         if self.transfer_fn is None:
             res = consumes

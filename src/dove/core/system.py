@@ -18,11 +18,11 @@ Classes
 
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from dove.models import BUILDER_REGISTRY
 
-from . import Component, Resource, Storage
+from . import Component, Resource, Sink, Storage
 
 
 class System:
@@ -164,9 +164,11 @@ class System:
                 "min_capacity_factor": comp.min_capacity_factor,
             }
             if getattr(comp, "demand_profile", None) is not None:
-                time_series.update({"demand_profile": comp.demand_profile})
+                comp = cast("Sink", comp)  # Must be a Sink if it has demand_profile
+                time_series.update({"demand_profile": comp.demand_profile})  # type: ignore[dict-item]
             if getattr(comp, "min_demand_profile", None) is not None:
-                time_series.update({"min_demand_profile": comp.min_demand_profile})
+                comp = cast("Sink", comp)  # Must be a Sink if it has min_demand_profile
+                time_series.update({"min_demand_profile": comp.min_demand_profile})  # type: ignore[dict-item]
             time_series.update(
                 {f"{cf.name} price_profile": cf.price_profile for cf in comp.cashflows}
             )

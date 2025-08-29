@@ -32,7 +32,7 @@ dove.models.base.BaseModelBuilder : Parent class providing the base builder inte
 from typing import Any, Self
 
 import pandas as pd
-import pyomo.environ as pyo  # type: ignore[import-untyped]
+import pyomo.environ as pyo
 
 from dove.models import register_builder
 from dove.models.base import BaseModelBuilder
@@ -79,7 +79,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         Self
             The builder instance, allowing for method chaining.
         """
-        self.model = pyo.ConcreteModel()
+        self.model: pyo.ConcreteModel = pyo.ConcreteModel()
         self.model.system = self.system
 
         self._add_sets()
@@ -144,7 +144,8 @@ class PriceTakerBuilder(BaseModelBuilder):
             for cf in comp.cashflows:
                 for t in T:
                     net_cashflow[t] += cf.evaluate(
-                        t, pyo.value(m.flow[comp.name, comp.capacity_resource.name, t])
+                        t,
+                        pyo.value(m.flow[comp.name, comp.capacity_resource.name, t]),  # type: ignore[union-attr]
                     )
 
         data["net_cashflow"] = net_cashflow

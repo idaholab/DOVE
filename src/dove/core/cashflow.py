@@ -77,7 +77,7 @@ class CashFlow(ABC):
         Returns the cashflow's dollar value at the given timestep t, provided a dispatch quantity.
         Recall that a positive value indicates a revenue and a negative value indicates a cost.
         """
-        value = self.sign * self.alpha * ((dispatch / self.dprime) ** self.scalex)
+        value: float = self.sign * self.alpha * ((dispatch / self.dprime) ** self.scalex)
         if len(self.price_profile) > 0:
             if t > len(self.price_profile) - 1:
                 available = (
