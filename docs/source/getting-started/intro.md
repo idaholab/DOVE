@@ -2,5 +2,5 @@
 
 ```{include} ../../../README.md
 :start-after: run-tests.yml)
-:end-before: "# Installation"
+:end-before: "Please see"
 ```
