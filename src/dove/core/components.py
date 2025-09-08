@@ -543,6 +543,13 @@ class Converter(Component):
                     f"was not provided. Please specify '{required_kwarg}'."
                 )
 
+        for required_kwarg in ["capacity_resource", "transfer_fn"]:
+            if not getattr(self, required_kwarg, None):
+                raise ValueError(
+                    f"Converter {self.name}: Required keyword argument '{required_kwarg}' "
+                    f"was not provided. Please specify '{required_kwarg}'."
+                )
+
         for res in self.consumes:
             if res in self.produces:
                 raise ValueError(
