@@ -2,6 +2,8 @@
 # ALL RIGHTS RESERVED
 """This example demonstrates how to force the activity of Components to exceed a minimum value."""
 
+from check_constraints_working import minimum_working
+
 import dove.core as dc
 
 res = dc.Resource(name="res")
@@ -36,3 +38,8 @@ sys = dc.System(
 
 results = sys.solve("price_taker")
 print(results)
+
+# Confirm that constraints are not being violated
+minimum_working(sys, results, "production", "production_res_produces")
+minimum_working(sys, results, "market_1", "market_1_res_consumes")
+minimum_working(sys, results, "market_2", "market_2_res_consumes")

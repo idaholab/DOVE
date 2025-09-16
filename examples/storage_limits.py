@@ -3,6 +3,12 @@
 """ """
 
 import numpy as np
+from check_constraints_working import (
+    max_charge_rate_working,
+    max_discharge_rate_working,
+    periodic_storage_working,
+    rte_working,
+)
 
 import dove.core as dc
 
@@ -23,14 +29,20 @@ if __name__ == "__main__":
         name="storage",
         resource=resrc,
         installed_capacity=4,
+        initial_stored=0.5,
         max_charge_rate=0.25,
         max_discharge_rate=0.5,
+        rte=0.9,
     )
 
-    sink = dc.Sink(
-        name="sink", consumes=resrc, demand_profile=[10, 10, 10, 10, 10], cashflows=[sales]
-    )
+    sink = dc.Sink(name="sink", consumes=resrc, installed_capacity=10, cashflows=[sales])
 
     sys = dc.System([src, storg, sink], [resrc], [0, 1, 2, 3, 4])
     results = sys.solve()
     print(results)
+
+    # Check that constraints are working properly
+    max_charge_rate_working(sys, results, "storage")
+    max_discharge_rate_working(sys, results, "storage")
+    rte_working(sys, results, "storage")
+    periodic_storage_working(sys, results, "storage")
