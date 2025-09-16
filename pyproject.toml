@@ -106,6 +106,10 @@ strict = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
+[[tool.mypy.overrides]]
+module = ["pyomo.*"]
+ignore_missing_imports = true
+
 [tool.codespell]
 skip = './docs/build,./tests/pyomo_tests'
 count = true

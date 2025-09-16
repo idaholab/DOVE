@@ -29,7 +29,7 @@ a 'system' attribute containing component and resource information.
 
 from typing import TYPE_CHECKING
 
-import pyomo.environ as pyo  # type: ignore[import-untyped]
+import pyomo.environ as pyo
 
 if TYPE_CHECKING:
     from dove.core import Storage
@@ -144,7 +144,7 @@ def minimum_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     return m.flow[cname, comp.capacity_resource.name, t] >= comp.minimum_at_timestep(t)
 
 
-def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Limit rate of increase in component output between time periods.
 
@@ -159,7 +159,7 @@ def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint limiting upward ramping or Constraint.Skip
     """
     system = m.system
@@ -171,7 +171,7 @@ def ramp_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
     return m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)] <= max_allowed_ramp
 
 
-def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Limit rate of decrease in component output between time periods.
 
@@ -186,7 +186,7 @@ def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint limiting downward ramping or Constraint.Skip
     """
     system = m.system
@@ -198,7 +198,7 @@ def ramp_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
     return m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t] <= max_allowed_ramp
 
 
-def ramp_track_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_track_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Track upward ramps for a component.
 
@@ -213,7 +213,7 @@ def ramp_track_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constrai
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint tracking upward ramps or Constraint.Skip
     """
     system = m.system
@@ -224,7 +224,7 @@ def ramp_track_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constrai
     return m.ramp_up[cname, t] >= m.flow[cname, res, t] - m.flow[cname, res, m.T.prev(t)]
 
 
-def ramp_track_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_track_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Track downward ramps for a component.
 
@@ -239,7 +239,7 @@ def ramp_track_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constr
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint tracking downward ramps or Constraint.Skip
     """
     system = m.system
@@ -250,7 +250,7 @@ def ramp_track_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constr
     return m.ramp_down[cname, t] >= m.flow[cname, res, m.T.prev(t)] - m.flow[cname, res, t]
 
 
-def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Limit upward ramp size based on binary variable.
 
@@ -265,7 +265,7 @@ def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint limiting ramp size or Constraint.Skip
     """
     system = m.system
@@ -275,7 +275,7 @@ def ramp_bin_up_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint
     return m.ramp_up[cname, t] <= comp.installed_capacity * m.ramp_up_bin[cname, t]
 
 
-def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Limit downward ramp size based on binary variable.
 
@@ -290,7 +290,7 @@ def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constrai
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint limiting ramp size or Constraint.Skip
     """
     system = m.system
@@ -300,7 +300,7 @@ def ramp_bin_down_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constrai
     return m.ramp_down[cname, t] <= comp.installed_capacity * m.ramp_down_bin[cname, t]
 
 
-def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Limit frequency of ramping events within a time window.
 
@@ -315,7 +315,7 @@ def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Const
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Constraint limiting ramp frequency or Constraint.Skip
     """
     system = m.system
@@ -331,7 +331,7 @@ def ramp_freq_window_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Const
     return sum(m.ramp_up_bin[cname, tw] + m.ramp_down_bin[cname, tw] for tw in freq_window) <= 1
 
 
-def steady_state_upper_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def steady_state_upper_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Define upper bound for steady state operation (no flow increase if in steady state).
 
@@ -346,7 +346,7 @@ def steady_state_upper_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Upper bound constraint for steady state or Constraint.Skip
     """
     system = m.system
@@ -359,7 +359,7 @@ def steady_state_upper_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
     return m.ramp_up[cname, t] <= M * (1 - m.steady_bin[cname, t])
 
 
-def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Define lower bound for steady state operation (no flow decrease if in steady state).
 
@@ -374,7 +374,7 @@ def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Lower bound constraint for steady state or Constraint.Skip
     """
     system = m.system
@@ -387,7 +387,7 @@ def steady_state_lower_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Con
     return m.ramp_down[cname, t] >= -M * (1 - m.steady_bin[cname, t])
 
 
-def state_selection_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constraint:
+def state_selection_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Expression:
     """
     Ensure exactly one operational state is active at each time step.
 
@@ -402,7 +402,7 @@ def state_selection_rule(m: pyo.ConcreteModel, cname: str, t: int) -> pyo.Constr
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         Component must be in exactly one state (up, down, or steady)
     """
     # If no components spcecify a non-default ramp_freq, then skip
@@ -567,7 +567,7 @@ def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     return m.soc[sname, t] <= comp.capacity_at_timestep(t)
 
 
-def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Constraint:
+def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Expression:
     """
     Enforce periodic storage level for a storage component.
 
@@ -583,7 +583,7 @@ def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Constraint:
 
     Returns
     -------
-    pyo.Constraint
+    pyo.Expression
         A Pyomo constraint enforcing periodic storage level.
     """
     comp = m.system.comp_map[sname]
