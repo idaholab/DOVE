@@ -480,13 +480,13 @@ def storage_balance_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expres
     Notes
     -----
     For the first time step, the previous state of charge is determined by the
-    initial stored energy parameter of the storage component.
+    initial stored energy variable for the storage component.
     The round-trip efficiency (rte) is applied as a square root to both charging and
     discharging, with charging multiplied by rte^0.5 and discharging divided by rte^0.5.
     """
     comp = m.system.comp_map[sname]
     if t == m.T.first():
-        soc_prev = comp.initial_stored * comp.installed_capacity
+        soc_prev = m.initial_stored[sname] * comp.installed_capacity
     else:
         soc_prev = m.soc[sname, m.T.prev(t)]
     return m.soc[sname, t] == soc_prev + (
@@ -567,12 +567,38 @@ def soc_limit_rule(m: pyo.ConcreteModel, sname: str, t: int) -> pyo.Expression:
     return m.soc[sname, t] <= comp.capacity_at_timestep(t)
 
 
+def initial_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Expression:
+    """
+    Require initial storage values to respect user input.
+
+    This constraint ensures that the initial storage values equal the user-given
+    values for initial storage, if applicable.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        The Pyomo model instance containing system components and variables.
+    sname : str
+        The name of the storage component.
+
+    Returns
+    -------
+    pyo.Expression
+        A Pyomo expression enforcing initial storage values.
+    """
+    comp: Storage = m.system.comp_map[sname]
+    if comp.initial_stored is None:
+        return pyo.Constraint.Skip
+
+    return m.initial_stored[sname] == comp.initial_stored
+
+
 def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Expression:
     """
     Enforce periodic storage level for a storage component.
 
     This constraint ensures that the state of charge (SOC) at the final time step
-    equals the initial state of charge, respecting the `initial_stored` attribute.
+    equals the initial state of charge.
 
     Parameters
     ----------
@@ -591,7 +617,7 @@ def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Expression:
         return pyo.Constraint.Skip
 
     # Enforce SOC at the final time step equals the initial SOC
-    return m.soc[sname, m.T.last()] == comp.initial_stored * comp.installed_capacity
+    return m.soc[sname, m.T.last()] == m.initial_stored[sname] * comp.installed_capacity
 
 
 def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:

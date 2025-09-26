@@ -140,6 +140,7 @@ class PriceTakerBuilder(BaseModelBuilder):
                 data[f"{comp.name}_SOC"] = [pyo.value(m.soc[comp.name, t]) for t in T]
                 data[f"{comp.name}_charge"] = [pyo.value(m.charge[comp.name, t]) for t in T]
                 data[f"{comp.name}_discharge"] = [pyo.value(m.discharge[comp.name, t]) for t in T]
+                # Don't really need to print the initial_stored values
 
             for cf in comp.cashflows:
                 for t in T:
@@ -179,6 +180,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         - SOC: State of charge for storage components
         - charge: Charging activity for storage components
         - discharge: Discharging activity for storage components
+        - initial_stored: Initial level for storage components
         - ramp_up/ramp_down: Track ramping between time periods
         - ramp_up_bin/ramp_down_bin: Binary indicators for ramping events
         - steady_bin: Binary indicator for steady state operation
@@ -190,6 +192,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         m.soc = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.charge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.discharge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
+        m.initial_stored = pyo.Var(m.Storage, within=pyo.NonNegativeReals, bounds=(0, 1))
 
         # Don't add ramping variables if no component has ramp frequency
         # This is to avoid unnecessary complexity in the model
@@ -243,6 +246,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         m.charge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.charge_limit_rule)
         m.discharge_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.discharge_limit_rule)
         m.soc_limit = pyo.Constraint(m.STORAGE, m.T, rule=prl.soc_limit_rule)
+        m.initial_storage = pyo.Constraint(m.STORAGE, rule=prl.initial_storage_rule)
         m.periodic_storage = pyo.Constraint(m.STORAGE, rule=prl.periodic_storage_rule)
 
         # Ramp Constraints

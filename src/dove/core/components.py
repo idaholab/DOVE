@@ -581,7 +581,7 @@ class Storage(Component):
         per time period, between 0 and 1. Defaults to 1.0.
     initial_stored : float
         Initial stored amount as a fraction of installed capacity,
-        between 0 and 1. Defaults to 0.0.
+        between 0 and 1. Defaults to allowing the optimizer to select this value.
     periodic_level : bool
         If True, storage level at the end of the simulation
         must equal the initial level. Defaults to True.
@@ -604,7 +604,7 @@ class Storage(Component):
     rte: float = 1.0
     max_charge_rate: float = 1.0
     max_discharge_rate: float = 1.0
-    initial_stored: float = 0.0
+    initial_stored: float | None = None
     periodic_level: bool = True
 
     def __post_init__(self) -> None:
@@ -642,7 +642,7 @@ class Storage(Component):
         # Error if parameters are outside [0, 1]
         for attr in ("rte", "max_charge_rate", "max_discharge_rate", "initial_stored"):
             val = getattr(self, attr)
-            if not (0.0 <= val <= 1.0):
+            if (val is not None) and (not (0.0 <= val <= 1.0)):
                 raise ValueError(
                     f"Storage {self.name}: '{attr}'={val} is outside the range [0, 1].",
                 )
