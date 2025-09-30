@@ -106,9 +106,8 @@ class PriceTakerBuilder(BaseModelBuilder):
         pyo.ConcreteModel
             The solved Pyomo model.
         """
-        solver = pyo.SolverFactory(kw.get("solver", "cbc"))
-        solver.solve(self.model)
-        return self.model
+        self.solver = pyo.SolverFactory(kw.pop("solver", "cbc"))
+        return self.solver.solve(self.model, **kw)
 
     def extract_results(self) -> pd.DataFrame:
         """

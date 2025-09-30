@@ -71,6 +71,8 @@ class System:
         self.comp_map: dict[str, Component] = {comp.name: comp for comp in self.components}
         self.res_map: dict[str, Resource] = {res.name: res for res in self.resources}
 
+        self._built_model = None
+
     @property
     def non_storage_comp_names(self) -> list[str]:
         """The names of all non-storage components in the system."""
@@ -184,7 +186,7 @@ class System:
         if len(time_series_errors) > 0:
             raise ValueError(time_series_errors)
 
-    def build(self) -> None:
+    def build(self, model_type: str = "price_taker") -> None:
         """
         Build the system model.
 
@@ -196,8 +198,18 @@ class System:
         NotImplementedError
             This method is not yet implemented.
         """
-        # TODO: Implement the build method
-        raise NotImplementedError("System method 'build' is not yet implemented!")
+        self._validate()
+
+        try:
+            builder_cls = BUILDER_REGISTRY[model_type]
+        except KeyError as err:
+            raise ValueError(
+                f"Unknown model type: '{model_type}'! Available: {list(BUILDER_REGISTRY)}"
+            ) from err
+
+        builder = builder_cls(self)
+        self._built_model = builder.build()
+        return self._built_model
 
     def solve(self, model_type: str = "price_taker", **kw: dict[str, Any]) -> Any:
         """
@@ -220,16 +232,8 @@ class System:
         ValueError
             If the specified model_type is not registered.
         """
-        self._validate()
+        if self._built_model is None:
+            self.build(model_type)
 
-        try:
-            builder_cls = BUILDER_REGISTRY[model_type]
-        except KeyError as err:
-            raise ValueError(
-                f"Unknown model type: '{model_type}'! Available: {list(BUILDER_REGISTRY)}"
-            ) from err
-
-        builder = builder_cls(self)
-        builder.build()
-        builder.solve(**kw)
-        return builder.extract_results()
+        self._built_model.solve(**kw)
+        return self._built_model.extract_results()
