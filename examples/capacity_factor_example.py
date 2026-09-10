@@ -91,7 +91,7 @@ if __name__ == "__main__":
     grid = dc.Sink(
         name="grid",
         consumes=elec,
-        demand_profile=[40] * len(wind_cap_fac_ts),
+        installed_capacity=40,
         flexibility="fixed",
         cashflows=[dc.Revenue("e_sales", alpha=50e3)],
     )
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     exportelec = dc.Sink(
         name="export",
         consumes=elec,
-        demand_profile=[100] * len(wind_cap_fac_ts),
+        installed_capacity=100,
         cashflows=[dc.Cost("export", alpha=1e6)],
     )
 

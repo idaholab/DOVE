@@ -63,21 +63,21 @@ if __name__ == "__main__":
     market_linear = dc.Sink(
         name="market_linear",
         consumes=elec,
-        demand_profile=[2] * len(linear_price),
+        installed_capacity=2,
         cashflows=[dc.Revenue("esales", price_profile=linear_price)],  # Time Varying Revenue
     )
 
     market_spike = dc.Sink(
         name="market_spike",
         consumes=elec,
-        demand_profile=[40] * len(linear_price),
+        installed_capacity=40,
         cashflows=[dc.Revenue("esales", price_profile=spike_price)],  # Time Varying Revenue
     )
 
     steam_offload = dc.Sink(
         name="steam_offload",
         consumes=steam,
-        demand_profile=[100] * len(linear_price),
+        installed_capacity=100,
         cashflows=[dc.Revenue("steam_offload", alpha=0.01)],  # Constant Revenue
     )
 
