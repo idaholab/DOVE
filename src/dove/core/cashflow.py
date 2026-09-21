@@ -55,6 +55,11 @@ class CashFlow(ABC):
         Flag indicating if the price is levelized, defaults to False. (Not Implemented)
     sign : int, optional
         Direction of the cash flow (positive or negative), defaults to 0.
+    driver_var : str, optional
+        Name of the model variable whose value drives this cash flow's dispatch quantity.
+        One of "flow", "charge", "discharge", or "soc". Defaults to "flow", which uses the
+        component's capacity resource flow. Storage components should set this to "charge",
+        "discharge", or "soc" as appropriate, since storage components have no "flow" variable.
     """
 
     name: str
@@ -64,6 +69,9 @@ class CashFlow(ABC):
     scalex: float = 1.0
     price_is_levelized: bool = False
     sign: int = 0
+    driver_var: str = "flow"
+
+    _ALLOWED_DRIVER_VARS = ("flow", "charge", "discharge", "soc")
 
     def __post_init__(self) -> None:
         """
@@ -71,6 +79,12 @@ class CashFlow(ABC):
         """
         # Convert price_profile
         self.price_profile = np.asarray(self.price_profile, float).ravel()
+
+        if self.driver_var not in self._ALLOWED_DRIVER_VARS:
+            raise ValueError(
+                f"{self.name}: driver_var '{self.driver_var}' is not one of "
+                f"{self._ALLOWED_DRIVER_VARS}."
+            )
 
     def evaluate(self, t: int, dispatch: float) -> float:
         """

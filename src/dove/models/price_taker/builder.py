@@ -143,10 +143,8 @@ class PriceTakerBuilder(BaseModelBuilder):
 
             for cf in comp.cashflows:
                 for t in T:
-                    net_cashflow[t] += cf.evaluate(
-                        t,
-                        pyo.value(m.flow[comp.name, comp.capacity_resource.name, t]),  # type: ignore[union-attr]
-                    )
+                    dispatch = pyo.value(prl.get_cashflow_dispatch_value(m, comp, cf, t))
+                    net_cashflow[t] += cf.evaluate(t, dispatch)
 
         data["net_cashflow"] = net_cashflow
         data["objective"] = [pyo.value(m.objective)]

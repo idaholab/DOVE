@@ -27,12 +27,14 @@ variables, parameters, and sets already defined. The model is expected to have
 a 'system' attribute containing component and resource information.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pyomo.environ as pyo
 
 if TYPE_CHECKING:
     from dove.core import Storage
+    from dove.core.cashflow import CashFlow
+    from dove.core.components import Component
 
 
 def transfer_block_rule(b: pyo.Block, cname: str, t: int) -> None:
@@ -594,6 +596,44 @@ def periodic_storage_rule(m: pyo.ConcreteModel, sname: str) -> pyo.Expression:
     return m.soc[sname, m.T.last()] == comp.initial_stored * comp.installed_capacity
 
 
+def get_cashflow_dispatch_value(m: pyo.ConcreteModel, comp: "Component", cf: "CashFlow", t: int) -> Any:
+    """
+    Resolve the model variable value that drives a cashflow's dispatch quantity.
+
+    Non-storage components only have a "flow" variable, so this defaults to reading
+    the component's capacity resource flow. Storage components have no "flow" variable
+    at all; they use separate "charge", "discharge", and "soc" variables instead, so a
+    cashflow on a Storage component must set `driver_var` to one of those.
+
+    Parameters
+    ----------
+    m : pyo.ConcreteModel
+        The Pyomo model containing system components, dispatch variables, and time periods
+    comp : Component
+        The component that owns the cashflow
+    cf : CashFlow
+        The cashflow whose driver variable should be resolved
+    t : int
+        The time period to resolve the driver variable at
+
+    Returns
+    -------
+    Any
+        The Pyomo variable (or expression) representing the cashflow's dispatch quantity
+        at time t
+    """
+    if cf.driver_var == "flow":
+        rname = comp.capacity_resource.name
+        return m.flow[comp.name, rname, t]
+    if cf.driver_var == "charge":
+        return m.charge[comp.name, t]
+    if cf.driver_var == "discharge":
+        return m.discharge[comp.name, t]
+    if cf.driver_var == "soc":
+        return m.soc[comp.name, t]
+    raise ValueError(f"{cf.name}: unrecognized driver_var '{cf.driver_var}'.")
+
+
 def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
     """
     Calculate the objective function expression for a price-taker optimization model.
@@ -616,17 +656,15 @@ def objective_rule(m: pyo.ConcreteModel) -> pyo.Expression:
     -----
     The function iterates through all components in the system, accessing their
     cashflows and calculating the contribution to the objective based on:
-    - The dispatch level of the component at each time period
+    - The dispatch level of the component at each time period (per the cashflow's
+      `driver_var`: flow, charge, discharge, or soc)
     - The price profile associated with each cashflow
     - Scaling parameters (dprime and scalex) that allow for non-linear relationships
     """
     total = 0
     for comp in m.system.components:
-        # TODO: cashflow defaults to capacity_resource
-        # we should find a way to do different resource vars like level/charge/discharge
-        rname = comp.capacity_resource.name
         for cf in comp.cashflows:
             for t in m.T:
-                dispatch = m.flow[comp.name, rname, t]
+                dispatch = get_cashflow_dispatch_value(m, comp, cf, t)
                 total += cf.evaluate(t, dispatch)
     return total
