@@ -72,13 +72,6 @@ class Component(ABC):
         Economic cashflows associated with this component.
     transfer_fn : TransferFunc | None
         Function defining resource conversion logic.
-    ramp_limit : float
-        Maximum rate of change for the component's capacity
-        utilization between timesteps as a fraction of installed capacity.
-        Must be a value between 0 and 1. Default is 1.0 (no limit).
-    ramp_freq : int
-        Frequency at which ramp limitations are applied.
-        Default is 0 (every timestep).
 
     Notes
     -----
@@ -96,8 +89,6 @@ class Component(ABC):
     flexibility: Literal["flex", "fixed"] = "flex"
     cashflows: list[CashFlow] = field(default_factory=list)
     transfer_fn: TransferFunc | None = None
-    ramp_limit: float = 1.0
-    ramp_freq: int = 0
 
     @property
     def produces_by_name(self) -> list[str]:
@@ -124,7 +115,6 @@ class Component(ABC):
         8. Ensures capacity_resource is in either consumes or produces
         9. Checks that all cashflows are CashFlow instances
         10. Checks that the minimum activity of the component is less than the capacity by timestep
-        11. Validates ramp_limit and ramp_freq values
 
         Raises
         ------
@@ -163,14 +153,6 @@ class Component(ABC):
         # cashflows
         if not all(isinstance(cf, CashFlow) for cf in self.cashflows):
             raise TypeError(f"{self.name}: all cashflows must be CashFlow instances")
-
-        # ramping
-        if not (0.0 <= self.ramp_limit <= 1.0):
-            raise ValueError(
-                f"{self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
-            )
-        if self.ramp_freq < 0:
-            raise ValueError(f"{self.name}: 'ramp_freq'={self.ramp_freq} must be positive")
 
     def _validate_caps_and_mins(self) -> None:
         """Performs validation checks related to capacity and minimums."""
@@ -250,8 +232,63 @@ class Component(ABC):
         return 0.0
 
 
+@dataclass(kw_only=True)
+class _FlowRampMixin:
+    """
+    Adds a ramp-rate limit to a single, memoryless per-timestep flow.
+
+    This is only meaningful for components that have exactly one net flow to
+    rate-limit per timestep (Source, Sink, Converter). Storage is deliberately
+    excluded: it persists state (state-of-charge) across timesteps and already
+    expresses this same per-timestep-change-limiting idea through its own
+    `max_charge_rate`/`max_discharge_rate` fields, one for each of its two
+    independent flows (charge in, discharge out). Mix this in alongside
+    `Component` (see `_FlowComponent`) rather than directly onto `Storage`.
+
+    Attributes
+    ----------
+    ramp_limit : float
+        Maximum rate of change for the component's capacity
+        utilization between timesteps as a fraction of installed capacity.
+        Must be a value between 0 and 1. Default is 1.0 (no limit).
+    ramp_freq : int
+        Frequency at which ramp limitations are applied.
+        Default is 0 (every timestep).
+    """
+
+    ramp_limit: float = 1.0
+    ramp_freq: int = 0
+
+
+@dataclass(kw_only=True)
+class _FlowComponent(_FlowRampMixin, Component):
+    """
+    A `Component` with a single, memoryless per-timestep flow that can be ramp-limited.
+
+    Intermediate base for `Source`, `Sink`, and `Converter`. `Storage` does not
+    inherit from this class — see `_FlowRampMixin` for why.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Validate ramp_limit and ramp_freq values, in addition to Component's own checks.
+
+        Raises
+        ------
+        ValueError
+            If ramp_limit is outside the range [0, 1], or ramp_freq is negative.
+        """
+        super().__post_init__()
+        if not (0.0 <= self.ramp_limit <= 1.0):
+            raise ValueError(
+                f"{self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
+            )
+        if self.ramp_freq < 0:
+            raise ValueError(f"{self.name}: 'ramp_freq'={self.ramp_freq} must be positive")
+
+
 @dataclass
-class Source(Component):
+class Source(_FlowComponent):
     """
     A Source component that produces a specified resource in the DOVE simulation.
 
@@ -304,7 +341,7 @@ class Source(Component):
 
 
 @dataclass
-class Sink(Component):
+class Sink(_FlowComponent):
     """
     A component that consumes a resource and acts as an endpoint in the DOVE system.
 
@@ -501,7 +538,7 @@ class Sink(Component):
 
 
 @dataclass
-class Converter(Component):
+class Converter(_FlowComponent):
     """
     A Component subclass that converts resources from one type to another.
 
@@ -592,10 +629,14 @@ class Storage(Component):
 
     Notes
     -----
-    Storage components are treated differently from other components in terms of
-    capacity and resource management. They can store energy for later use,
-    and their operation is governed by the round-trip efficiency (rte) and
-    charge/discharge rates.
+    Storage is DOVE's "stock" component: unlike Source, Sink, and Converter
+    ("flow" components, each with one memoryless net flow per timestep, see
+    `_FlowRampMixin`), Storage persists state (state-of-charge) across
+    timesteps and exposes two independent flows into/out of that state —
+    charge and discharge — each with its own rate limit (`max_charge_rate`/
+    `max_discharge_rate`) playing the same role `ramp_limit` plays for flow
+    components. Storage does not have a `ramp_limit`/`ramp_freq` of its own;
+    these fields simply don't apply here.
     """
 
     resource: Resource
@@ -618,18 +659,20 @@ class Storage(Component):
         Raises
         ------
         ValueError
-            If 'produces', 'consumes', 'capacity_resource', 'ramp_freq', or 'ramp_limit' was added
+            If 'produces', 'consumes', or 'capacity_resource' was added
             If 'flexibility' was set to 'fixed'
             If any of the rate parameters are outside the range [0, 1]
         """
         # Error if unaccepted attribute was added
+        # Note: 'ramp_freq'/'ramp_limit' are intentionally absent here — Storage
+        # doesn't inherit from `_FlowComponent`, so those attributes don't exist
+        # on it at all; passing them raises TypeError from the dataclass-generated
+        # __init__ itself, before this method ever runs.
         for bad_attr in (
             "produces",
             "consumes",
             "capacity_resource",
             "transfer_fn",
-            "ramp_freq",
-            "ramp_limit",
         ):
             if getattr(self, bad_attr):
                 raise ValueError(
