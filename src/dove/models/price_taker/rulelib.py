@@ -623,6 +623,9 @@ def get_cashflow_dispatch_value(m: pyo.ConcreteModel, comp: "Component", cf: "Ca
         at time t
     """
     if cf.driver_var == "flow":
+        assert comp.capacity_resource is not None, (
+            f"{comp.name}: capacity_resource must be set for a 'flow'-driven cashflow."
+        )
         rname = comp.capacity_resource.name
         return m.flow[comp.name, rname, t]
     if cf.driver_var == "charge":
