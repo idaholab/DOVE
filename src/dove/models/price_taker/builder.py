@@ -192,7 +192,7 @@ class PriceTakerBuilder(BaseModelBuilder):
         m.soc = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.charge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
         m.discharge = pyo.Var(m.STORAGE, m.T, within=pyo.NonNegativeReals)
-        m.initial_stored = pyo.Var(m.Storage, within=pyo.NonNegativeReals, bounds=(0, 1))
+        m.initial_stored = pyo.Var(m.STORAGE, within=pyo.NonNegativeReals, bounds=(0, 1))
 
         # Don't add ramping variables if no component has ramp frequency
         # This is to avoid unnecessary complexity in the model
