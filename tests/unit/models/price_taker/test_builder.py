@@ -614,11 +614,20 @@ def test_add_constraints_adds_ramp_up_limit_constraint(add_constraints_setup, ch
 
     # Set up required vars for input
     # Recall that steam to elec converter ramp_limit = 0.5; max_capacity_profile = [1, 1, 1]
+    # steam_source and elec_sink use the default ramp_limit = 1.0 (no limit), so any flow
+    # within their own capacity trivially satisfies this constraint -- held flat here to
+    # isolate the converter's own ramp_limit = 0.4 as the only case that can fail.
     m.flow.set_values(
         {
             ("steam_to_elec_converter", "steam", 0): 0.0,  # first t -> constraint skipped
             ("steam_to_elec_converter", "steam", 1): 0.4,  # == max allowed ramp -> constr satisfied
             ("steam_to_elec_converter", "steam", 2): 1.0,  # > max allowed ramp -> constr fails
+            ("steam_source", "steam", 0): 1.0,
+            ("steam_source", "steam", 1): 1.0,
+            ("steam_source", "steam", 2): 1.0,
+            ("elec_sink", "electricity", 0): 0.75,
+            ("elec_sink", "electricity", 1): 0.75,
+            ("elec_sink", "electricity", 2): 0.75,
         }
     )
 
@@ -626,6 +635,10 @@ def test_add_constraints_adds_ramp_up_limit_constraint(add_constraints_setup, ch
     expected_ramp_up_limit_results = {
         ("steam_to_elec_converter", 1): True,
         ("steam_to_elec_converter", 2): False,
+        ("steam_source", 1): True,
+        ("steam_source", 2): True,
+        ("elec_sink", 1): True,
+        ("elec_sink", 2): True,
     }
 
     # Verify constraint
@@ -638,11 +651,20 @@ def test_add_constraints_adds_ramp_down_limit_constraint(add_constraints_setup, 
 
     # Set up required vars for input
     # Recall that steam to elec converter ramp_limit = 0.5; max_capacity_profile = [1, 1, 1]
+    # steam_source and elec_sink use the default ramp_limit = 1.0 (no limit), so any flow
+    # within their own capacity trivially satisfies this constraint -- held flat here to
+    # isolate the converter's own ramp_limit = 0.4 as the only case that can fail.
     m.flow.set_values(
         {
             ("steam_to_elec_converter", "steam", 0): 1.0,  # first t -> constraint skipped
             ("steam_to_elec_converter", "steam", 1): 0.6,  # == max allowed ramp -> constr satisfied
             ("steam_to_elec_converter", "steam", 2): 0.0,  # > max allowed ramp -> constr fails
+            ("steam_source", "steam", 0): 1.0,
+            ("steam_source", "steam", 1): 1.0,
+            ("steam_source", "steam", 2): 1.0,
+            ("elec_sink", "electricity", 0): 0.75,
+            ("elec_sink", "electricity", 1): 0.75,
+            ("elec_sink", "electricity", 2): 0.75,
         }
     )
 
@@ -650,6 +672,10 @@ def test_add_constraints_adds_ramp_down_limit_constraint(add_constraints_setup, 
     expected_ramp_down_limit_results = {
         ("steam_to_elec_converter", 1): True,
         ("steam_to_elec_converter", 2): False,
+        ("steam_source", 1): True,
+        ("steam_source", 2): True,
+        ("elec_sink", 1): True,
+        ("elec_sink", 2): True,
     }
 
     # Verify constraint
