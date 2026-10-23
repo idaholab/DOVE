@@ -154,6 +154,31 @@ def test_source_with_explicit_capacity_resource():
 
 
 @pytest.mark.unit()
+def test_source_with_valid_ramp_settings():
+    r = Resource(name="r")
+    src = Source(name="src", produces=r, installed_capacity=1.0, ramp_limit=0.4, ramp_freq=2)
+    assert src.ramp_limit == 0.4
+    assert src.ramp_freq == 2
+
+
+@pytest.mark.unit()
+@pytest.mark.parametrize(
+    "bad_kwargs, msg_substr",
+    [
+        ({"ramp_limit": 1.1}, "ramp_limit"),
+        ({"ramp_freq": -1}, "ramp_freq"),
+    ],
+)
+def test_source_bad_ramp_values_raise(bad_kwargs, msg_substr):
+    r = Resource(name="r")
+    init_kwargs = {"name": "src", "produces": r, "installed_capacity": 1.0}
+    init_kwargs.update(bad_kwargs)
+    with pytest.raises(ValueError) as exc:
+        Source(**init_kwargs)
+    assert msg_substr in str(exc.value)
+
+
+@pytest.mark.unit()
 def test_sink_defaults_transfer_function():
     r = Resource(name="fuel")
     sink = Sink(name="sink", demand_profile=[8.0], consumes=r)
@@ -261,6 +286,49 @@ def test_sink_with_explicit_capacity_resource():
 
 
 @pytest.mark.unit()
+def test_sink_with_valid_ramp_settings():
+    r = Resource(name="r")
+    sink = Sink(name="sink", consumes=r, demand_profile=[1.0], ramp_limit=0.4, ramp_freq=2)
+    assert sink.ramp_limit == 0.4
+    assert sink.ramp_freq == 2
+
+
+@pytest.mark.unit()
+@pytest.mark.parametrize(
+    "bad_kwargs, msg_substr",
+    [
+        ({"ramp_limit": 1.1}, "ramp_limit"),
+        ({"ramp_freq": -1}, "ramp_freq"),
+    ],
+)
+def test_sink_bad_ramp_values_raise(bad_kwargs, msg_substr):
+    r = Resource(name="r")
+    init_kwargs = {"name": "sink", "consumes": r, "demand_profile": [1.0]}
+    init_kwargs.update(bad_kwargs)
+    with pytest.raises(ValueError) as exc:
+        Sink(**init_kwargs)
+    assert msg_substr in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_converter_with_valid_ramp_settings():
+    r1 = Resource(name="r1")
+    r2 = Resource(name="r2")
+    conv = Converter(
+        name="conv",
+        installed_capacity=1.0,
+        consumes=[r1],
+        produces=[r2],
+        capacity_resource=r1,
+        transfer_fn=RatioTransfer(input_resources={r1: 1.0}, output_resources={r2: 1.0}),
+        ramp_limit=0.4,
+        ramp_freq=2,
+    )
+    assert conv.ramp_limit == 0.4
+    assert conv.ramp_freq == 2
+
+
+@pytest.mark.unit()
 @pytest.mark.parametrize(
     "bad_kwargs, msg_substr",
     [
@@ -357,3 +425,25 @@ def test_storage_invalid_parameters_raise(bad_kwargs, msg_substr):
     with pytest.raises(ValueError) as exc:
         Storage(**init_kwargs)
     assert msg_substr in str(exc.value)
+
+
+@pytest.mark.unit()
+def test_storage_construction_without_optional_kwargs_does_not_raise():
+    """A bare Storage construction, with none of its optional kwargs set,
+    should always succeed. Storage has several fields it explicitly rejects
+    (e.g. ramp_limit/ramp_freq, which don't apply to it — see
+    _FlowRampMixin); none of those checks should ever fire just because an
+    optional field is sitting at its own default."""
+    r = Resource(name="stor_res_bare")
+    Storage(name="stor_bare", installed_capacity=10.0, resource=r)
+
+
+@pytest.mark.unit()
+@pytest.mark.parametrize("bad_kwarg", ["ramp_limit", "ramp_freq"])
+def test_storage_does_not_accept_ramp_kwargs(bad_kwarg):
+    """ramp_limit/ramp_freq apply to flow components (Source/Sink/Converter),
+    not Storage (see _FlowRampMixin) — Storage has no such fields, so passing
+    either is an unrecognized keyword argument."""
+    r = Resource(name="stor_ramp_bad")
+    with pytest.raises(TypeError):
+        Storage(name="stor_ramp_bad", installed_capacity=5.0, resource=r, **{bad_kwarg: 0.5})
