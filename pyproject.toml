@@ -25,9 +25,9 @@ classifiers = [
     "Intended Audience :: Science/Research"
 ]
 dependencies = [
-    "numpy>=2.2.5",
+    "numpy==1.26.*",
     "pandas>=2.2.3",
-    "pyomo>=6.9.2",
+    "pyomo==6.4.*",
 ]
 
 [project.urls]
