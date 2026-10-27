@@ -116,7 +116,7 @@ def test_with_no_cfs(generic_system_setup):
             "elec_storage_discharge": [0.0],
             "elec_sink_electricity_consumes": [-25.0],
             "net_cashflow": [0.0],
-            "objective": [0],
+            "objective": [0.0],
         }
     )
 

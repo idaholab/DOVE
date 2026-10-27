@@ -149,7 +149,7 @@ class PriceTakerBuilder(BaseModelBuilder):
                     )
 
         data["net_cashflow"] = net_cashflow
-        data["objective"] = [pyo.value(m.objective)]
+        data["objective"] = [float(pyo.value(m.objective))]
         return pd.DataFrame(data, index=T)
 
     def _add_sets(self) -> None:
