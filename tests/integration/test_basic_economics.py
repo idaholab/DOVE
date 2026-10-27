@@ -15,7 +15,12 @@ import dove.core as dc
 @pytest.fixture()
 def generic_system_setup():
     def _generic_system_setup(
-        source_cfs=None, converter_cfs=None, storage_cfs=None, sink_cfs=None, times=1
+        source_cfs=None,
+        converter_cfs=None,
+        storage_cfs=None,
+        sink_cfs=None,
+        times=1,
+        storage_initial_stored=0.0,
     ):
         # Creates a generic system that can be used for simple tests on economics edge cases
 
@@ -55,6 +60,15 @@ def generic_system_setup():
             "rte": 0.9,
             "max_charge_rate": 0.5,
             "max_discharge_rate": 0.5,
+            # Pinned explicitly by default (rather than left at the None/optimizer-chosen
+            # default) so the SOC trajectory below has a unique optimum -- without an explicit
+            # value, and with no cashflow attached to SOC/charge/discharge directly, the solver
+            # is free to place the periodic SOC "wraparound point" at any timestep with no
+            # change in objective value, which makes the exact per-timestep SOC values below
+            # non-reproducible across different solver builds. Pass
+            # storage_initial_stored=None to exercise that free-default behavior instead (see
+            # test_with_costs_only_and_free_initial_stored).
+            "initial_stored": storage_initial_stored,
         }
         if storage_cfs:
             stor_init_kwargs.update({"cashflows": storage_cfs})
@@ -138,6 +152,69 @@ def test_with_costs_only(generic_system_setup):
     )
 
     pd.testing.assert_frame_equal(results, expected, check_like=True, atol=1e-8)
+
+
+@pytest.mark.integration()
+def test_with_costs_only_and_free_initial_stored(generic_system_setup):
+    """
+    Same scenario as test_with_costs_only, but elec_storage's initial_stored is left at its
+    default (None / optimizer-chosen) instead of pinned to 0.0. Since no cashflow targets
+    elec_storage's SOC/charge/discharge directly, and the source's cost here has no real
+    per-timestep variation (an empty price_profile), there's no economic signal distinguishing
+    *when* storage charges/discharges or what SOC trajectory it follows -- many equally-optimal
+    schedules exist (same objective, same multiset of per-timestep net_cashflow values, just
+    permuted across timesteps). Different solver builds have been observed to land on
+    different, equally valid schedules here, so this test only asserts the columns that are
+    genuinely pinned down (non-storage production, objective) and separately verifies the
+    solver's actual storage trajectory is internally self-consistent, rather than asserting one
+    specific per-timestep charge/discharge/SOC trajectory.
+    """
+    times = 4
+
+    # Set up cashflows
+    source_cost = dc.Cost(name="steam_source_fuel_cost", price_profile=np.arange(1 + times, 1))
+    sink_cost = dc.Cost(name="export_cost", alpha=1)
+
+    # Create and solve system
+    sys = generic_system_setup(
+        source_cfs=[source_cost],
+        sink_cfs=[sink_cost],
+        times=times,
+        storage_initial_stored=None,
+    )
+    results = sys.solve("price_taker")
+    print(results)
+
+    # Check the columns that are genuinely pinned down regardless of which equally-optimal
+    # storage schedule the solver finds (non-storage flows and the objective).
+    expected = pd.DataFrame(
+        {
+            "steam_source_steam_produces": [50.0, 50.0, 50.0, 50.0],
+            "steam_to_elec_converter_electricity_produces": [25.0, 25.0, 25.0, 25.0],
+            "steam_to_elec_converter_steam_consumes": [-50.0, -50.0, -50.0, -50.0],
+            "objective": [-292.0, -292.0, -292.0, -292.0],
+        }
+    )
+    pd.testing.assert_frame_equal(results[expected.columns], expected, atol=1e-8)
+
+    # net_cashflow should sum to the same total regardless of per-timestep schedule.
+    assert abs(results["net_cashflow"].sum() - -292.0) < 1e-6
+
+    # Verify the SOC trajectory the solver actually returned is internally consistent with
+    # the storage balance recurrence, whatever specific schedule it happens to be.
+    storage = sys.comp_map["elec_storage"]
+    rte_sqrt = storage.rte**0.5
+    soc = results["elec_storage_SOC"].tolist()
+    charge = results["elec_storage_charge"].tolist()
+    discharge = results["elec_storage_discharge"].tolist()
+
+    prev_soc = soc[-1]  # periodic_level=True ties the wraparound point to soc[last]
+    for t in range(times):
+        expected_soc_t = prev_soc + charge[t] * rte_sqrt - discharge[t] / rte_sqrt
+        assert abs(expected_soc_t - soc[t]) < 1e-6, (
+            f"storage balance violated at t={t}: expected {expected_soc_t}, got {soc[t]}"
+        )
+        prev_soc = soc[t]
 
 
 @pytest.mark.integration()

@@ -331,9 +331,11 @@ def test_storage_default_capacity_and_valid_ranges():
     assert st.resource is r
     assert st.capacity_resource is r
     # default attributes are in [0,1]
-    for attr in ("rte", "max_charge_rate", "max_discharge_rate", "initial_stored"):
+    for attr in ("rte", "max_charge_rate", "max_discharge_rate"):
         val = getattr(st, attr)
         assert 0.0 <= val <= 1.0
+    # initial_stored defaults to None (optimizer-chosen), not a fixed value in [0,1]
+    assert st.initial_stored is None
 
 
 @pytest.mark.unit()

@@ -441,7 +441,16 @@ def test_add_constraints_adds_storage_balance_constraint(add_constraints_setup, 
     m = add_constraints_setup.model
 
     # Set up required vars for input
-    # Recall that default rte == 1.0; default initial_stored == 0.0
+    # Recall that default rte == 1.0; steam_storage initial_stored = 0.5, elec_storage initial_stored = 0.2
+    # initial_stored is now a free pyo.Var (optimizer-chosen by default) rather than a fixed
+    # component attribute, so it must be given a value here too, like charge/discharge/soc.
+    m.initial_stored.set_values(
+        {
+            "steam_storage": 0.5,
+            "elec_storage": 0.2,
+        }
+    )
+
     m.charge.set_values(
         {
             ("steam_storage", 0): 1.0,
@@ -590,6 +599,15 @@ def test_add_constraints_adds_periodic_storage_constraint(add_constraints_setup,
 
     # Set up required vars for input
     # Recall that steam storage initial_stored = 0.5; elec storage periodic_level = False
+    # initial_stored is now a free pyo.Var (optimizer-chosen by default) rather than a fixed
+    # component attribute, so it must be given a value here too, like soc.
+    m.initial_stored.set_values(
+        {
+            "steam_storage": 0.5,
+            "elec_storage": 0.2,
+        }
+    )
+
     m.soc.set_values(
         {
             ("steam_storage", 0): 0.0,
