@@ -18,11 +18,14 @@ Classes
 
 from __future__ import annotations
 
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from dove.models import BUILDER_REGISTRY
 
 from . import Component, Resource, Sink, Storage
+
+if TYPE_CHECKING:
+    from dove.models.base import BaseModelBuilder
 
 
 class System:
@@ -70,6 +73,8 @@ class System:
         self.dispatch_window = [0] if dispatch_window is None else dispatch_window
         self.comp_map: dict[str, Component] = {comp.name: comp for comp in self.components}
         self.res_map: dict[str, Resource] = {res.name: res for res in self.resources}
+
+        self._built_model: BaseModelBuilder | None = None
 
     @property
     def non_storage_comp_names(self) -> list[str]:
@@ -184,20 +189,37 @@ class System:
         if len(time_series_errors) > 0:
             raise ValueError(time_series_errors)
 
-    def build(self) -> None:
+    def build(self, model_type: str = "price_taker") -> BaseModelBuilder:
         """
         Build the system model.
 
-        This method is intended to construct the necessary optimization problem
-        based on the system configuration.
+        Parameters
+        ----------
+        model_type : str, default="price_taker"
+            The type of optimization model to use.
+
+        Returns
+        -------
+        BaseModelBuilder
+            The builder instance, holding the built model and ready to solve.
 
         Raises
         ------
-        NotImplementedError
-            This method is not yet implemented.
+        ValueError
+            If the specified model_type is not registered.
         """
-        # TODO: Implement the build method
-        raise NotImplementedError("System method 'build' is not yet implemented!")
+        self._validate()
+
+        try:
+            builder_cls = BUILDER_REGISTRY[model_type]
+        except KeyError as err:
+            raise ValueError(
+                f"Unknown model type: '{model_type}'! Available: {list(BUILDER_REGISTRY)}"
+            ) from err
+
+        builder = builder_cls(self)
+        self._built_model = cast("BaseModelBuilder", builder.build())
+        return self._built_model
 
     def solve(self, model_type: str = "price_taker", **kw: dict[str, Any]) -> Any:
         """
@@ -220,16 +242,7 @@ class System:
         ValueError
             If the specified model_type is not registered.
         """
-        self._validate()
+        built_model = self._built_model if self._built_model is not None else self.build(model_type)
 
-        try:
-            builder_cls = BUILDER_REGISTRY[model_type]
-        except KeyError as err:
-            raise ValueError(
-                f"Unknown model type: '{model_type}'! Available: {list(BUILDER_REGISTRY)}"
-            ) from err
-
-        builder = builder_cls(self)
-        builder.build()
-        builder.solve(**kw)
-        return builder.extract_results()
+        built_model.solve(**kw)
+        return built_model.extract_results()
