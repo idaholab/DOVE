@@ -21,12 +21,13 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import TypeAlias
+from typing import Literal, TypeAlias, get_args
 
 import numpy as np
 from numpy.typing import NDArray
 
 TimeDependent: TypeAlias = list[float] | NDArray[np.float64]
+DriverVar: TypeAlias = Literal["flow", "charge", "discharge", "soc"]
 
 
 @dataclass
@@ -55,6 +56,11 @@ class CashFlow(ABC):
         Flag indicating if the price is levelized, defaults to False. (Not Implemented)
     sign : int, optional
         Direction of the cash flow (positive or negative), defaults to 0.
+    driver_var : DriverVar, optional
+        Name of the model variable whose value drives this cash flow's dispatch quantity.
+        One of "flow", "charge", "discharge", or "soc". Defaults to "flow", which uses the
+        component's capacity resource flow. Storage components should set this to "charge",
+        "discharge", or "soc" as appropriate, since storage components have no "flow" variable.
     """
 
     name: str
@@ -64,6 +70,7 @@ class CashFlow(ABC):
     scalex: float = 1.0
     price_is_levelized: bool = False
     sign: int = 0
+    driver_var: DriverVar = "flow"
 
     def __post_init__(self) -> None:
         """
@@ -71,6 +78,13 @@ class CashFlow(ABC):
         """
         # Convert price_profile
         self.price_profile = np.asarray(self.price_profile, float).ravel()
+
+        allowed_driver_vars = get_args(DriverVar)
+        if self.driver_var not in allowed_driver_vars:
+            raise ValueError(
+                f"{self.name}: driver_var '{self.driver_var}' is not one of "
+                f"{allowed_driver_vars}."
+            )
 
     def evaluate(self, t: int, dispatch: float) -> float:
         """
