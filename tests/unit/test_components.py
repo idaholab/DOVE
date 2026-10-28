@@ -431,8 +431,8 @@ def test_storage_invalid_parameters_raise(bad_kwargs, msg_substr):
 def test_storage_construction_without_optional_kwargs_does_not_raise():
     """A bare Storage construction, with none of its optional kwargs set,
     should always succeed. Storage has several fields it explicitly rejects
-    (e.g. ramp_limit/ramp_freq, which don't apply to it — see
-    _FlowRampMixin); none of those checks should ever fire just because an
+    (e.g. ramp_limit/ramp_freq, inherited from Component but not applicable
+    to Storage); none of those checks should ever fire just because an
     optional field is sitting at its own default."""
     r = Resource(name="stor_res_bare")
     Storage(name="stor_bare", installed_capacity=10.0, resource=r)
@@ -442,8 +442,8 @@ def test_storage_construction_without_optional_kwargs_does_not_raise():
 @pytest.mark.parametrize("bad_kwarg", ["ramp_limit", "ramp_freq"])
 def test_storage_does_not_accept_ramp_kwargs(bad_kwarg):
     """ramp_limit/ramp_freq apply to flow components (Source/Sink/Converter),
-    not Storage (see _FlowRampMixin) — Storage has no such fields, so passing
-    either is an unrecognized keyword argument."""
+    not Storage. Storage inherits the fields from Component, so passing a
+    non-default value is explicitly rejected rather than raising TypeError."""
     r = Resource(name="stor_ramp_bad")
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="Unaccepted keyword argument"):
         Storage(name="stor_ramp_bad", installed_capacity=5.0, resource=r, **{bad_kwarg: 0.5})
