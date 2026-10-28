@@ -72,6 +72,13 @@ class Component(ABC):
         Economic cashflows associated with this component.
     transfer_fn : TransferFunc | None
         Function defining resource conversion logic.
+    ramp_limit : float
+        Maximum rate of change for the component's capacity
+        utilization between timesteps as a fraction of installed capacity.
+        Must be a value between 0 and 1. Default is 1.0 (no limit).
+    ramp_freq : int
+        Frequency at which ramp limitations are applied.
+        Default is 0 (every timestep).
 
     Notes
     -----
@@ -89,6 +96,8 @@ class Component(ABC):
     flexibility: Literal["flex", "fixed"] = "flex"
     cashflows: list[CashFlow] = field(default_factory=list)
     transfer_fn: TransferFunc | None = None
+    ramp_limit: float = 1.0
+    ramp_freq: int = 0
 
     @property
     def produces_by_name(self) -> list[str]:
@@ -115,6 +124,7 @@ class Component(ABC):
         8. Ensures capacity_resource is in either consumes or produces
         9. Checks that all cashflows are CashFlow instances
         10. Checks that the minimum activity of the component is less than the capacity by timestep
+        11. Validates ramp_limit and ramp_freq values
 
         Raises
         ------
@@ -130,6 +140,14 @@ class Component(ABC):
         self.min_capacity_factor = np.asarray(self.min_capacity_factor, float).ravel()
 
         self._validate_caps_and_mins()
+
+        # ramp_limit and ramp_freq
+        if not (0.0 <= self.ramp_limit <= 1.0):
+            raise ValueError(
+                f"{self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
+            )
+        if self.ramp_freq < 0:
+            raise ValueError(f"{self.name}: 'ramp_freq'={self.ramp_freq} must be positive")
 
         # flexibility
         if self.flexibility not in ("flex", "fixed"):
@@ -364,8 +382,7 @@ class Sink(Component):
         comp_init_kwargs.update(kwargs)
 
         if self.demand_profile is not None:
-            # installed_capacity should never be needed in the model if demand_profile is
-            # provided, but it's still required by the Component, so we'll give it a value
+            # assume that the installed capacity equals the max of the demand profile
             comp_init_kwargs.update({"installed_capacity": np.max(demand_profile)})  # type: ignore[arg-type]
 
         super().__init__(**comp_init_kwargs)  # type: ignore[arg-type]
@@ -493,13 +510,6 @@ class Converter(Component):
 
     Parameters
     ----------
-    ramp_limit : float
-        Maximum rate of change for the component's capacity
-        utilization between timesteps as a fraction of installed capacity.
-        Must be a value between 0 and 1. Default is 1.0 (no limit).
-    ramp_freq : int
-        Frequency at which ramp limitations are applied.
-        Default is 0 (every timestep).
     **kwargs : Any
         Additional keyword arguments to pass to the parent Component class.
 
@@ -509,17 +519,13 @@ class Converter(Component):
       the resource to which the capacity limits refer.
     """
 
-    ramp_limit: float = 1.0
-    ramp_freq: int = 0
-
     def __post_init__(self) -> None:
         """
         Perform post-initialization validation and setup.
 
         This method calls the parent class's post-initialization and then:
-        1. Validates ramp_limit and ramp_freq values
-        2. Raises error if capacity_resource or transfer_fn was not explicitly provided
-        3. Raises error if any resource is both an input and an output
+        1. Raises error if capacity_resource or transfer_fn was not explicitly provided
+        2. Raises error if any resource is both an input and an output
 
         Raises
         ------
@@ -527,14 +533,6 @@ class Converter(Component):
             If capacity_resource was not explicitly provided
         """
         super().__post_init__()
-        if not (0.0 <= self.ramp_limit <= 1.0):
-            raise ValueError(
-                f"Converter {self.name}: 'ramp_limit'={self.ramp_limit} is outside the range [0, 1].",
-            )
-        if self.ramp_freq < 0:
-            raise ValueError(
-                f"Converter {self.name}: 'ramp_freq'={self.ramp_freq} must be positive"
-            )
 
         for required_kwarg in ["capacity_resource", "transfer_fn"]:
             if not getattr(self, required_kwarg, None):
@@ -594,10 +592,14 @@ class Storage(Component):
 
     Notes
     -----
-    Storage components are treated differently from other components in terms of
-    capacity and resource management. They can store energy for later use,
-    and their operation is governed by the round-trip efficiency (rte) and
-    charge/discharge rates.
+    Storage is DOVE's "stock" component: unlike Source, Sink, and Converter
+    ("flow" components, each with one memoryless net flow per timestep),
+    Storage persists state (state-of-charge) across timesteps and exposes
+    two independent flows into/out of that state — charge and discharge —
+    each with its own rate limit (`max_charge_rate`/`max_discharge_rate`)
+    playing the same role `ramp_limit` plays for flow components. Storage
+    does not use `Component`'s `ramp_limit`/`ramp_freq`; those are rejected
+    the same way `produces`/`consumes`/`capacity_resource`/`transfer_fn` are.
     """
 
     resource: Resource
@@ -624,9 +626,22 @@ class Storage(Component):
             If 'flexibility' was set to 'fixed'
             If any of the rate parameters are outside the range [0, 1]
         """
-        # Error if unaccepted attribute was added
-        for bad_attr in ("produces", "consumes", "capacity_resource", "transfer_fn"):
+        # Error if unaccepted attribute was added. ramp_limit/ramp_freq are
+        # inherited from Component but don't apply to Storage, so they're
+        # checked against their Component-level defaults rather than truthiness.
+        for bad_attr in (
+            "produces",
+            "consumes",
+            "capacity_resource",
+            "transfer_fn",
+        ):
             if getattr(self, bad_attr):
+                raise ValueError(
+                    f"Unaccepted keyword argument '{bad_attr}' provided to Storage {self.name}. "
+                    "Please remove keyword argument."
+                )
+        for bad_attr, default in (("ramp_limit", 1.0), ("ramp_freq", 0)):
+            if getattr(self, bad_attr) != default:
                 raise ValueError(
                     f"Unaccepted keyword argument '{bad_attr}' provided to Storage {self.name}. "
                     "Please remove keyword argument."
