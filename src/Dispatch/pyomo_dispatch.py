@@ -9,7 +9,6 @@ import time as time_mod
 
 import numpy as np
 import pyomo.environ as pyo
-import pyutilib.subprocess.GlobalData
 from pyomo.opt import SolverStatus, TerminationCondition
 from ravenframework.utils import InputData, InputTypes
 
@@ -19,7 +18,13 @@ from .DispatchState import NumpyState
 from .PyomoModelHandler import PyomoModelHandler
 
 # allows pyomo to solve on threaded processes
-pyutilib.subprocess.GlobalData.DEFINE_SIGNAL_HANDLERS_DEFAULT = False
+# Only older pyomo (which used pyutilib to run solvers) has this setting; newer pyomo does not use
+# pyutilib, and pyutilib itself fails to import on Python 3.12 (it imports the removed "imp" module).
+try:
+  import pyutilib.subprocess.GlobalData
+  pyutilib.subprocess.GlobalData.DEFINE_SIGNAL_HANDLERS_DEFAULT = False
+except ImportError:
+  pass
 
 # different solvers express "tolerance" for converging solution in different
 # ways. Further, they mean different things for different solvers. This map

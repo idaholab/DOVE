@@ -1,6 +1,6 @@
 <dependencies>
   <main>
-    <pyomo source='forge'>6.4</pyomo>
+    <pyomo source='forge'>6.6</pyomo>
     <pyutilib source='forge'/>
     <glpk source='forge' skip_check='True'/>
     <ipopt source='forge' skip_check='True'/>
